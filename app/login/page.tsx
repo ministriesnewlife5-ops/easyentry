@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Facebook, Linkedin, Loader2, ArrowRight } from 'lucide-react';
-import { signIn } from 'next-auth/react';
+import { signIn, getSession } from 'next-auth/react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -113,7 +113,12 @@ export default function LoginPage() {
         setError(res.error);
         setIsLoading(false);
       } else {
-        router.push('/events');
+        const session = await getSession();
+        if (session?.user?.role === 'outlet') {
+          router.push('/outlet/profile');
+        } else {
+          router.push('/events');
+        }
         router.refresh();
       }
     } catch (err) {
@@ -139,7 +144,12 @@ export default function LoginPage() {
         setError(res.error);
         setIsLoading(false);
       } else {
-        router.push('/events');
+        const session = await getSession();
+        if (session?.user?.role === 'outlet') {
+          router.push('/outlet/profile');
+        } else {
+          router.push('/events');
+        }
         router.refresh();
       }
     } catch (err) {

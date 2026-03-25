@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Calendar, Tag, Mic, PartyPopper, Disc, Smile, Drama, Palette } from 'lucide-react';
+import { MapPin, Calendar, Tag, Mic, PartyPopper, Disc, Smile, Drama, Palette, Building2 } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -11,6 +11,7 @@ const mainFilters = [
   { name: 'DATE', icon: Calendar },
   { name: 'PRICE', icon: Tag },
   { name: 'ARTIST', icon: Tag, href: '/artist' },
+  { name: 'VENUES', icon: Building2, href: '/venues' },
 ];
 
 const categories = [
