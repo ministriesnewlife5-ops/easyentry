@@ -121,33 +121,33 @@ const DJLightingEffects = () => {
 const events = [
   {
     id: 1,
-    title: 'Namma Chennai Night with DJ Goutham',
-    date: '2026-07-01',
-    venue: 'Gatsby 2000',
+    title: 'Fusion Friday',
+    date: '2026-03-27',
+    venue: 'Sin and tonic',
     price: '₹1500',
     imageColor: 'bg-red-900',
     category: 'Commercial',
-    imageUrl: 'https://images.unsplash.com/photo-1514525253440-b393452e3726?auto=format&fit=crop&q=80&w=800'
+    imageUrl: '/sin1.png'
   },
   {
     id: 2,
-    title: 'Electronic City Beats | Night 2',
-    date: '2026-05-30',
-    venue: 'Pasha - The Park',
-    price: '₹2000',
-    imageColor: 'bg-green-900',
-    category: 'EDM',
-    imageUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&q=80&w=800'
+    title: 'Sinful Saturday',
+    date: '2026-07-01',
+    venue: 'Sin and tonic',
+    price: '₹1500',
+    imageColor: 'bg-red-900',
+    category: 'Commercial',
+    imageUrl: '/sin2.png'
   },
   {
     id: 3,
-    title: 'The Great Indian Party',
-    date: '2026-03-14',
-    venue: 'High - Radisson Blu',
-    price: '₹1200',
-    imageColor: 'bg-pink-600',
-    category: 'Bollywood',
-    imageUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=800'
+    title: 'Alternate Realm',
+    date: '2026-07-01',
+    venue: 'Sin and tonic',
+    price: '₹1500',
+    imageColor: 'bg-red-900',
+    category: 'Commercial',
+    imageUrl: '/sin3.png'
   },
   {
     id: 4,
@@ -159,46 +159,6 @@ const events = [
     category: 'Techno',
     imageUrl: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&q=80&w=800'
   },
-  {
-    id: 5,
-    title: 'Live Fusion Night',
-    date: '2026-06-12',
-    venue: 'Illusions - The Madras Pub',
-    price: '₹1000',
-    imageColor: 'bg-blue-800',
-    category: 'Live',
-    imageUrl: 'https://images.unsplash.com/photo-1459749411177-d4a428c3feae?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: 6,
-    title: 'South Side Groove Tour',
-    date: '2026-07-05',
-    venue: 'Q Bar - Hilton',
-    price: '₹2500',
-    imageColor: 'bg-yellow-700',
-    category: 'Funk',
-    imageUrl: 'https://images.unsplash.com/photo-1574391884720-2e45599e9633?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: 7,
-    title: 'The Underground Session',
-    date: '2026-09-19',
-    venue: 'The Slate Hotels',
-    price: '₹1500',
-    imageColor: 'bg-purple-900',
-    category: 'Techno',
-    imageUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: 8,
-    title: 'Retro Night Specials',
-    date: '2026-10-22',
-    venue: '10 Downing Street',
-    price: '₹800',
-    imageColor: 'bg-indigo-800',
-    category: 'Indie',
-    imageUrl: 'https://images.unsplash.com/photo-1533174072545-e8d4aa97d890?auto=format&fit=crop&q=80&w=800'
-  }
 ];
 
 export default function Home() {

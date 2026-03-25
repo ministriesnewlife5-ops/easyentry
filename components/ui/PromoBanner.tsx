@@ -10,10 +10,10 @@ const promoSlides = [
     id: 1,
     tag: 'New Feature',
     title: "Find Chennai's hottest shows",
-    description: 'Discover the best DJ nights at Gatsby, Pasha, and more. Connect your music for personalized alerts.',
-    image: 'https://images.unsplash.com/photo-1574391884720-2e45599e9633?auto=format&fit=crop&q=80&w=800',
+    description: 'Discover the best DJ nights at Sin and Tonic, Pasha, and more. Connect your music for personalized alerts.',
+    image: '/ban1.jpg',
     buttons: [
-      { label: 'SPOTIFY', color: 'bg-white text-black' },
+      { label: 'Learn More', color: 'bg-white text-black' },
     ]
   },
   {
@@ -21,7 +21,7 @@ const promoSlides = [
     tag: 'Exclusive',
     title: 'Experience Madras Nightlife',
     description: 'From ECR raves to rooftop parties in OMR, find your vibe in the city.',
-    image: 'https://images.unsplash.com/photo-1514525253440-b393452e3726?auto=format&fit=crop&q=80&w=800',
+    image: '/ban2.jpg',
     buttons: [
       { label: 'EXPLORE EVENTS', color: 'bg-[#E5A823] text-black' }
     ]
