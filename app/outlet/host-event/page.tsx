@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { Calendar, Clock3, ImageIcon, IndianRupee, Info, MapPin, Sparkles, Ticket, Upload, X } from 'lucide-react';
+import { Calendar, Clock3, ImageIcon, IndianRupee, Info, MapPin, Sparkles, Ticket, Upload, X, Loader2 } from 'lucide-react';
 import { saveHostedEvent } from '@/lib/hosted-events';
 
 type EventTemplate = {
@@ -83,6 +83,8 @@ export default function OutletHostEventPage() {
   const { data: session, status } = useSession();
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [eventImages, setEventImages] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [eventData, setEventData] = useState({
     title: '',
     subtitle: '',
@@ -151,22 +153,76 @@ export default function OutletHostEventPage() {
     setEventImages((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const createdEvent = {
-      id: Date.now(),
-      title: eventData.title,
-      date: eventData.date,
-      venue: eventData.venue,
-      price: eventData.price,
-      imageColor: 'bg-[#2A2A2A]',
-      category: eventData.category || 'Live',
-      imageUrl: eventData.image,
-      createdAt: Date.now(),
-    };
-    saveHostedEvent(createdEvent);
-    alert('Event submitted and added to Popular Events.');
-    router.push('/events');
+    setIsSubmitting(true);
+    setSubmitMessage(null);
+
+    try {
+      const response = await fetch('/api/admin/event-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventData: {
+            title: eventData.title,
+            subtitle: eventData.subtitle,
+            date: eventData.date,
+            time: eventData.time,
+            venue: eventData.venue,
+            category: eventData.category,
+            price: eventData.price,
+            image: eventData.image,
+            description: eventData.description,
+            fullDescription: eventData.fullDescription,
+            gatesOpen: eventData.gatesOpen,
+            entryAge: eventData.entryAge,
+            layout: eventData.layout,
+            seating: eventData.seating,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        setSubmitMessage({ 
+          type: 'success', 
+          text: 'Event request submitted successfully! Waiting for admin approval.' 
+        });
+        // Reset form after successful submission
+        setEventData({
+          title: '',
+          subtitle: '',
+          date: '',
+          time: '',
+          venue: '',
+          category: '',
+          price: '',
+          image: '',
+          description: '',
+          fullDescription: '',
+          gatesOpen: '',
+          entryAge: '21+',
+          layout: 'Indoor Club',
+          seating: 'Standing',
+        });
+        setSelectedTemplate('');
+        setEventImages([]);
+      } else {
+        const errorData = await response.json();
+        setSubmitMessage({ 
+          type: 'error', 
+          text: errorData.error || 'Failed to submit event request' 
+        });
+      }
+    } catch (error) {
+      setSubmitMessage({ 
+        type: 'error', 
+        text: 'An error occurred while submitting the request' 
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (status === 'loading') {
@@ -326,10 +382,22 @@ export default function OutletHostEventPage() {
               </div>
             </div>
 
-            <div className="flex justify-end">
-              <button type="submit" className="rounded-lg bg-[#E5A823] px-6 py-3 font-bold text-[#0D0D0D] hover:bg-[#F5C542] transition-colors">
-                Save Event Draft
-              </button>
+            <div className="space-y-4">
+              {submitMessage && (
+                <div className={`rounded-lg px-4 py-3 ${submitMessage.type === 'success' ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-[#EB4D4B]/10 border border-[#EB4D4B]/20 text-[#EB4D4B]'}`}>
+                  <p className="text-sm">{submitMessage.text}</p>
+                </div>
+              )}
+              <div className="flex justify-end">
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="rounded-lg bg-[#E5A823] px-6 py-3 font-bold text-[#0D0D0D] hover:bg-[#F5C542] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isSubmitting ? 'Submitting...' : 'Submit Event Request'}
+                </button>
+              </div>
             </div>
           </form>
         </div>

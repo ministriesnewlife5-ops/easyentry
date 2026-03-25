@@ -180,7 +180,7 @@ export default function Navigation() {
 
                           {session?.user?.role === 'outlet' && (
                             <Link
-                              href="/outlet/host-event"
+                              href="/seller-form"
                               className="flex items-center gap-3 px-4 py-3 hover:bg-[#E5A823]/10 transition-colors group border-t border-[#2A2A2A]"
                             >
                               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#2A2A2A] border border-[#2A2A2A] group-hover:bg-[#E5A823]/20 group-hover:border-[#E5A823] transition-all">

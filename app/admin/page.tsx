@@ -1,9 +1,10 @@
-import { BarChart3, CalendarDays, CircleCheckBig, ImageIcon, IndianRupee, Mic2, Settings, Ticket, TrendingUp, Users, Megaphone } from 'lucide-react';
+import { BarChart3, CalendarDays, CircleCheckBig, ImageIcon, IndianRupee, Mic2, Settings, Ticket, TrendingUp, Users, Megaphone, FileText } from 'lucide-react';
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth-options';
 import Link from 'next/link';
 import SettingsContent from '@/components/SettingsContent';
+import EventRequestsSection from '@/components/EventRequestsSection';
 
 const stats = [
   { label: 'Revenue this month', value: '₹4.82L', delta: '↑ 24% vs last month', icon: IndianRupee },
@@ -213,6 +214,10 @@ export default async function AdminPage({
               <Users className="h-4 w-4" />
               Customers
             </button>
+            <Link href="/admin?section=requests" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'requests' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
+              <FileText className="h-4 w-4" />
+              Event Requests
+            </Link>
             <Link href="/admin?section=settings" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'settings' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
               <Settings className="h-4 w-4" />
               Settings
@@ -233,6 +238,7 @@ export default async function AdminPage({
                    activeSection === 'events' ? 'All Platform Events' : 
                    activeSection === 'artists' ? 'All Enrolled Artists' :
                    activeSection === 'influencers' ? 'All Influencers' :
+                   activeSection === 'requests' ? 'Event Requests' :
                    activeSection === 'settings' ? 'Settings' :
                    'Good evening, Pasha'}
                 </h1>
@@ -241,6 +247,7 @@ export default async function AdminPage({
                    activeSection === 'events' ? `Manage and view all ${allWebsiteEvents.length} events across the platform` : 
                    activeSection === 'artists' ? `Manage and view all ${allEnrolledArtists.length} artists enrolled on the platform` :
                    activeSection === 'influencers' ? `Manage and view all ${allInfluencers.length} influencers collaborating on the platform` :
+                   activeSection === 'requests' ? 'Review and approve event requests from outlet providers' :
                    activeSection === 'settings' ? 'Manage your account settings and security' :
                    `Thursday, 20 March 2026 · ${upcomingEvents.length} events this week`}
                 </p>
@@ -409,6 +416,8 @@ export default async function AdminPage({
                 </form>
               </div>
             </article>
+          ) : activeSection === 'requests' ? (
+            <EventRequestsSection />
           ) : activeSection === 'settings' ? (
             <SettingsContent userEmail={session?.user?.email} />
           ) : (

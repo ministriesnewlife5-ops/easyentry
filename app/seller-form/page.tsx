@@ -45,6 +45,12 @@ export default function SellerFormPage() {
     discountPercent: ''
   });
   const [promoRequests, setPromoRequests] = useState<Array<{ id: number; eventTitle: string; code: string; status: string }>>([]);
+  const [pricing, setPricing] = useState({
+    ticket: 0,
+    platformFee: 5,
+    artistShare: 4,
+    discount: 0
+  });
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -231,6 +237,165 @@ export default function SellerFormPage() {
                           step="0.01"
                           required
                         />
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <div className="bg-[#0F0F0F] rounded-2xl p-6 border border-[#2A2A2A]">
+                        <h4 className="text-base font-bold text-[#F5F5DC] mb-1">Per-ticket Money Flow</h4>
+                        <p className="text-xs text-[#F5F5DC]/50 mb-6">Preview the split for one ticket</p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-5">
+                            <div>
+                              <label className="block text-xs font-medium mb-2 text-[#F5F5DC]/70">Ticket price (₹)</label>
+                              <div className="relative">
+                                <DollarSign className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
+                                <input
+                                  type="number"
+                                  value={pricing.ticket}
+                                  onChange={(e) => {
+                                    const v = Math.max(0, Number(e.target.value));
+                                    setPricing((p) => ({ ...p, ticket: v }));
+                                    setFormData((prev) => ({ ...prev, price: String(v) }));
+                                  }}
+                                  className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                  placeholder="0"
+                                  min={0}
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="flex items-center justify-between text-xs font-medium mb-2 text-[#F5F5DC]/70">
+                                <span>Platform fee (%)</span>
+                                <span className="text-[#E5A823] font-bold">{pricing.platformFee.toFixed(1)}%</span>
+                              </label>
+                              <input
+                                type="range"
+                                min={0}
+                                max={15}
+                                step={0.5}
+                                value={pricing.platformFee}
+                                onChange={(e) => setPricing((p) => ({ ...p, platformFee: Number(e.target.value) }))}
+                                className="w-full accent-[#E5A823]"
+                              />
+                            </div>
+                            <div>
+                              <label className="flex items-center justify-between text-xs font-medium mb-2 text-[#F5F5DC]/70">
+                                <span>Artist revenue share (%)</span>
+                                <span className="text-[#E5A823] font-bold">{pricing.artistShare.toFixed(1)}%</span>
+                              </label>
+                              <input
+                                type="range"
+                                min={0}
+                                max={50}
+                                step={0.5}
+                                value={pricing.artistShare}
+                                onChange={(e) => setPricing((p) => ({ ...p, artistShare: Number(e.target.value) }))}
+                                className="w-full accent-[#E5A823]"
+                              />
+                            </div>
+                            <div>
+                              <label className="flex items-center justify-between text-xs font-medium mb-2 text-[#F5F5DC]/70">
+                                <span>Customer discount (%)</span>
+                                <span className="text-[#E5A823] font-bold">{pricing.discount.toFixed(1)}%</span>
+                              </label>
+                              <input
+                                type="range"
+                                min={0}
+                                max={50}
+                                step={0.5}
+                                value={pricing.discount}
+                                onChange={(e) => setPricing((p) => ({ ...p, discount: Number(e.target.value) }))}
+                                className="w-full accent-[#E5A823]"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            {(() => {
+                              const gross = pricing.ticket || 0;
+                              const discountAmt = gross * (pricing.discount / 100);
+                              const customerPays = Math.max(gross - discountAmt, 0);
+                              const pgFee = customerPays * 0.03 + (customerPays > 0 ? 3 : 0);
+                              const platformFeeAmt = customerPays * (pricing.platformFee / 100);
+                              const artistAmt = gross * (pricing.artistShare / 100);
+                              const outletNet = Math.max(customerPays - pgFee - platformFeeAmt - artistAmt, 0);
+                              const fmt = (n: number) => `₹${n.toFixed(0)}`;
+                              const totalBar = Math.max(customerPays, 1);
+                              const w = (n: number) => `${Math.max(0, Math.min(100, (n / totalBar) * 100))}%`;
+                              return (
+                                <>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
+                                      <div className="text-xs text-[#F5F5DC]/50">Customer</div>
+                                      <div className="text-2xl font-black text-[#F5F5DC] mt-1">{fmt(customerPays)}</div>
+                                      <div className="text-[10px] text-[#F5F5DC]/40 mt-1">full price</div>
+                                    </div>
+                                    <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
+                                      <div className="text-xs text-[#F5F5DC]/50">Outlet</div>
+                                      <div className="text-2xl font-black text-[#F5F5DC] mt-1">{fmt(outletNet)}</div>
+                                      <div className="text-[10px] text-[#F5F5DC]/40 mt-1">bears artist share</div>
+                                    </div>
+                                    <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
+                                      <div className="text-xs text-[#F5F5DC]/50">Artist</div>
+                                      <div className="text-xl font-black text-[#F5F5DC] mt-1">{fmt(artistAmt)}</div>
+                                      <div className="text-[10px] text-[#F5F5DC]/40 mt-1">no code used</div>
+                                    </div>
+                                    <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
+                                      <div className="text-xs text-[#F5F5DC]/50">Razorpay</div>
+                                      <div className="text-xl font-black text-[#F5F5DC] mt-1">{fmt(pgFee)}</div>
+                                      <div className="text-[10px] text-[#F5F5DC]/40 mt-1">3% + ₹3 txn</div>
+                                    </div>
+                                    <div className="col-span-2 rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
+                                      <div className="flex items-center justify-between text-xs text-[#F5F5DC]/50">
+                                        <span>Platform</span>
+                                        <span className="text-[#F5F5DC] font-semibold">{fmt(platformFeeAmt)}</span>
+                                      </div>
+                                      <div className="mt-2 h-1.5 rounded bg-[#2A2A2A] overflow-hidden">
+                                        <div className="h-full bg-gradient-to-r from-[#E5A823] to-[#EB4D4B]" style={{ width: w(platformFeeAmt) }} />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4 space-y-2">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-[#F5F5DC]/60">Customer pays</span>
+                                      <span className="text-[#F5F5DC] font-semibold">{fmt(customerPays)}</span>
+                                    </div>
+                                    <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
+                                      <div className="h-full bg-[#E5A823]" style={{ width: w(customerPays) }} />
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-xs pt-2">
+                                      <span className="text-[#F5F5DC]/60">Razorpay</span>
+                                      <span className="text-[#F5F5DC] font-semibold">-{fmt(pgFee)}</span>
+                                    </div>
+                                    <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
+                                      <div className="h-full bg-[#EB4D4B]" style={{ width: w(pgFee) }} />
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-xs pt-2">
+                                      <span className="text-[#F5F5DC]/60">Platform fee</span>
+                                      <span className="text-[#F5F5DC] font-semibold">-{fmt(platformFeeAmt)}</span>
+                                    </div>
+                                    <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
+                                      <div className="h-full bg-[#7C6F3E]" style={{ width: w(platformFeeAmt) }} />
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-xs pt-2">
+                                      <span className="text-[#F5F5DC]/60">Outlet net</span>
+                                      <span className="text-[#F5F5DC] font-semibold">{fmt(outletNet)}</span>
+                                    </div>
+                                    <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
+                                      <div className="h-full bg-[#3E83B6]" style={{ width: w(outletNet) }} />
+                                    </div>
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
