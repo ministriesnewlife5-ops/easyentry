@@ -36,7 +36,7 @@ const upcomingEvents = [
     date: '2026-03-27', 
     time: '20:00', 
     price: '₹1500',
-    image: '/images/sin1.png'
+    image: '/images/sin1.jpg'
   },
   { 
     id: 2, 
@@ -44,7 +44,7 @@ const upcomingEvents = [
     date: '2026-03-28', 
     time: '21:00', 
     price: '₹2000',
-    image: '/images/sin2.png'
+    image: '/images/sin2.jpg'
   },
   { 
     id: 3, 
@@ -52,7 +52,7 @@ const upcomingEvents = [
     date: '2026-03-29', 
     time: '19:30', 
     price: '₹500',
-    image: '/images/sin3.png'
+    image: '/images/sin3.jpg'
   },
 ];
 
