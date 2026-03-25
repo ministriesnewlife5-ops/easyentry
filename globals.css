@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand Colors */
+  --color-midnight: #0D0D0D;
+  --color-velvet-gold: #E5A823;
+  --color-neon-coral: #EB4D4B;
+  --color-cream: #F5F5DC;
+  --color-charcoal: #2A2A2A;
+  
+  /* Legacy neon colors - keeping for compatibility */
+  --color-neon-pink: #EB4D4B;
+  --color-neon-blue: #E5A823;
+  --color-neon-purple: #E5A823;
+  --color-neon-green: #F5F5DC;
+  
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-float: float 6s ease-in-out infinite;
+}
+
+:root {
+  --background: #0D0D0D;
+  --foreground: #F5F5DC;
+  --velvet-gold: #E5A823;
+  --neon-coral: #EB4D4B;
+  --charcoal: #2A2A2A;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0D0D0D;
+    --foreground: #F5F5DC;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+@layer utilities {
+  .text-velvet-gold {
+    color: var(--color-velvet-gold);
+  }
+  
+  .text-neon-coral {
+    color: var(--color-neon-coral);
+  }
+  
+  .text-cream {
+    color: var(--color-cream);
+  }
+  
+  .bg-midnight {
+    background-color: var(--color-midnight);
+  }
+  
+  .bg-charcoal {
+    background-color: var(--color-charcoal);
+  }
+  
+  .border-velvet-gold {
+    border-color: var(--color-velvet-gold);
+  }
+  
+  .border-neon-coral {
+    border-color: var(--color-neon-coral);
+  }
+
+  /* Legacy classes mapped to brand colors */
+  .text-neon-pink {
+    color: var(--color-neon-coral);
+  }
+  
+  .text-neon-blue {
+    color: var(--color-velvet-gold);
+  }
+
+  .text-neon-purple {
+    color: var(--color-velvet-gold);
+  }
+
+  .text-neon-green {
+    color: var(--color-cream);
+  }
+
+  .box-neon-pink {
+    border: 1px solid var(--color-neon-coral);
+  }
+
+  .box-neon-blue {
+    border: 1px solid var(--color-velvet-gold);
+  }
+}
+
+/* Hide scrollbar globally for elements with this class */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}

@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@theme {
+  --color-neon-pink: #ff00ff;
+  --color-neon-blue: #00ffff;
+  --color-neon-purple: #bd00ff;
+  --color-neon-green: #00ff00;
+  
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-float: float 6s ease-in-out infinite;
+}
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #050505;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-dm-sans), Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+@layer utilities {
+  .font-bebas {
+    font-family: var(--font-bebas-neue), sans-serif;
+  }
+  .font-dm {
+    font-family: var(--font-dm-sans), sans-serif;
+  }
+  .font-space {
+    font-family: var(--font-space-mono), monospace;
+  }
+  
+  .text-neon-pink {
+    color: var(--color-neon-pink);
+  }
+  
+  .text-neon-blue {
+    color: var(--color-neon-blue);
+  }
+
+  .text-neon-purple {
+    color: var(--color-neon-purple);
+  }
+
+  .text-neon-green {
+    color: var(--color-neon-green);
+  }
+
+  .box-neon-pink {
+    border: 1px solid var(--color-neon-pink);
+  }
+
+  .box-neon-blue {
+    border: 1px solid var(--color-neon-blue);
+  }
+
+  /* Hide scrollbar utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
