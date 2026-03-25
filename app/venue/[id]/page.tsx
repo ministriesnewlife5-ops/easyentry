@@ -8,6 +8,7 @@ import {
   Calendar, Music, Star, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 
 type Venue = {
@@ -35,7 +36,7 @@ const upcomingEvents = [
     date: '2026-03-27', 
     time: '20:00', 
     price: '₹1500',
-    image: '/sin1.png'
+    image: '/images/sin1.png'
   },
   { 
     id: 2, 
@@ -43,7 +44,7 @@ const upcomingEvents = [
     date: '2026-03-28', 
     time: '21:00', 
     price: '₹2000',
-    image: '/sin2.png'
+    image: '/images/sin2.png'
   },
   { 
     id: 3, 
@@ -51,7 +52,7 @@ const upcomingEvents = [
     date: '2026-03-29', 
     time: '19:30', 
     price: '₹500',
-    image: '/sin3.png'
+    image: '/images/sin3.png'
   },
 ];
 
@@ -121,10 +122,14 @@ export default function VenueProfilePage() {
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">
       {/* Cover Image */}
       <div className="relative h-72 md:h-96">
-        <img
+        <Image
           src={venue.coverImage || venue.imageUrl || 'https://images.unsplash.com/photo-1571266028243-e4733b0f0bb0?auto=format&fit=crop&q=80&w=1200'}
           alt={venue.venueName}
-          className="w-full h-full object-cover"
+          fill
+          className="object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1571266028243-e4733b0f0bb0?auto=format&fit=crop&q=80&w=1200';
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0D0D0D] via-[#0D0D0D]/50 to-transparent" />
         
@@ -158,10 +163,14 @@ export default function VenueProfilePage() {
             transition={{ duration: 0.5 }}
             className="relative w-40 h-40 rounded-2xl overflow-hidden border-4 border-[#0D0D0D] bg-[#1A1A1A]"
           >
-            <img
+            <Image
               src={venue.imageUrl || 'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?auto=format&fit=crop&q=80&w=800'}
               alt={venue.venueName}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?auto=format&fit=crop&q=80&w=800';
+              }}
             />
           </motion.div>
 
@@ -392,10 +401,14 @@ export default function VenueProfilePage() {
                   className="bg-[#1A1A1A] rounded-2xl overflow-hidden border border-[#2A2A2A] hover:border-[#E5A823]/50 transition-colors"
                 >
                   <div className="relative h-40 bg-[#0D0D0D]">
-                    <img 
+                    <Image 
                       src={event.image} 
-                      alt={event.title} 
-                      className="w-full h-full object-cover"
+                      alt={event.title}
+                      fill
+                      className="object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1571266028243-e4733b0f0bb0?auto=format&fit=crop&q=80&w=800';
+                      }}
                     />
                     <div className="absolute top-3 right-3 px-3 py-1 bg-[#E5A823] text-[#0D0D0D] text-sm font-bold rounded-full">
                       {event.price}
