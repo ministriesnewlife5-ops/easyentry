@@ -18,7 +18,9 @@ import {
   Edit2,
   Camera,
   Star,
-  CheckCircle2
+  CheckCircle2,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import Navigation from '@/components/ui/Navigation';
 import Footer from '@/components/ui/Footer';
@@ -45,8 +47,14 @@ export default function SellerFormPage() {
     discountPercent: ''
   });
   const [promoRequests, setPromoRequests] = useState<Array<{ id: number; eventTitle: string; code: string; status: string }>>([]);
+  const [ticketCategories, setTicketCategories] = useState<Array<{ id: string; name: string; price: number }>>([
+    { id: 'female', name: 'FEMALE', price: 799 },
+    { id: 'male', name: 'MALE', price: 1399 },
+    { id: 'couple', name: 'COUPLE', price: 1599 }
+  ]);
+  const [previewCategoryId, setPreviewCategoryId] = useState<string>('female');
   const [pricing, setPricing] = useState({
-    ticket: 0,
+    ticket: 799,
     platformFee: 5,
     artistShare: 4,
     discount: 0
@@ -124,6 +132,11 @@ export default function SellerFormPage() {
     alert('Event created successfully!');
     // Handle API submission here
   };
+
+  const previewPriceValue =
+    ticketCategories.length > 0
+      ? Math.min(...ticketCategories.map((c) => Number(c.price) || 0))
+      : Number(formData.price || 0);
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">
@@ -223,20 +236,74 @@ export default function SellerFormPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-3">Ticket Price (€) *</label>
-                      <div className="relative">
-                        <DollarSign className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
-                        <input
-                          type="number"
-                          name="price"
-                          value={formData.price}
-                          onChange={handleInputChange}
-                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                          placeholder="0.00"
-                          min="0"
-                          step="0.01"
-                          required
-                        />
+                      <label className="block text-sm font-medium mb-3">Ticket Categories *</label>
+                      <div className="space-y-3">
+                        {ticketCategories.map((cat, idx) => (
+                          <div key={cat.id} className="flex items-center gap-3">
+                            <input
+                              type="text"
+                              value={cat.name}
+                              onChange={(e) => {
+                                const v = e.target.value.toUpperCase();
+                                setTicketCategories((prev) =>
+                                  prev.map((c) => (c.id === cat.id ? { ...c, name: v } : c))
+                                );
+                              }}
+                              className="flex-1 bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                              placeholder="Category name"
+                              required
+                            />
+                            <div className="relative w-40">
+                              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/50" />
+                              <input
+                                type="number"
+                                value={cat.price}
+                                onChange={(e) => {
+                                  const price = Math.max(0, Number(e.target.value));
+                                  setTicketCategories((prev) =>
+                                    prev.map((c) => (c.id === cat.id ? { ...c, price } : c))
+                                  );
+                                  if (cat.id === previewCategoryId) {
+                                    setPricing((p) => ({ ...p, ticket: price }));
+                                  }
+                                }}
+                                className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-9 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                placeholder="0"
+                                min={0}
+                                step={0.01}
+                                required
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTicketCategories((prev) => prev.filter((c) => c.id !== cat.id));
+                                if (previewCategoryId === cat.id && ticketCategories.length > 1) {
+                                  const next = ticketCategories.find((c) => c.id !== cat.id);
+                                  if (next) {
+                                    setPreviewCategoryId(next.id);
+                                    setPricing((p) => ({ ...p, ticket: next.price }));
+                                  }
+                                }
+                              }}
+                              disabled={ticketCategories.length <= 1}
+                              className="p-2 rounded-lg border border-[#2A2A2A] hover:border-[#EB4D4B] hover:bg-[#EB4D4B]/10 disabled:opacity-40"
+                            >
+                              <Trash2 className="w-4 h-4 text-[#F5F5DC]/70" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const id = Math.random().toString(36).slice(2);
+                            setTicketCategories((prev) => [...prev, { id, name: 'NEW', price: 0 }]);
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#2A2A2A] text-sm hover:border-[#E5A823]"
+                        >
+                          <Plus className="w-4 h-4 text-[#E5A823]" />
+                          Add category
+                        </button>
                       </div>
                     </div>
 
@@ -248,6 +315,25 @@ export default function SellerFormPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-5">
                             <div>
+                              <label className="block text-xs font-medium mb-2 text-[#F5F5DC]/70">Preview category</label>
+                              <select
+                                value={previewCategoryId}
+                                onChange={(e) => {
+                                  const id = e.target.value;
+                                  setPreviewCategoryId(id);
+                                  const cat = ticketCategories.find((c) => c.id === id);
+                                  if (cat) setPricing((p) => ({ ...p, ticket: cat.price }));
+                                }}
+                                className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                              >
+                                {ticketCategories.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
                               <label className="block text-xs font-medium mb-2 text-[#F5F5DC]/70">Ticket price (₹)</label>
                               <div className="relative">
                                 <DollarSign className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
@@ -257,7 +343,9 @@ export default function SellerFormPage() {
                                   onChange={(e) => {
                                     const v = Math.max(0, Number(e.target.value));
                                     setPricing((p) => ({ ...p, ticket: v }));
-                                    setFormData((prev) => ({ ...prev, price: String(v) }));
+                                    setTicketCategories((prev) =>
+                                      prev.map((c) => (c.id === previewCategoryId ? { ...c, price: v } : c))
+                                    );
                                   }}
                                   className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                                   placeholder="0"
@@ -695,7 +783,7 @@ export default function SellerFormPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-[#F5F5DC]/60">Price</span>
                       <span className="font-medium text-[#E5A823]">
-                        €{formData.price || '0.00'}
+                        ₹{previewPriceValue.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">

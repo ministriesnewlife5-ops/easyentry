@@ -29,9 +29,30 @@ type Venue = {
 
 // Sample upcoming events at this venue
 const upcomingEvents = [
-  { id: 1, title: 'Friday Night Live', date: '2026-04-15', time: '20:00', price: '₹1500' },
-  { id: 2, title: 'DJ Night Special', date: '2026-04-16', time: '21:00', price: '₹2000' },
-  { id: 3, title: 'Comedy Open Mic', date: '2026-04-18', time: '19:30', price: '₹500' },
+  { 
+    id: 1, 
+    title: 'Fusion Friday', 
+    date: '2026-03-27', 
+    time: '20:00', 
+    price: '₹1500',
+    image: '/sin1.png'
+  },
+  { 
+    id: 2, 
+    title: 'Sinful Saturday', 
+    date: '2026-03-28', 
+    time: '21:00', 
+    price: '₹2000',
+    image: '/sin2.png'
+  },
+  { 
+    id: 3, 
+    title: 'Alternate Realm', 
+    date: '2026-03-29', 
+    time: '19:30', 
+    price: '₹500',
+    image: '/sin3.png'
+  },
 ];
 
 export default function VenueProfilePage() {
@@ -368,25 +389,32 @@ export default function VenueProfilePage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A] hover:border-[#E5A823]/50 transition-colors"
+                  className="bg-[#1A1A1A] rounded-2xl overflow-hidden border border-[#2A2A2A] hover:border-[#E5A823]/50 transition-colors"
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 bg-[#E5A823]/20 rounded-xl flex items-center justify-center">
-                      <Calendar className="w-6 h-6 text-[#E5A823]" />
-                    </div>
-                    <span className="px-3 py-1 bg-[#E5A823] text-[#0D0D0D] text-sm font-bold rounded-full">
+                  <div className="relative h-40 bg-[#0D0D0D]">
+                    <img 
+                      src={event.image} 
+                      alt={event.title} 
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-3 right-3 px-3 py-1 bg-[#E5A823] text-[#0D0D0D] text-sm font-bold rounded-full">
                       {event.price}
-                    </span>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold text-[#F5F5DC] mb-2">{event.title}</h3>
-                  <p className="text-sm text-[#F5F5DC]/60 mb-4">{event.date} • {event.time}</p>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full py-3 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-xl"
-                  >
-                    Book Tickets
-                  </motion.button>
+                  <div className="p-6">
+                    <h3 className="text-lg font-bold text-[#F5F5DC] mb-1">{event.title}</h3>
+                    <div className="flex items-center gap-2 text-sm text-[#F5F5DC]/60 mb-4">
+                      <Calendar className="w-4 h-4 text-[#E5A823]" />
+                      <span>{event.date} • {event.time}</span>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="w-full py-3 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-xl"
+                    >
+                      Book Tickets
+                    </motion.button>
+                  </div>
                 </motion.div>
               ))}
             </div>
