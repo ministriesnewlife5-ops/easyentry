@@ -131,7 +131,9 @@ export default function OutletProfilePage() {
   const fetchOutletEvents = useCallback(async () => {
     try {
       setIsEventsLoading(true);
-      const response = await fetch('/api/outlet/events');
+      const response = await fetch('/api/outlet/events', {
+        cache: 'no-store',
+      });
       const data = await response.json();
 
       if (!response.ok) {

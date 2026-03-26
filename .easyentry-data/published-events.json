@@ -1,0 +1,73 @@
+[
+  {
+    "id": "hosted-req-1774489419172-ldfaum2y6",
+    "title": "faithful Friday",
+    "subtitle": "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.",
+    "date": "2026-04-05",
+    "time": "07:18",
+    "venue": "Chennai, Tamil Nadu",
+    "distance": "Newly approved event",
+    "gatesOpen": "07:18",
+    "price": "₹1999",
+    "priceSubtext": "onwards",
+    "image": "blob:http://localhost:5000/8e663099-5694-4615-ba17-6eec3b4d4967",
+    "images": [
+      "blob:http://localhost:5000/8e663099-5694-4615-ba17-6eec3b4d4967"
+    ],
+    "description": "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.\n\n",
+    "fullDescription": "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.\n\n",
+    "category": "General",
+    "entryAge": "18+",
+    "layout": "Standing",
+    "seating": "General Admission",
+    "promoterName": "stdntsanjay",
+    "promoterLabel": "Outlet Hosted Event",
+    "highlights": [
+      {
+        "iconKey": "star",
+        "title": "stdntsanjay presents",
+        "description": "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum."
+      },
+      {
+        "iconKey": "zap",
+        "title": "General night",
+        "description": "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.\n\n"
+      }
+    ],
+    "thingsToKnow": [
+      {
+        "iconKey": "clock3",
+        "label": "Event schedule",
+        "value": "07:18"
+      },
+      {
+        "iconKey": "ticket",
+        "label": "Ticket needed for",
+        "value": "ages 18+ and above"
+      },
+      {
+        "iconKey": "users",
+        "label": "Entry allowed for",
+        "value": "18+"
+      },
+      {
+        "iconKey": "map-pinned",
+        "label": "Layout",
+        "value": "Standing"
+      },
+      {
+        "iconKey": "armchair",
+        "label": "Seating Arrangement",
+        "value": "General Admission"
+      },
+      {
+        "iconKey": "droplets",
+        "label": "Washrooms",
+        "value": "available"
+      }
+    ],
+    "artists": [],
+    "publishedAt": 1774489485598,
+    "sourceRequestId": "req-1774489419172-ldfaum2y6"
+  }
+]
