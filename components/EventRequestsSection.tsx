@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, X, Loader2, Clock, AlertCircle, Calendar, MapPin, IndianRupee, FileText } from 'lucide-react';
+import { Check, X, Loader2, Clock, AlertCircle, Calendar, MapPin, IndianRupee, FileText, Eye, Ticket, Users, Star, Zap } from 'lucide-react';
 import type { EventRequest } from '@/lib/event-request-store';
 
 export default function EventRequestsSection() {
@@ -12,6 +12,8 @@ export default function EventRequestsSection() {
   const [selectedRequest, setSelectedRequest] = useState<EventRequest | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingRequest, setViewingRequest] = useState<EventRequest | null>(null);
 
   useEffect(() => {
     const loadRequests = async () => {
@@ -105,6 +107,11 @@ export default function EventRequestsSection() {
   const openRejectModal = (request: EventRequest) => {
     setSelectedRequest(request);
     setShowRejectModal(true);
+  };
+
+  const openViewModal = (request: EventRequest) => {
+    setViewingRequest(request);
+    setShowViewModal(true);
   };
 
   const getStatusBadge = (status: string) => {
@@ -232,34 +239,43 @@ export default function EventRequestsSection() {
                     {getStatusBadge(request.status)}
                   </td>
                   <td className="px-4 py-4">
-                    {request.status === 'pending' ? (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleApprove(request.id)}
-                          disabled={actionInProgress === request.id}
-                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
-                        >
-                          {actionInProgress === request.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Check className="h-3 w-3" />
-                          )}
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => openRejectModal(request)}
-                          disabled={actionInProgress === request.id}
-                          className="inline-flex items-center gap-1 rounded-lg bg-[#EB4D4B]/10 px-3 py-1.5 text-xs font-medium text-[#EB4D4B] hover:bg-[#EB4D4B]/20 transition-colors disabled:opacity-50"
-                        >
-                          <X className="h-3 w-3" />
-                          Reject
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-[#F5F5DC]/50">
-                        {request.reviewedAt && `Reviewed ${new Date(request.reviewedAt).toLocaleDateString()}`}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => openViewModal(request)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-[#E5A823]/10 px-3 py-1.5 text-xs font-medium text-[#E5A823] hover:bg-[#E5A823]/20 transition-colors"
+                      >
+                        <Eye className="h-3 w-3" />
+                        View Details
+                      </button>
+                      {request.status === 'pending' ? (
+                        <>
+                          <button
+                            onClick={() => handleApprove(request.id)}
+                            disabled={actionInProgress === request.id}
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                          >
+                            {actionInProgress === request.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Check className="h-3 w-3" />
+                            )}
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => openRejectModal(request)}
+                            disabled={actionInProgress === request.id}
+                            className="inline-flex items-center gap-1 rounded-lg bg-[#EB4D4B]/10 px-3 py-1.5 text-xs font-medium text-[#EB4D4B] hover:bg-[#EB4D4B]/20 transition-colors disabled:opacity-50"
+                          >
+                            <X className="h-3 w-3" />
+                            Reject
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-[#F5F5DC]/50">
+                          {request.reviewedAt && `Reviewed ${new Date(request.reviewedAt).toLocaleDateString()}`}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -268,49 +284,163 @@ export default function EventRequestsSection() {
         )}
       </article>
 
-      {/* Rejection Modal */}
-      {showRejectModal && selectedRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-[#2A2A2A] bg-[#101018] p-6">
-            <h3 className="text-lg font-semibold text-[#F5F5DC]">Reject Event Request</h3>
-            <p className="mt-2 text-sm text-[#F5F5DC]/60">
-              You are rejecting: <span className="text-[#E5A823]">{selectedRequest.eventData.title}</span>
-            </p>
-            
-            <div className="mt-4">
-              <label className="block text-sm text-[#F5F5DC]/70 mb-2">
-                Rejection Reason (optional)
-              </label>
-              <textarea
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Explain why this event is being rejected..."
-                rows={3}
-                className="w-full rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2 text-sm text-[#F5F5DC] focus:border-[#E5A823] focus:outline-none"
-              />
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3">
+      {/* View Details Modal */}
+      {showViewModal && viewingRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 overflow-y-auto">
+          <div className="w-full max-w-4xl rounded-2xl border border-[#2A2A2A] bg-[#101018] p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-semibold text-[#F5F5DC]">Event Request Details</h3>
+                <p className="text-sm text-[#F5F5DC]/60 mt-1">
+                  Submitted by {viewingRequest.outletName} on {new Date(viewingRequest.submittedAt).toLocaleDateString()}
+                </p>
+              </div>
               <button
                 onClick={() => {
-                  setShowRejectModal(false);
-                  setRejectionReason('');
-                  setSelectedRequest(null);
+                  setShowViewModal(false);
+                  setViewingRequest(null);
                 }}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-[#F5F5DC]/70 hover:text-[#F5F5DC] transition-colors"
+                className="rounded-lg p-2 text-[#F5F5DC]/70 hover:text-[#F5F5DC] hover:bg-[#2A2A2A] transition-colors"
               >
-                Cancel
+                <X className="h-5 w-5" />
               </button>
-              <button
-                onClick={handleReject}
-                disabled={actionInProgress === selectedRequest.id}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#EB4D4B] px-4 py-2 text-sm font-medium text-white hover:bg-[#d64545] transition-colors disabled:opacity-50"
-              >
-                {actionInProgress === selectedRequest.id && (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+            </div>
+
+            {/* Event Image */}
+            {viewingRequest.eventData.image && (
+              <div className="mb-6 rounded-xl overflow-hidden border border-[#2A2A2A]">
+                <img
+                  src={viewingRequest.eventData.image}
+                  alt={viewingRequest.eventData.title}
+                  className="w-full h-48 object-cover"
+                />
+              </div>
+            )}
+
+            {/* Basic Info */}
+            <div className="grid gap-4 md:grid-cols-2 mb-6">
+              <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4">
+                <p className="text-xs text-[#F5F5DC]/50 uppercase tracking-wider mb-1">Event Title</p>
+                <p className="text-lg font-semibold text-[#E5A823]">{viewingRequest.eventData.title}</p>
+              </div>
+              <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4">
+                <p className="text-xs text-[#F5F5DC]/50 uppercase tracking-wider mb-1">Category</p>
+                <p className="text-lg font-semibold text-[#F5F5DC]">{viewingRequest.eventData.category}</p>
+              </div>
+            </div>
+
+            {/* Date & Venue */}
+            <div className="grid gap-4 md:grid-cols-3 mb-6">
+              <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="h-4 w-4 text-[#E5A823]" />
+                  <p className="text-xs text-[#F5F5DC]/50 uppercase tracking-wider">Date & Time</p>
+                </div>
+                <p className="text-sm font-medium text-[#F5F5DC]">{viewingRequest.eventData.date}</p>
+                <p className="text-sm text-[#F5F5DC]/70">{viewingRequest.eventData.time}</p>
+                <p className="text-xs text-[#F5F5DC]/50 mt-1">Gates open: {viewingRequest.eventData.gatesOpen}</p>
+              </div>
+              <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="h-4 w-4 text-[#E5A823]" />
+                  <p className="text-xs text-[#F5F5DC]/50 uppercase tracking-wider">Venue</p>
+                </div>
+                <p className="text-sm font-medium text-[#F5F5DC]">{viewingRequest.eventData.venue}</p>
+              </div>
+              <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="h-4 w-4 text-[#E5A823]" />
+                  <p className="text-xs text-[#F5F5DC]/50 uppercase tracking-wider">Entry Requirements</p>
+                </div>
+                <p className="text-sm font-medium text-[#F5F5DC]">Age: {viewingRequest.eventData.entryAge}</p>
+                <p className="text-xs text-[#F5F5DC]/50 mt-1">Layout: {viewingRequest.eventData.layout}</p>
+                <p className="text-xs text-[#F5F5DC]/50">Seating: {viewingRequest.eventData.seating}</p>
+              </div>
+            </div>
+
+            {/* Pricing Details */}
+            <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4 mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <IndianRupee className="h-5 w-5 text-[#E5A823]" />
+                <h4 className="font-semibold text-[#F5F5DC]">Pricing & Commission Details</h4>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-lg bg-[#2A2A2A]/50 p-3">
+                  <p className="text-xs text-[#F5F5DC]/50 mb-1">Ticket Price</p>
+                  <p className="text-xl font-bold text-[#E5A823]">{viewingRequest.eventData.price}</p>
+                </div>
+                <div className="rounded-lg bg-[#2A2A2A]/50 p-3">
+                  <p className="text-xs text-[#F5F5DC]/50 mb-1">Platform Fee</p>
+                  <p className="text-xl font-bold text-[#F5F5DC]">5%</p>
+                  <p className="text-xs text-[#F5F5DC]/50">Per transaction</p>
+                </div>
+                <div className="rounded-lg bg-[#2A2A2A]/50 p-3">
+                  <p className="text-xs text-[#F5F5DC]/50 mb-1">Outlet Revenue Share</p>
+                  <p className="text-xl font-bold text-emerald-400">95%</p>
+                  <p className="text-xs text-[#F5F5DC]/50">After platform fee</p>
+                </div>
+              </div>
+              <div className="mt-4 p-3 rounded-lg bg-[#E5A823]/10 border border-[#E5A823]/20">
+                <p className="text-sm text-[#F5F5DC]/80">
+                  <span className="text-[#E5A823] font-medium">Commission Structure:</span> The outlet provider receives 95% of the ticket price, while Easy Entry retains 5% as a platform fee for payment processing, hosting, and marketing services.
+                </p>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4 mb-6">
+              <h4 className="font-semibold text-[#F5F5DC] mb-3">Event Description</h4>
+              <p className="text-sm text-[#F5F5DC]/80 leading-relaxed">{viewingRequest.eventData.description}</p>
+            </div>
+
+            {/* Full Description */}
+            <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4 mb-6">
+              <h4 className="font-semibold text-[#F5F5DC] mb-3">Full Description</h4>
+              <p className="text-sm text-[#F5F5DC]/80 leading-relaxed">{viewingRequest.eventData.fullDescription}</p>
+            </div>
+
+            {/* Status & Actions */}
+            <div className="flex items-center justify-between pt-4 border-t border-[#2A2A2A]">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-[#F5F5DC]/70">Status:</span>
+                {getStatusBadge(viewingRequest.status)}
+              </div>
+              <div className="flex items-center gap-3">
+                {viewingRequest.status === 'pending' && (
+                  <>
+                    <button
+                      onClick={() => {
+                        handleApprove(viewingRequest.id);
+                        setShowViewModal(false);
+                      }}
+                      disabled={actionInProgress === viewingRequest.id}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                    >
+                      <Check className="h-4 w-4" />
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowViewModal(false);
+                        openRejectModal(viewingRequest);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg bg-[#EB4D4B] px-4 py-2 text-sm font-medium text-white hover:bg-[#d64545] transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                      Reject
+                    </button>
+                  </>
                 )}
-                Reject Event
-              </button>
+                <button
+                  onClick={() => {
+                    setShowViewModal(false);
+                    setViewingRequest(null);
+                  }}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-[#F5F5DC]/70 hover:text-[#F5F5DC] transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -318,4 +448,3 @@ export default function EventRequestsSection() {
     </>
   );
 }
-
