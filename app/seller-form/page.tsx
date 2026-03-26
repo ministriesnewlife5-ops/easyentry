@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { 
   Calendar, 
   MapPin, 
-  DollarSign, 
+  IndianRupee,
   User, 
   Image as ImageIcon, 
   Info, 
@@ -21,7 +21,9 @@ import {
   Star,
   CheckCircle2,
   Plus,
-  Trash2
+  Trash2,
+  Video,
+  X
 } from 'lucide-react';
 import Navigation from '@/components/ui/Navigation';
 import Footer from '@/components/ui/Footer';
@@ -47,9 +49,13 @@ export default function SellerFormPage() {
     datetime: '',
     about: '',
     rules: '',
+    numberOfTickets: '',
+    category: '',
   });
 
   const [images, setImages] = useState<File[]>([]);
+  const [coverImage, setCoverImage] = useState<File | null>(null);
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
 
   const [activeTab, setActiveTab] = useState<'details' | 'media' | 'promo'>('details');
   const [events, setEvents] = useState<Array<{ id: number; title: string; venue: string; date: string }>>([]);
@@ -61,8 +67,11 @@ export default function SellerFormPage() {
   const [promoRequests, setPromoRequests] = useState<Array<{ id: number; eventTitle: string; code: string; status: string }>>([]);
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [ticketCategories, setTicketCategories] = useState<Array<{ id: string; name: string; price: number }>>([]);
   const [previewCategoryId, setPreviewCategoryId] = useState<string>('female');
+  const [customCategory, setCustomCategory] = useState('');
+  const [rules, setRules] = useState<Array<{ id: string; text: string }>>([{ id: '1', text: '' }]);
   const [pricing, setPricing] = useState({
     ticket: 799,
     platformFee: 5,
@@ -101,6 +110,8 @@ export default function SellerFormPage() {
       return;
     }
     
+    setIsSubmitting(true);
+    
     try {
       // Format the date and time from datetime input
       const dateObj = new Date(formData.datetime);
@@ -112,8 +123,19 @@ export default function SellerFormPage() {
         ? Math.min(...ticketCategories.map(c => c.price))
         : Number(formData.price) || 0;
 
-      // Convert image to base64 so it persists across sessions and pages
-      const imageBase64 = images.length > 0 ? await fileToBase64(images[0]) : '';
+      // Convert cover image to base64
+      const coverImageBase64 = coverImage 
+        ? await fileToBase64(coverImage) 
+        : (mediaFiles.length > 0 && mediaFiles[0].type.startsWith('image/') 
+            ? await fileToBase64(mediaFiles[0]) 
+            : '');
+
+      // Convert all media files (images and videos) to base64
+      const mediaFilesBase64: string[] = [];
+      for (const file of mediaFiles) {
+        const base64 = await fileToBase64(file);
+        mediaFilesBase64.push(base64);
+      }
       
       const eventData = {
         title: formData.title,
@@ -121,15 +143,18 @@ export default function SellerFormPage() {
         date: dateStr,
         time: timeStr,
         venue: formData.location,
-        category: 'General',
+        category: formData.category === 'Other' ? customCategory : (formData.category || 'General'),
         price: `₹${minPrice}`,
-        image: imageBase64,
+        image: coverImageBase64,
+        numberOfTickets: formData.numberOfTickets,
+        mediaFiles: mediaFilesBase64,
         description: formData.about,
         fullDescription: formData.about,
         gatesOpen: timeStr,
         entryAge: '18+',
         layout: 'Standing',
-        seating: 'General Admission'
+        seating: 'General Admission',
+        rules: rules.filter(r => r.text.trim()).map(r => r.text)
       };
 
       const response = await fetch('/api/admin/event-requests', {
@@ -160,7 +185,7 @@ export default function SellerFormPage() {
           price: `₹${minPrice}`,
           imageColor: 'bg-blue-900',
           category: 'General',
-          imageUrl: imageBase64,
+          imageUrl: coverImageBase64,
           createdAt: Date.now()
         });
         
@@ -174,9 +199,15 @@ export default function SellerFormPage() {
           datetime: '',
           about: '',
           rules: '',
+          numberOfTickets: '',
+          category: '',
         });
         setImages([]);
+        setCoverImage(null);
+        setMediaFiles([]);
         setTicketCategories([]);
+        setCustomCategory('');
+        setRules([{ id: '1', text: '' }]);
         
         // Also handle promo code if entered
         if (promoForm.promoCode) {
@@ -203,12 +234,31 @@ export default function SellerFormPage() {
       console.error('Error submitting event:', error);
       setNotificationMessage('An error occurred while submitting your request.');
       setShowNotification(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setCoverImage(e.target.files[0]);
+    }
+  };
+
+  const handleMediaFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files);
+      setMediaFiles((prev) => [...prev, ...selectedFiles]);
+    }
+  };
+
+  const removeMediaFile = (index: number) => {
+    setMediaFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -233,7 +283,11 @@ export default function SellerFormPage() {
         : Number(formData.price) || 0;
 
       // Convert image to base64 so it persists across sessions and pages
-      const imageBase64 = images.length > 0 ? await fileToBase64(images[0]) : '';
+      const imageBase64 = coverImage 
+        ? await fileToBase64(coverImage) 
+        : (mediaFiles.length > 0 && mediaFiles[0].type.startsWith('image/') 
+            ? await fileToBase64(mediaFiles[0]) 
+            : '');
       
       const eventData = {
         title: formData.title,
@@ -294,9 +348,15 @@ export default function SellerFormPage() {
           datetime: '',
           about: '',
           rules: '',
+          numberOfTickets: '',
+          category: '',
         });
         setImages([]);
+        setCoverImage(null);
+        setMediaFiles([]);
         setTicketCategories([]);
+        setCustomCategory('');
+        setRules([{ id: '1', text: '' }]);
       } else {
         const error = await response.json();
         setNotificationMessage(error.error || 'Failed to submit event request.');
@@ -422,6 +482,44 @@ export default function SellerFormPage() {
                     </div>
 
                     <div>
+                      <label className="block text-sm font-medium mb-3">Category *</label>
+                      <select
+                        name="category"
+                        value={formData.category}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData((prev) => ({ ...prev, category: value }));
+                          if (value !== 'Other') {
+                            setCustomCategory('');
+                          }
+                        }}
+                        className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                        required
+                      >
+                        <option value="">Select category</option>
+                        <option value="Gigs">Gigs</option>
+                        <option value="Party">Party</option>
+                        <option value="DJ">DJ</option>
+                        <option value="Comedy">Comedy</option>
+                        <option value="Theatre">Theatre</option>
+                        <option value="Art">Art</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      {formData.category === 'Other' && (
+                        <div className="mt-3">
+                          <input
+                            type="text"
+                            value={customCategory}
+                            onChange={(e) => setCustomCategory(e.target.value)}
+                            className="w-full bg-[#2A2A2A] border border-[#E5A823]/50 rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                            placeholder="Enter custom category"
+                            required
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
                       <label className="block text-sm font-medium mb-3">Organizer *</label>
                       <div className="relative">
                         <User className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
@@ -456,7 +554,7 @@ export default function SellerFormPage() {
                               required
                             />
                             <div className="relative w-40">
-                              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/50" />
+                              <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/50" />
                               <input
                                 type="number"
                                 value={cat.price}
@@ -509,6 +607,24 @@ export default function SellerFormPage() {
                       </div>
                     </div>
 
+                    <div>
+                      <label className="block text-sm font-medium mb-3">Number of Tickets *</label>
+                      <div className="relative">
+                        <Ticket className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
+                        <input
+                          type="number"
+                          name="numberOfTickets"
+                          value={formData.numberOfTickets}
+                          onChange={handleInputChange}
+                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                          placeholder="e.g. 100"
+                          min={1}
+                          required
+                        />
+                      </div>
+                      <p className="text-xs text-[#F5F5DC]/50 mt-2">Total number of tickets available for this event</p>
+                    </div>
+
                     <div className="md:col-span-2">
                       <div className="bg-[#0F0F0F] rounded-2xl p-6 border border-[#2A2A2A]">
                         <h4 className="text-base font-bold text-[#F5F5DC] mb-1">Per-ticket Money Flow</h4>
@@ -538,7 +654,7 @@ export default function SellerFormPage() {
                             <div>
                               <label className="block text-xs font-medium mb-2 text-[#F5F5DC]/70">Ticket price (₹)</label>
                               <div className="relative">
-                                <DollarSign className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
+                                <IndianRupee className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
                                 <input
                                   type="number"
                                   value={pricing.ticket}
@@ -771,15 +887,47 @@ export default function SellerFormPage() {
                         <AlertCircle className="w-4 h-4 text-[#E5A823]" />
                         Event Rules & Guidelines *
                       </label>
-                      <textarea
-                        name="rules"
-                        value={formData.rules}
-                        onChange={handleInputChange}
-                        rows={4}
-                        className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] resize-y"
-                        placeholder="Age restrictions, dress code, prohibited items..."
-                        required
-                      />
+                      <div className="space-y-3">
+                        {rules.map((rule, idx) => (
+                          <div key={rule.id} className="flex items-center gap-3">
+                            <span className="text-[#E5A823] font-bold w-6">{idx + 1}.</span>
+                            <input
+                              type="text"
+                              value={rule.text}
+                              onChange={(e) => {
+                                const text = e.target.value;
+                                setRules((prev) =>
+                                  prev.map((r) => (r.id === rule.id ? { ...r, text } : r))
+                                );
+                              }}
+                              className="flex-1 bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                              placeholder={`Rule ${idx + 1}`}
+                              required
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRules((prev) => prev.filter((r) => r.id !== rule.id));
+                              }}
+                              disabled={rules.length <= 1}
+                              className="p-2 rounded-lg border border-[#2A2A2A] hover:border-[#EB4D4B] hover:bg-[#EB4D4B]/10 disabled:opacity-40"
+                            >
+                              <Trash2 className="w-4 h-4 text-[#F5F5DC]/70" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const id = Math.random().toString(36).slice(2);
+                            setRules((prev) => [...prev, { id, text: '' }]);
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#2A2A2A] text-sm hover:border-[#E5A823]"
+                        >
+                          <Plus className="w-4 h-4 text-[#E5A823]" />
+                          Add Rule
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -793,52 +941,136 @@ export default function SellerFormPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-6"
               >
+                {/* Cover Image Section */}
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
-                  <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                  <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
                     <ImageIcon className="w-5 h-5 text-[#E5A823]" />
-                    Event Media
+                    Cover Image
                   </h3>
+                  <p className="text-sm text-[#F5F5DC]/60 mb-6">
+                    This image will be displayed as the main event cover. Recommended size: 1200x630px
+                  </p>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-3">Event Images</label>
                     <div 
-                      onClick={() => document.getElementById('image-upload')?.click()}
-                      className="mt-2 flex justify-center px-6 pt-10 pb-10 border-2 border-dashed border-[#2A2A2A] rounded-2xl hover:border-[#E5A823]/50 hover:bg-[#2A2A2A]/50 transition-all cursor-pointer"
+                      onClick={() => document.getElementById('cover-image-upload')?.click()}
+                      className="mt-2 flex justify-center px-6 pt-10 pb-10 border-2 border-dashed border-[#E5A823]/50 rounded-2xl hover:border-[#E5A823] hover:bg-[#E5A823]/5 transition-all cursor-pointer"
                     >
                       <div className="space-y-3 text-center">
-                        <div className="w-12 h-12 mx-auto rounded-full bg-[#2A2A2A] flex items-center justify-center">
-                          <Upload className="h-5 w-5 text-[#E5A823]" />
+                        <div className="w-16 h-16 mx-auto rounded-full bg-[#E5A823]/10 flex items-center justify-center">
+                          <ImageIcon className="h-8 w-8 text-[#E5A823]" />
                         </div>
                         <div className="flex flex-col text-sm text-[#F5F5DC]/50 justify-center gap-1">
-                          <span className="font-medium text-[#E5A823] hover:text-[#F5C542]">Click to upload</span>
+                          <span className="font-medium text-[#E5A823] hover:text-[#F5C542]">Click to upload cover image</span>
                           <span>or drag and drop</span>
                         </div>
                         <p className="text-xs text-[#F5F5DC]/30">High-res PNG, JPG up to 10MB</p>
                       </div>
                       <input 
-                        id="image-upload"
+                        id="cover-image-upload"
                         type="file" 
-                        multiple 
                         accept="image/*"
-                        onChange={handleImageChange}
+                        onChange={handleCoverImageChange}
                         className="hidden" 
                       />
                     </div>
                     
-                    {images.length > 0 && (
+                    {coverImage && (
+                      <div className="mt-6">
+                        <div className="relative aspect-video rounded-xl overflow-hidden border border-[#E5A823]/30">
+                          <img 
+                            src={URL.createObjectURL(coverImage)} 
+                            alt="Cover Preview" 
+                            className="object-cover w-full h-full"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setCoverImage(null)}
+                            className="absolute top-2 right-2 p-2 bg-[#0D0D0D]/80 rounded-full hover:bg-[#EB4D4B]/80 transition-colors"
+                          >
+                            <X className="w-4 h-4 text-white" />
+                          </button>
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#0D0D0D] to-transparent p-4">
+                            <span className="text-sm font-medium text-[#E5A823]">Cover Image</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Event Images & Videos Section */}
+                <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
+                  <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+                    <Camera className="w-5 h-5 text-[#E5A823]" />
+                    Event Images & Videos
+                  </h3>
+                  <p className="text-sm text-[#F5F5DC]/60 mb-6">
+                    Upload additional images and videos to showcase your event
+                  </p>
+                  
+                  <div>
+                    <div 
+                      onClick={() => document.getElementById('media-files-upload')?.click()}
+                      className="mt-2 flex justify-center px-6 pt-10 pb-10 border-2 border-dashed border-[#2A2A2A] rounded-2xl hover:border-[#E5A823]/50 hover:bg-[#2A2A2A]/50 transition-all cursor-pointer"
+                    >
+                      <div className="space-y-3 text-center">
+                        <div className="flex items-center justify-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-[#2A2A2A] flex items-center justify-center">
+                            <ImageIcon className="h-5 w-5 text-[#E5A823]" />
+                          </div>
+                          <div className="w-12 h-12 rounded-full bg-[#2A2A2A] flex items-center justify-center">
+                            <Video className="h-5 w-5 text-[#E5A823]" />
+                          </div>
+                        </div>
+                        <div className="flex flex-col text-sm text-[#F5F5DC]/50 justify-center gap-1">
+                          <span className="font-medium text-[#E5A823] hover:text-[#F5C542]">Click to upload images or videos</span>
+                          <span>or drag and drop</span>
+                        </div>
+                        <p className="text-xs text-[#F5F5DC]/30">PNG, JPG, MP4, MOV up to 50MB each</p>
+                      </div>
+                      <input 
+                        id="media-files-upload"
+                        type="file" 
+                        multiple 
+                        accept="image/*,video/*"
+                        onChange={handleMediaFilesChange}
+                        className="hidden" 
+                      />
+                    </div>
+                    
+                    {mediaFiles.length > 0 && (
                       <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {images.map((file, index) => (
+                        {mediaFiles.map((file, index) => (
                           <motion.div 
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             key={index} 
-                            className="relative aspect-square rounded-xl overflow-hidden border border-[#2A2A2A]"
+                            className="relative aspect-square rounded-xl overflow-hidden border border-[#2A2A2A] group"
                           >
-                            <img 
-                              src={URL.createObjectURL(file)} 
-                              alt={`Preview ${index}`} 
-                              className="object-cover w-full h-full hover:scale-105 transition-transform duration-500"
-                            />
+                            {file.type.startsWith('video/') ? (
+                              <div className="w-full h-full bg-[#0D0D0D] flex items-center justify-center">
+                                <video className="w-full h-full object-cover">
+                                  <source src={URL.createObjectURL(file)} type={file.type} />
+                                </video>
+                                <div className="absolute inset-0 flex items-center justify-center bg-[#0D0D0D]/50">
+                                  <Video className="w-8 h-8 text-[#E5A823]" />
+                                </div>
+                              </div>
+                            ) : (
+                              <img 
+                                src={URL.createObjectURL(file)} 
+                                alt={`Media ${index}`} 
+                                className="object-cover w-full h-full hover:scale-105 transition-transform duration-500"
+                              />
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => removeMediaFile(index)}
+                              className="absolute top-2 right-2 p-1.5 bg-[#0D0D0D]/80 rounded-full opacity-0 group-hover:opacity-100 hover:bg-[#EB4D4B]/80 transition-all"
+                            >
+                              <X className="w-3 h-3 text-white" />
+                            </button>
                           </motion.div>
                         ))}
                       </div>
@@ -907,12 +1139,35 @@ export default function SellerFormPage() {
                     <motion.button
                       type="button"
                       onClick={handleSendEventRequest}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="w-full py-4 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center justify-center gap-2"
+                      disabled={isSubmitting}
+                      whileHover={isSubmitting ? {} : { scale: 1.02 }}
+                      whileTap={isSubmitting ? {} : { scale: 0.98 }}
+                      className="w-full py-4 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed relative overflow-hidden"
                     >
-                      <Send className="w-5 h-5" />
-                      Send Request
+                      {isSubmitting && (
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: "100%" }}
+                          transition={{ duration: 2, ease: "easeInOut" }}
+                          className="absolute inset-0 bg-[#0D0D0D]/20"
+                        />
+                      )}
+                      <span className="relative z-10 flex items-center gap-2">
+                        {isSubmitting ? (
+                          <>
+                            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-5 h-5" />
+                            Send Request
+                          </>
+                        )}
+                      </span>
                     </motion.button>
                   </div>
                 </div>
@@ -951,9 +1206,15 @@ export default function SellerFormPage() {
                 
                 <div className="space-y-4">
                   <div className="aspect-video rounded-xl bg-[#2A2A2A] flex items-center justify-center">
-                    {images.length > 0 ? (
+                    {coverImage ? (
                       <img 
-                        src={URL.createObjectURL(images[0])} 
+                        src={URL.createObjectURL(coverImage)} 
+                        alt="Event Cover" 
+                        className="w-full h-full object-cover rounded-xl"
+                      />
+                    ) : mediaFiles.length > 0 && mediaFiles[0].type.startsWith('image/') ? (
+                      <img 
+                        src={URL.createObjectURL(mediaFiles[0])} 
                         alt="Event" 
                         className="w-full h-full object-cover rounded-xl"
                       />
@@ -998,6 +1259,35 @@ export default function SellerFormPage() {
                 <p className="text-sm text-[#E5A823]">
                   Complete all sections, then go to the Promo Codes tab and click "Send Request" to submit your event for admin approval.
                 </p>
+              </div>
+
+              {/* Bottom Navigation */}
+              <div className="flex justify-end pt-4 border-t border-[#2A2A2A]">
+                {activeTab === 'details' && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('media')}
+                    className="px-8 py-3 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity"
+                  >
+                    Next: Event Media
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                )}
+                {activeTab === 'media' && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('promo')}
+                    className="px-8 py-3 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity"
+                  >
+                    Next: Promo Codes
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                )}
+                {activeTab === 'promo' && null}
               </div>
             </div>
           </div>

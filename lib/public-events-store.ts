@@ -49,6 +49,7 @@ export type PublicEvent = {
   priceSubtext: string;
   image: string;
   images: string[];
+  mediaFiles?: string[];
   description: string;
   fullDescription: string;
   category: string;
@@ -112,6 +113,7 @@ function isValidPublicEvent(value: unknown): value is PublicEvent {
     typeof event.priceSubtext === 'string' &&
     typeof event.image === 'string' &&
     Array.isArray(event.images) &&
+    (event.mediaFiles === undefined || Array.isArray(event.mediaFiles)) &&
     typeof event.description === 'string' &&
     typeof event.fullDescription === 'string' &&
     typeof event.category === 'string' &&
@@ -192,6 +194,7 @@ function cloneEvent(event: PublicEvent): PublicEvent {
   return {
     ...event,
     images: [...event.images],
+    mediaFiles: event.mediaFiles ? [...event.mediaFiles] : [],
     highlights: event.highlights.map((item) => ({ ...item })),
     thingsToKnow: event.thingsToKnow.map((item) => ({ ...item })),
     artists: event.artists.map((artist) => ({
@@ -224,6 +227,12 @@ function getImageColor(category: string) {
 }
 
 function createApprovedEvent(request: EventRequest): PublicEvent {
+  // Combine main image with mediaFiles for the images array
+  const allImages = [request.eventData.image];
+  if (request.eventData.mediaFiles && request.eventData.mediaFiles.length > 0) {
+    allImages.push(...request.eventData.mediaFiles);
+  }
+
   return {
     id: `hosted-${request.id}`,
     title: request.eventData.title,
@@ -236,7 +245,8 @@ function createApprovedEvent(request: EventRequest): PublicEvent {
     price: request.eventData.price,
     priceSubtext: 'onwards',
     image: request.eventData.image,
-    images: [request.eventData.image],
+    images: allImages,
+    mediaFiles: request.eventData.mediaFiles || [],
     description: request.eventData.description,
     fullDescription: request.eventData.fullDescription,
     category: request.eventData.category,

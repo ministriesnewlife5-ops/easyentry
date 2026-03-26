@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Calendar, ChevronDown, Heart, Instagram, MapPin, MapPinned, Star, Ticket } from 'lucide-react';
+import { Calendar, ChevronDown, Heart, Instagram, MapPin, MapPinned, Star, Ticket, Video, Play } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -16,6 +16,7 @@ export default function EventDetailsPage() {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [event, setEvent] = useState<PublicEvent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedMediaType, setSelectedMediaType] = useState<'image' | 'video'>('image');
 
   const convenienceFee = 175;
   const maxTickets = 10;
@@ -171,15 +172,18 @@ export default function EventDetailsPage() {
               className="flex gap-4"
             >
               {/* Thumbnails - Left Side */}
-              <div className="flex flex-col gap-3 w-16 shrink-0">
+              <div className="flex flex-col gap-3 w-20 shrink-0 max-h-[500px] overflow-y-auto pr-1 scrollbar-hide">
                 {event.images.map((img, idx) => (
                   <motion.button
-                    key={idx}
+                    key={`img-${idx}`}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => setSelectedImageIndex(idx)}
-                    className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
-                      selectedImageIndex === idx 
+                    onClick={() => {
+                      setSelectedImageIndex(idx);
+                      setSelectedMediaType('image');
+                    }}
+                    className={`relative w-20 h-20 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
+                      selectedImageIndex === idx && selectedMediaType === 'image'
                         ? 'border-[#EB4D4B] ring-2 ring-[#EB4D4B]/30' 
                         : 'border-[#2A2A2A] hover:border-[#E5A823]'
                     }`}
@@ -191,15 +195,47 @@ export default function EventDetailsPage() {
                     />
                   </motion.button>
                 ))}
+                {event.mediaFiles?.map((media, idx) => (
+                  <motion.button
+                    key={`media-${idx}`}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      setSelectedImageIndex(idx);
+                      setSelectedMediaType('video');
+                    }}
+                    className={`relative w-20 h-20 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
+                      selectedImageIndex === idx && selectedMediaType === 'video'
+                        ? 'border-[#EB4D4B] ring-2 ring-[#EB4D4B]/30' 
+                        : 'border-[#2A2A2A] hover:border-[#E5A823]'
+                    }`}
+                  >
+                    <div className="w-full h-full bg-[#0D0D0D] flex items-center justify-center">
+                      <Video className="w-7 h-7 text-[#E5A823]" />
+                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Play className="w-5 h-5 text-white/80" />
+                    </div>
+                  </motion.button>
+                ))}
               </div>
 
-              {/* Main Image - Right Side */}
+              {/* Main Display - Right Side */}
               <div className="relative flex-1 rounded-xl overflow-hidden shadow-lg border border-[#2A2A2A]">
-                <img 
-                  src={event.images[selectedImageIndex]} 
-                  alt={event.title}
-                  className="w-full aspect-[1] object-cover"
-                />
+                {selectedMediaType === 'video' && event.mediaFiles && event.mediaFiles[selectedImageIndex] ? (
+                  <video 
+                    src={event.mediaFiles[selectedImageIndex]} 
+                    controls
+                    className="w-full aspect-[1] object-cover"
+                    poster={event.images[0]}
+                  />
+                ) : (
+                  <img 
+                    src={event.images[selectedImageIndex]} 
+                    alt={event.title}
+                    className="w-full aspect-[1] object-cover"
+                  />
+                )}
                 {/* Like Button */}
                 <motion.button 
                   whileHover={{ scale: 1.1 }}

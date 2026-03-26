@@ -16,6 +16,9 @@ export type EventRequest = {
     category: string;
     price: string;
     image: string;
+    mediaFiles?: string[];
+    numberOfTickets?: string;
+    rules?: string[];
     description: string;
     fullDescription: string;
     gatesOpen: string;
@@ -69,6 +72,8 @@ function isValidEventRequest(value: unknown): value is EventRequest {
     typeof eventData?.category === 'string' &&
     typeof eventData?.price === 'string' &&
     typeof eventData?.image === 'string' &&
+    (eventData?.mediaFiles === undefined || Array.isArray(eventData?.mediaFiles)) &&
+    (eventData?.numberOfTickets === undefined || typeof eventData?.numberOfTickets === 'string') &&
     typeof eventData?.description === 'string' &&
     typeof eventData?.fullDescription === 'string' &&
     typeof eventData?.gatesOpen === 'string' &&

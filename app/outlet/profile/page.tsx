@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useCallback, type ReactNode, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Upload, Camera, MapPin, Globe, 
   Building2, Edit2, CheckCircle2,
   Instagram, Phone, Mail,
-  Users, Loader2, CalendarDays, Clock3, IndianRupee, ExternalLink
+  Users, Loader2, CalendarDays, Clock3, IndianRupee, ExternalLink,
+  Plus
 } from 'lucide-react';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
@@ -43,7 +44,7 @@ type OutletEventsResponse = {
   waitingApprovalEvents: OutletEventItem[];
 };
 
-export default function OutletProfilePage() {
+function OutletProfileContent() {
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<ActiveTab>('details');
@@ -230,20 +231,15 @@ export default function OutletProfilePage() {
             <span className="text-[#F5F5DC]/50">|</span>
             <span className="text-[#F5F5DC]/70">Manage your venue details</span>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleSubmit}
-            disabled={isSaving}
-            className="px-6 py-2 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center gap-2 disabled:opacity-50"
-          >
-            {isSaving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4" />
-            )}
-            {isSaving ? 'Saving...' : 'Save Profile'}
-          </motion.button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/seller-form"
+              className="px-6 py-2 border-2 border-[#E5A823] text-[#E5A823] font-bold rounded-lg flex items-center gap-2 hover:bg-[#E5A823]/10 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Host Event
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -451,6 +447,42 @@ export default function OutletProfilePage() {
             </motion.div>
           )}
         </div>
+
+        {/* Bottom Navigation */}
+        <div className="flex justify-end pt-6 border-t border-[#2A2A2A]">
+          {activeTab === 'details' && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('about')}
+              className="px-8 py-3 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity"
+            >
+              Next: About & Social
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+          {activeTab === 'about' && (
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-8 py-3 bg-gradient-to-r from-emerald-500 to-emerald-400 text-[#0D0D0D] font-bold rounded-lg flex items-center gap-2 disabled:opacity-50"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-5 h-5" />
+                  Save Profile
+                </>
+              )}
+            </button>
+          )}
+          {activeTab === 'events' && null}
+        </div>
       </form>
     </div>
   );
@@ -597,5 +629,18 @@ function MetaItem({
       <p className="text-xs uppercase tracking-wide text-[#F5F5DC]/45">{label}</p>
       <p className="mt-1 text-sm text-[#F5F5DC]/80">{value}</p>
     </div>
+  );
+}
+
+// Default export wrapped in Suspense for SSR compatibility
+export default function OutletProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#E5A823]" />
+      </div>
+    }>
+      <OutletProfileContent />
+    </Suspense>
   );
 }
