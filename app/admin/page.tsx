@@ -5,21 +5,15 @@ import { authOptions } from '@/lib/auth-options';
 import Link from 'next/link';
 import SettingsContent from '@/components/SettingsContent';
 import EventRequestsSection from '@/components/EventRequestsSection';
+import { getAllPublishedEvents, getPublishedEventCards } from '@/lib/public-events-store';
+import { getAllEventRequests } from '@/lib/event-request-store';
+import { appUsers } from '@/lib/auth-store';
 
 const stats = [
   { label: 'Revenue this month', value: '₹4.82L', delta: '↑ 24% vs last month', icon: IndianRupee },
   { label: 'Tickets sold', value: '2,481', delta: '↑ 342 this week', icon: Ticket },
   { label: 'Code-driven bookings', value: '74%', delta: '↑ 12% vs last month', icon: TrendingUp },
   { label: 'Avg event rating', value: '4.8', delta: '↑ 0.3 this month', icon: CircleCheckBig },
-];
-
-const upcomingEvents = [
-  { name: 'DJ Arjun — House Night', date: 'Fri 21 Mar · 9PM', sold: '94/100', color: 'bg-[#E5A823]' },
-  { name: 'Sufi Evening — Ustad Rashid', date: 'Sat 22 Mar · 7PM', sold: '72/80', color: 'bg-emerald-400' },
-  { name: 'Indie Open Mic Night', date: 'Sun 23 Mar · 6PM', sold: '58/60', color: 'bg-[#EB4D4B]' },
-  { name: 'Retro Bollywood Night', date: 'Fri 28 Mar · 8PM', sold: '45/120', color: 'bg-violet-400' },
-  { name: 'Techno Underground — Vol 4', date: 'Sat 29 Mar · 10PM', sold: '112/150', color: 'bg-blue-400' },
-  { name: 'Acoustic Sunday Brunch', date: 'Sun 30 Mar · 12PM', sold: '28/40', color: 'bg-orange-400' },
 ];
 
 const revenueBars = [
@@ -34,15 +28,6 @@ const bookingSources = [
   { name: 'Walk-in', value: 12 },
   { name: 'Direct Search', value: 7 },
   { name: 'Partners', value: 5 },
-];
-
-const topArtists = [
-  { name: 'DJ Arjun', tickets: 482 },
-  { name: 'Ustad Rashid', tickets: 312 },
-  { name: 'Ritzy Collective', tickets: 256 },
-  { name: 'Neon Drifters', tickets: 198 },
-  { name: 'Sufi Brothers', tickets: 145 },
-  { name: 'The Indie Project', tickets: 124 },
 ];
 
 const recentActivity = [
@@ -74,94 +59,6 @@ const promoBannerPresets = [
   },
 ];
 
-const allWebsiteEvents = [
-  { id: '1', name: 'Namma Chennai Night with DJ Goutham', provider: 'Easy Entry', location: 'Gatsby 2000, Alwarpet', date: '2026-07-01' },
-  { id: '2', name: 'Electronic City Beats | Night 2', provider: 'Easy Entry', location: 'Pasha - The Park', date: '2026-05-30' },
-  { id: '3', name: 'The Underground Session', provider: 'Easy Entry', location: 'The Slate Hotels', date: 'Sat, Sep 19' },
-  { id: '4', name: 'ECR Beach Raves', provider: 'Easy Entry', location: 'ECR Beach House', date: 'Sat, Jun 20' },
-  { id: '5', name: 'Retro Bollywood Night', provider: 'Easy Entry', location: 'Pasha - The Park', date: 'Fri 28 Mar' },
-  { id: '6', name: 'Techno Underground — Vol 4', provider: 'Easy Entry', location: 'The Slate Hotels', date: 'Sat 29 Mar' },
-];
-
-const allEnrolledArtists = [
-  { 
-    id: '1', 
-    name: 'DJ GOUTHAM', 
-    image: 'https://images.unsplash.com/photo-1574391884720-2e45599e9633?auto=format&fit=crop&q=80&w=200', 
-    location: 'Chennai, Tamil Nadu', 
-    completedEvents: 450, 
-    upcomingEvents: 12, 
-    ticketsSoldByCode: 1240 
-  },
-  { 
-    id: '2', 
-    name: 'DJ KASH', 
-    image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&q=80&w=200', 
-    location: 'Bangalore, Karnataka', 
-    completedEvents: 320, 
-    upcomingEvents: 8, 
-    ticketsSoldByCode: 850 
-  },
-  { 
-    id: '3', 
-    name: 'SARAH CHEN', 
-    image: 'https://images.unsplash.com/photo-1598387993441-a364f854c3e1?auto=format&fit=crop&q=80&w=200', 
-    location: 'Mumbai, Karnataka', 
-    completedEvents: 180, 
-    upcomingEvents: 5, 
-    ticketsSoldByCode: 420 
-  },
-  { 
-    id: '4', 
-    name: 'MARCUS WAVES', 
-    image: 'https://images.unsplash.com/photo-1571266028243-3716f02d2d2e?auto=format&fit=crop&q=80&w=200', 
-    location: 'Goa, India', 
-    completedEvents: 210, 
-    upcomingEvents: 15, 
-    ticketsSoldByCode: 670 
-  },
-  { 
-    id: '5', 
-    name: 'DJ ANR', 
-    image: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&q=80&w=200', 
-    location: 'Chennai, Tamil Nadu', 
-    completedEvents: 520, 
-    upcomingEvents: 22, 
-    ticketsSoldByCode: 2100 
-  },
-];
-
-const allInfluencers = [
-  {
-    id: '101',
-    name: 'Athryan Media',
-    image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
-    location: 'Chennai, Tamil Nadu',
-    ticketsSoldByCode: 540,
-  },
-  {
-    id: '102',
-    name: 'Nightlife Chennai',
-    image: 'https://images.unsplash.com/photo-1547425260-76bcadfb4f9b?auto=format&fit=crop&q=80&w=200',
-    location: 'Chennai, Tamil Nadu',
-    ticketsSoldByCode: 320,
-  },
-  {
-    id: '103',
-    name: 'Party Pulse',
-    image: 'https://images.unsplash.com/photo-1519345182560-3f2917c472ef?auto=format&fit=crop&q=80&w=200',
-    location: 'Bangalore, Karnataka',
-    ticketsSoldByCode: 260,
-  },
-  {
-    id: '104',
-    name: 'Club Buzz India',
-    image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200',
-    location: 'Mumbai, Maharashtra',
-    ticketsSoldByCode: 780,
-  },
-];
-
 export default async function AdminPage({
   searchParams,
 }: any) {
@@ -176,6 +73,59 @@ export default async function AdminPage({
   if (session.user.role !== 'admin') {
     redirect('/events');
   }
+
+  // Fetch real data from the database
+  const publishedEvents = getAllPublishedEvents();
+  const eventCards = getPublishedEventCards();
+  const eventRequests = getAllEventRequests();
+  
+  // Get real artists (users with artist role)
+  const enrolledArtists = appUsers.filter(user => user.role === 'artist');
+  
+  // Get real influencers/promoters (users with promoter role)
+  const enrolledInfluencers = appUsers.filter(user => user.role === 'promoter');
+
+  // Map published events to the format used in the admin dashboard
+  const allWebsiteEvents = publishedEvents.map(event => ({
+    id: event.id,
+    name: event.title,
+    provider: event.promoterName || 'Easy Entry',
+    location: event.venue,
+    date: event.date,
+  }));
+
+  // Map artists to the format used in the admin dashboard
+  const allEnrolledArtists = enrolledArtists.map(artist => ({
+    id: artist.id,
+    name: artist.name.toUpperCase(),
+    image: `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name)}&background=random&color=fff&size=200`,
+    location: 'Chennai, Tamil Nadu',
+    completedEvents: 0,
+    upcomingEvents: 0,
+    ticketsSoldByCode: 0,
+  }));
+
+  // Map influencers to the format used in the admin dashboard
+  const allInfluencers = enrolledInfluencers.map(influencer => ({
+    id: influencer.id,
+    name: influencer.name,
+    image: `https://ui-avatars.com/api/?name=${encodeURIComponent(influencer.name)}&background=random&color=fff&size=200`,
+    location: 'Chennai, Tamil Nadu',
+    ticketsSoldByCode: 0,
+  }));
+
+  // Get upcoming events for the overview section (limit to 6)
+  const upcomingEvents = publishedEvents
+    .slice(0, 6)
+    .map((event, index) => {
+      const colors = ['bg-[#E5A823]', 'bg-emerald-400', 'bg-[#EB4D4B]', 'bg-violet-400', 'bg-blue-400', 'bg-orange-400'];
+      return {
+        name: event.title,
+        date: `${event.date} · ${event.time}`,
+        sold: '0/100',
+        color: colors[index % colors.length],
+      };
+    });
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">
@@ -479,12 +429,17 @@ export default async function AdminPage({
                 <article className="rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5">
                   <h2 className="text-xl font-semibold">Top artists by tickets</h2>
                   <ul className="mt-4 space-y-3">
-                    {topArtists.map((artist) => (
-                      <li key={artist.name} className="flex items-center justify-between rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/70 px-3 py-2.5">
+                    {allEnrolledArtists.slice(0, 6).map((artist) => (
+                      <li key={artist.id} className="flex items-center justify-between rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/70 px-3 py-2.5">
                         <p className="font-medium">{artist.name}</p>
-                        <p className="font-semibold text-[#E5A823]">{artist.tickets}</p>
+                        <p className="font-semibold text-[#E5A823]">{artist.ticketsSoldByCode}</p>
                       </li>
                     ))}
+                    {allEnrolledArtists.length === 0 && (
+                      <li className="text-center py-8 text-[#F5F5DC]/50">
+                        No enrolled artists yet
+                      </li>
+                    )}
                   </ul>
                 </article>
               </div>
