@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, X, Loader2, Clock, AlertCircle, ExternalLink, Calendar, MapPin, IndianRupee, FileText } from 'lucide-react';
+import { Check, X, Loader2, Clock, AlertCircle, Calendar, MapPin, IndianRupee, FileText } from 'lucide-react';
 import type { EventRequest } from '@/lib/event-request-store';
 
 export default function EventRequestsSection() {
@@ -14,24 +14,30 @@ export default function EventRequestsSection() {
   const [showRejectModal, setShowRejectModal] = useState(false);
 
   useEffect(() => {
-    fetchRequests();
-  }, []);
+    const loadRequests = async () => {
+      try {
+        setError(null);
+        const response = await fetch('/api/admin/event-requests', {
+          cache: 'no-store',
+        });
 
-  const fetchRequests = async () => {
-    try {
-      const response = await fetch('/api/admin/event-requests');
-      if (response.ok) {
+        if (!response.ok) {
+          const data = await response.json().catch(() => null);
+          setError(data?.error || 'Failed to load event requests');
+          return;
+        }
+
         const data = await response.json();
-        setRequests(data.requests || []);
-      } else {
-        setError('Failed to fetch event requests');
+        setRequests(Array.isArray(data.requests) ? data.requests : []);
+      } catch {
+        setError('An error occurred while loading event requests');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err) {
-      setError('An error occurred while fetching requests');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
+
+    loadRequests();
+  }, []);
 
   const handleApprove = async (requestId: string) => {
     setActionInProgress(requestId);
@@ -43,13 +49,17 @@ export default function EventRequestsSection() {
       });
 
       if (response.ok) {
-        setRequests(requests.map(r => 
-          r.id === requestId ? { ...r, status: 'approved', reviewedAt: Date.now() } : r
-        ));
+        const data = await response.json();
+        const updatedRequest = data.request as EventRequest;
+        const updatedRequests = requests.map(r =>
+          r.id === requestId ? updatedRequest : r
+        );
+        setRequests(updatedRequests);
       } else {
-        setError('Failed to approve request');
+        const data = await response.json().catch(() => null);
+        setError(data?.error || 'Failed to approve request');
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred while approving');
     } finally {
       setActionInProgress(null);
@@ -72,21 +82,20 @@ export default function EventRequestsSection() {
       });
 
       if (response.ok) {
-        setRequests(requests.map(r => 
-          r.id === selectedRequest.id ? { 
-            ...r, 
-            status: 'rejected', 
-            reviewedAt: Date.now(),
-            rejectionReason 
-          } : r
-        ));
+        const data = await response.json();
+        const updatedRequest = data.request as EventRequest;
+        const updatedRequests = requests.map(r =>
+          r.id === selectedRequest.id ? updatedRequest : r
+        );
+        setRequests(updatedRequests);
         setShowRejectModal(false);
         setRejectionReason('');
         setSelectedRequest(null);
       } else {
-        setError('Failed to reject request');
+        const data = await response.json().catch(() => null);
+        setError(data?.error || 'Failed to reject request');
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred while rejecting');
     } finally {
       setActionInProgress(null);
@@ -176,7 +185,7 @@ export default function EventRequestsSection() {
           <div className="py-10 text-center text-[#F5F5DC]/50">
             <FileText className="h-12 w-12 mx-auto mb-3 text-[#F5F5DC]/20" />
             <p>No event requests found</p>
-            <p className="text-sm mt-1">Outlet providers haven't submitted any event requests yet.</p>
+            <p className="text-sm mt-1">Outlet providers have not submitted any event requests yet.</p>
           </div>
         ) : (
           <table className="w-full text-left text-sm text-[#F5F5DC]">

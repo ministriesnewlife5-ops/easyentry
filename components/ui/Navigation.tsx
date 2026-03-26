@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Menu, ChevronDown, Mic2, Building2, Megaphone, LogOut, UserCircle2, LayoutDashboard } from 'lucide-react';
+import { Search, Menu, ChevronDown, Mic2, Building2, Megaphone, LogOut, UserCircle2, LayoutDashboard, CalendarDays } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import EyeLogo from './EyeLogo';
 
@@ -177,6 +177,21 @@ export default function Navigation() {
                               <span className="block text-[#F5F5DC]/40 text-xs">Email & security</span>
                             </div>
                           </Link>
+
+                          {session?.user?.role === 'outlet' && (
+                            <Link
+                              href="/outlet/profile?tab=events"
+                              className="flex items-center gap-3 px-4 py-3 hover:bg-[#E5A823]/10 transition-colors group border-t border-[#2A2A2A]"
+                            >
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#2A2A2A] border border-[#2A2A2A] group-hover:bg-[#E5A823]/20 group-hover:border-[#E5A823] transition-all">
+                                <CalendarDays className="w-4 h-4 text-[#E5A823] group-hover:text-[#F5C542]" />
+                              </div>
+                              <div>
+                                <span className="block text-[#F5F5DC] font-medium text-sm group-hover:text-[#E5A823] transition-colors">My Events</span>
+                                <span className="block text-[#F5F5DC]/40 text-xs">Upcoming, completed, approvals</span>
+                              </div>
+                            </Link>
+                          )}
 
                           {session?.user?.role === 'outlet' && (
                             <Link

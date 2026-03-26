@@ -6,7 +6,7 @@ import { useState, MouseEvent, useRef } from 'react';
 import { Heart, Share2, Calendar, MapPin, Clock, Sparkles, Zap, Instagram } from 'lucide-react';
 
 interface EventCardProps {
-  id: number;
+  id: string | number;
   title: string;
   date: string;
   venue: string;

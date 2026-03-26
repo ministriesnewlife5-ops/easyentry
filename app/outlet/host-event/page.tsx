@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Calendar, Clock3, ImageIcon, IndianRupee, Info, MapPin, Sparkles, Ticket, Upload, X, Loader2 } from 'lucide-react';
-import { saveHostedEvent } from '@/lib/hosted-events';
 
 type EventTemplate = {
   id: number;
@@ -185,11 +184,13 @@ export default function OutletHostEventPage() {
       });
 
       if (response.ok) {
+        const data = await response.json();
         setSubmitMessage({ 
           type: 'success', 
-          text: 'Event request submitted successfully! Waiting for admin approval.' 
+          text: data.adminNotificationSent
+            ? 'Event request submitted successfully. It is now in the admin dashboard and has been emailed to admin for approval.'
+            : 'Event request submitted successfully. It is now in the admin dashboard and waiting for admin approval.'
         });
-        // Reset form after successful submission
         setEventData({
           title: '',
           subtitle: '',
@@ -215,7 +216,7 @@ export default function OutletHostEventPage() {
           text: errorData.error || 'Failed to submit event request' 
         });
       }
-    } catch (error) {
+    } catch {
       setSubmitMessage({ 
         type: 'error', 
         text: 'An error occurred while submitting the request' 

@@ -143,20 +143,7 @@ export default function ArtistProfilePage() {
     if (typeof window !== 'undefined') {
       const { getHostedEvents } = require('@/lib/hosted-events');
       const hostedEvents = getHostedEvents();
-      
-      const staticEvents = [
-        { id: 1, title: 'Namma Chennai Night with DJ Goutham', venue: 'Gatsby 2000', date: '2026-07-01' },
-        { id: 2, title: 'Electronic City Beats | Night 2', venue: 'Pasha - The Park', date: '2026-05-30' },
-        { id: 3, title: 'The Great Indian Party', venue: 'High - Radisson Blu', date: '2026-03-14' },
-        { id: 4, title: 'Techno Night at OMR', venue: 'The Leather Bar', date: '2026-04-18' },
-        { id: 5, title: 'Live Fusion Night', venue: 'Illusions - The Madras Pub', date: '2026-06-12' },
-        { id: 6, title: 'South Side Groove Tour', venue: 'Q Bar - Hilton', date: '2026-07-05' },
-        { id: 7, title: 'The Underground Session', venue: 'The Slate Hotels', date: '2026-09-19' },
-        { id: 8, title: 'Retro Night Specials', venue: '10 Downing Street', date: '2026-10-22' }
-      ];
-      
-      const allEvents = [...hostedEvents, ...staticEvents];
-      setEvents(allEvents);
+      setEvents(hostedEvents);
     }
   }, []);
 

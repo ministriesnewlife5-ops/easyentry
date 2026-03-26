@@ -28,33 +28,7 @@ type Venue = {
   twitter: string;
 };
 
-// Sample upcoming events at this venue
-const upcomingEvents = [
-  { 
-    id: 1, 
-    title: 'Fusion Friday', 
-    date: '2026-03-27', 
-    time: '20:00', 
-    price: '₹1500',
-    image: '/images/sin1.jpg'
-  },
-  { 
-    id: 2, 
-    title: 'Sinful Saturday', 
-    date: '2026-03-28', 
-    time: '21:00', 
-    price: '₹2000',
-    image: '/images/sin2.jpg'
-  },
-  { 
-    id: 3, 
-    title: 'Alternate Realm', 
-    date: '2026-03-29', 
-    time: '19:30', 
-    price: '₹500',
-    image: '/images/sin3.jpg'
-  },
-];
+const upcomingEvents: any[] = [];
 
 export default function VenueProfilePage() {
   const params = useParams();

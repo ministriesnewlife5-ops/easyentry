@@ -5,9 +5,9 @@ import BrowseFilters from '@/components/ui/BrowseFilters';
 import PromoBanner from '@/components/ui/PromoBanner';
 import EventCard from '@/components/ui/EventCard';
 import { ArrowRight } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { getHostedEvents } from '@/lib/hosted-events';
+import type { PublicEventCard } from '@/lib/public-events-store';
 
 // DJ Lighting Animation Component
 const DJLightingEffects = () => {
@@ -117,96 +117,11 @@ const DJLightingEffects = () => {
     </div>
   );
 };
-const events = [
-  {
-    id: 1,
-    title: 'Namma Chennai Night with DJ Goutham',
-    date: '2026-07-01',
-    venue: 'Gatsby 2000',
-    price: '₹1500',
-    imageColor: 'bg-red-900',
-    category: 'Commercial',
-    imageUrl: 'https://images.unsplash.com/photo-1514525253440-b393452e3726?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: 2,
-    title: 'Electronic City Beats | Night 2',
-    date: '2026-05-30',
-    venue: 'Pasha - The Park',
-    price: '₹2000',
-    imageColor: 'bg-green-900',
-    category: 'EDM',
-    imageUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: 3,
-    title: 'The Great Indian Party',
-    date: '2026-03-14',
-    venue: 'High - Radisson Blu',
-    price: '₹1200',
-    imageColor: 'bg-pink-600',
-    category: 'Bollywood',
-    imageUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: 4,
-    title: 'Techno Night at OMR',
-    date: '2026-04-18',
-    venue: 'The Leather Bar',
-    price: '₹1800',
-    imageColor: 'bg-red-700',
-    category: 'Techno',
-    imageUrl: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: 5,
-    title: 'Live Fusion Night',
-    date: '2026-06-12',
-    venue: 'Illusions - The Madras Pub',
-    price: '₹1000',
-    imageColor: 'bg-blue-800',
-    category: 'Live',
-    imageUrl: 'https://images.unsplash.com/photo-1459749411177-d4a428c3feae?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: 6,
-    title: 'South Side Groove Tour',
-    date: '2026-07-05',
-    venue: 'Q Bar - Hilton',
-    price: '₹2500',
-    imageColor: 'bg-yellow-700',
-    category: 'Funk',
-    imageUrl: 'https://images.stockcake.com/public/9/6/d/96d4100c-ca71-4e09-b84e-d7e90c294a87_large/joyful-party-celebration-stockcake.jpg'
-  },
-  {
-    id: 7,
-    title: 'The Underground Session',
-    date: '2026-09-19',
-    venue: 'The Slate Hotels',
-    price: '₹1500',
-    imageColor: 'bg-purple-900',
-    category: 'Techno',
-    imageUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: 8,
-    title: 'Retro Night Specials',
-    date: '2026-10-22',
-    venue: '10 Downing Street',
-    price: '₹800',
-    imageColor: 'bg-indigo-800',
-    category: 'Indie',
-    imageUrl: 'https://images.unsplash.com/photo-1533174072545-e8d4aa97d890?auto=format&fit=crop&q=80&w=800'
-  }
-];
-
 export default function EventsPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showPromoBanner, setShowPromoBanner] = useState(true);
-  const [displayEvents] = useState(() => {
-    const hostedEvents = getHostedEvents();
-    return hostedEvents.length ? [...hostedEvents, ...events] : events;
-  });
+  const [displayEvents, setDisplayEvents] = useState<PublicEventCard[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const { scrollY } = useScroll();
   
   // Parallax effect for hero
@@ -222,6 +137,26 @@ export default function EventsPage() {
   const handleFilterStateChange = (hasActiveFilters: boolean) => {
     setShowPromoBanner(!hasActiveFilters);
   };
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const response = await fetch('/api/events');
+        if (!response.ok) {
+          throw new Error('Failed to fetch events');
+        }
+
+        const data = await response.json();
+        setDisplayEvents(data.events || []);
+      } catch (error) {
+        console.error('Failed to load events:', error);
+      } finally {
+        setEventsLoading(false);
+      }
+    };
+
+    fetchEvents();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">
@@ -359,23 +294,29 @@ export default function EventsPage() {
             <h2 className="text-2xl font-bold mb-6 text-[#F5F5DC] drop-shadow-lg">
               Popular Events <span className="text-[#F5F5DC]/50">in Chennai</span>
             </h2>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {displayEvents.map((event, index) => (
-                <motion.div
-                  key={event.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <EventCard 
-                    {...event} 
-                    layout="vertical"
-                  />
-                </motion.div>
-              ))}
-            </div>
+
+            {eventsLoading ? (
+              <div className="rounded-2xl border border-[#2A2A2A] bg-[#101018] px-6 py-10 text-center text-[#F5F5DC]/60">
+                Loading events...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {displayEvents.map((event, index) => (
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <EventCard
+                      {...event}
+                      layout="vertical"
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>

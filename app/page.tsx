@@ -5,9 +5,9 @@ import BrowseFilters from '@/components/ui/BrowseFilters';
 import PromoBanner from '@/components/ui/PromoBanner';
 import EventCard from '@/components/ui/EventCard';
 import { ArrowRight } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { getHostedEvents } from '@/lib/hosted-events';
+import type { PublicEventCard } from '@/lib/public-events-store';
 
 // DJ Lighting Animation Component
 const DJLightingEffects = () => {
@@ -118,56 +118,11 @@ const DJLightingEffects = () => {
   );
 };
 
-const events = [
-  {
-    id: 1,
-    title: 'Fusion Friday',
-    date: '2026-03-27',
-    venue: 'Sin and tonic',
-    price: '₹1500',
-    imageColor: 'bg-red-900',
-    category: 'Commercial',
-    imageUrl: '/sin1.png'
-  },
-  {
-    id: 2,
-    title: 'Sinful Saturday',
-    date: '2026-07-01',
-    venue: 'Sin and tonic',
-    price: '₹1500',
-    imageColor: 'bg-red-900',
-    category: 'Commercial',
-    imageUrl: '/sin2.png'
-  },
-  {
-    id: 3,
-    title: 'Alternate Realm',
-    date: '2026-07-01',
-    venue: 'Sin and tonic',
-    price: '₹1500',
-    imageColor: 'bg-red-900',
-    category: 'Commercial',
-    imageUrl: '/sin3.png'
-  },
-  {
-    id: 4,
-    title: 'Techno Night at OMR',
-    date: '2026-04-18',
-    venue: 'The Leather Bar',
-    price: '₹1800',
-    imageColor: 'bg-red-700',
-    category: 'Techno',
-    imageUrl: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&q=80&w=800'
-  },
-];
-
 export default function Home() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hasActiveFilters, setHasActiveFilters] = useState(false);
-  const [displayEvents] = useState(() => {
-    const hostedEvents = getHostedEvents();
-    return hostedEvents.length ? [...hostedEvents, ...events] : events;
-  });
+  const [displayEvents, setDisplayEvents] = useState<PublicEventCard[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const { scrollY } = useScroll();
   
   // Parallax effect for hero
@@ -183,6 +138,26 @@ export default function Home() {
   const handleFilterStateChange = (hasActive: boolean) => {
     setHasActiveFilters(hasActive);
   };
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const response = await fetch('/api/events');
+        if (!response.ok) {
+          throw new Error('Failed to fetch events');
+        }
+
+        const data = await response.json();
+        setDisplayEvents(data.events || []);
+      } catch (error) {
+        console.error('Failed to load events:', error);
+      } finally {
+        setEventsLoading(false);
+      }
+    };
+
+    fetchEvents();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">
@@ -313,23 +288,29 @@ export default function Home() {
             <h2 className="text-2xl font-bold mb-6 text-[#F5F5DC] drop-shadow-lg">
               Popular Events <span className="text-[#F5F5DC]/50">in Chennai</span>
             </h2>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {displayEvents.map((event, index) => (
-                <motion.div
-                  key={event.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <EventCard 
-                    {...event} 
-                    layout="vertical"
-                  />
-                </motion.div>
-              ))}
-            </div>
+
+            {eventsLoading ? (
+              <div className="rounded-2xl border border-[#2A2A2A] bg-[#101018] px-6 py-10 text-center text-[#F5F5DC]/60">
+                Loading events...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {displayEvents.map((event, index) => (
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <EventCard
+                      {...event}
+                      layout="vertical"
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>

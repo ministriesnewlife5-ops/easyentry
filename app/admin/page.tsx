@@ -252,12 +252,8 @@ export default async function AdminPage({
                    `Thursday, 20 March 2026 · ${upcomingEvents.length} events this week`}
                 </p>
               </div>
-              {activeSection === 'ads' ? (
+              {activeSection === 'ads' && (
                 <span className="rounded-full bg-[#E5A823]/10 px-4 py-2 text-xs font-semibold text-[#E5A823]">Promo Banner Data</span>
-              ) : (
-                <button className="rounded-full bg-[#E5A823] px-5 py-2 text-sm font-semibold text-[#0D0D0D] transition hover:bg-[#F5C542]">
-                  + Create Event
-                </button>
               )}
             </div>
           </header>

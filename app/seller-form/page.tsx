@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
   Calendar, 
@@ -26,6 +27,7 @@ import Navigation from '@/components/ui/Navigation';
 import Footer from '@/components/ui/Footer';
 
 export default function SellerFormPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -47,11 +49,9 @@ export default function SellerFormPage() {
     discountPercent: ''
   });
   const [promoRequests, setPromoRequests] = useState<Array<{ id: number; eventTitle: string; code: string; status: string }>>([]);
-  const [ticketCategories, setTicketCategories] = useState<Array<{ id: string; name: string; price: number }>>([
-    { id: 'female', name: 'FEMALE', price: 799 },
-    { id: 'male', name: 'MALE', price: 1399 },
-    { id: 'couple', name: 'COUPLE', price: 1599 }
-  ]);
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [ticketCategories, setTicketCategories] = useState<Array<{ id: string; name: string; price: number }>>([]);
   const [previewCategoryId, setPreviewCategoryId] = useState<string>('female');
   const [pricing, setPricing] = useState({
     ticket: 799,
@@ -64,20 +64,7 @@ export default function SellerFormPage() {
     if (typeof window !== 'undefined') {
       const { getHostedEvents } = require('@/lib/hosted-events');
       const hostedEvents = getHostedEvents();
-      
-      const staticEvents = [
-        { id: 1, title: 'Namma Chennai Night with DJ Goutham', venue: 'Gatsby 2000', date: '2026-07-01' },
-        { id: 2, title: 'Electronic City Beats | Night 2', venue: 'Pasha - The Park', date: '2026-05-30' },
-        { id: 3, title: 'The Great Indian Party', venue: 'High - Radisson Blu', date: '2026-03-14' },
-        { id: 4, title: 'Techno Night at OMR', venue: 'The Leather Bar', date: '2026-04-18' },
-        { id: 5, title: 'Live Fusion Night', venue: 'Illusions - The Madras Pub', date: '2026-06-12' },
-        { id: 6, title: 'South Side Groove Tour', venue: 'Q Bar - Hilton', date: '2026-07-05' },
-        { id: 7, title: 'The Underground Session', venue: 'The Slate Hotels', date: '2026-09-19' },
-        { id: 8, title: 'Retro Night Specials', venue: '10 Downing Street', date: '2026-10-22' }
-      ];
-      
-      const allEvents = [...hostedEvents, ...staticEvents];
-      setEvents(allEvents);
+      setEvents(hostedEvents);
     }
   }, []);
 
@@ -93,24 +80,117 @@ export default function SellerFormPage() {
     setPromoForm(prev => ({ ...prev, promoCode: code }));
   };
 
-  const handleSendPromoRequest = (e: React.FormEvent) => {
+  const handleSendEventRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!promoForm.eventId || !promoForm.promoCode) {
-      alert('Please select an event and enter a promo code');
+    
+    // Validate required fields
+    if (!formData.title || !formData.datetime || !formData.location) {
+      setNotificationMessage('Please fill in all required fields (Title, Date & Time, Location)');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 5000);
       return;
     }
     
-    const selectedEvent = events.find(e => e.id.toString() === promoForm.eventId);
-    const newRequest = {
-      id: Date.now(),
-      eventTitle: selectedEvent?.title || 'Unknown Event',
-      code: promoForm.promoCode,
-      status: 'Pending'
-    };
-    
-    setPromoRequests(prev => [newRequest, ...prev]);
-    alert(`Promo code request sent for ${selectedEvent?.title}!\nCode: ${promoForm.promoCode}`);
-    setPromoForm({ eventId: '', promoCode: '', discountPercent: '' });
+    try {
+      // Format the date and time from datetime input
+      const dateObj = new Date(formData.datetime);
+      const dateStr = dateObj.toISOString().split('T')[0];
+      const timeStr = dateObj.toTimeString().slice(0, 5);
+      
+      // Get the minimum price from ticket categories or form
+      const minPrice = ticketCategories.length > 0 
+        ? Math.min(...ticketCategories.map(c => c.price))
+        : Number(formData.price) || 0;
+      
+      const eventData = {
+        title: formData.title,
+        subtitle: formData.description,
+        date: dateStr,
+        time: timeStr,
+        venue: formData.location,
+        category: 'General',
+        price: `₹${minPrice}`,
+        image: images.length > 0 ? URL.createObjectURL(images[0]) : '',
+        description: formData.about,
+        fullDescription: formData.about,
+        gatesOpen: timeStr,
+        entryAge: '18+',
+        layout: 'Standing',
+        seating: 'General Admission'
+      };
+
+      const response = await fetch('/api/admin/event-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ eventData }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setNotificationMessage('Your request has been sent to admin for approval.');
+        setShowNotification(true);
+        
+        // Hide notification after 5 seconds
+        setTimeout(() => {
+          setShowNotification(false);
+        }, 5000);
+        
+        // Also save to localStorage for immediate display
+        const { saveHostedEvent } = require('@/lib/hosted-events');
+        saveHostedEvent({
+          id: Date.now(),
+          title: formData.title,
+          date: dateStr,
+          venue: formData.location,
+          price: `₹${minPrice}`,
+          imageColor: 'bg-blue-900',
+          category: 'General',
+          imageUrl: images.length > 0 ? URL.createObjectURL(images[0]) : '',
+          createdAt: Date.now()
+        });
+        
+        // Reset form
+        setFormData({
+          title: '',
+          description: '',
+          price: '',
+          organizer: '',
+          location: '',
+          datetime: '',
+          about: '',
+          rules: '',
+        });
+        setImages([]);
+        setTicketCategories([]);
+        
+        // Also handle promo code if entered
+        if (promoForm.promoCode) {
+          const newRequest = {
+            id: Date.now(),
+            eventTitle: formData.title,
+            code: promoForm.promoCode,
+            status: 'Pending'
+          };
+          setPromoRequests(prev => [newRequest, ...prev]);
+          setPromoForm({ eventId: '', promoCode: '', discountPercent: '' });
+        }
+        
+        // Redirect to outlet profile events page after 2 seconds to see the notification
+        setTimeout(() => {
+          router.push('/outlet/profile?tab=events');
+        }, 2000);
+      } else {
+        const error = await response.json();
+        setNotificationMessage(error.error || 'Failed to submit event request.');
+        setShowNotification(true);
+      }
+    } catch (error) {
+      console.error('Error submitting event:', error);
+      setNotificationMessage('An error occurred while submitting your request.');
+      setShowNotification(true);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -125,12 +205,92 @@ export default function SellerFormPage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form Data:', formData);
-    console.log('Images:', images);
-    alert('Event created successfully!');
-    // Handle API submission here
+    
+    try {
+      // Format the date and time from datetime input
+      const dateObj = new Date(formData.datetime);
+      const dateStr = dateObj.toISOString().split('T')[0];
+      const timeStr = dateObj.toTimeString().slice(0, 5);
+      
+      // Get the minimum price from ticket categories or form
+      const minPrice = ticketCategories.length > 0 
+        ? Math.min(...ticketCategories.map(c => c.price))
+        : Number(formData.price) || 0;
+      
+      const eventData = {
+        title: formData.title,
+        subtitle: formData.description,
+        date: dateStr,
+        time: timeStr,
+        venue: formData.location,
+        category: 'General',
+        price: `₹${minPrice}`,
+        image: images.length > 0 ? URL.createObjectURL(images[0]) : '',
+        description: formData.about,
+        fullDescription: formData.about,
+        gatesOpen: timeStr,
+        entryAge: '18+',
+        layout: 'Standing',
+        seating: 'General Admission'
+      };
+
+      const response = await fetch('/api/admin/event-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ eventData }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setNotificationMessage('Your request has been sent to admin for approval.');
+        setShowNotification(true);
+        
+        // Hide notification after 5 seconds
+        setTimeout(() => {
+          setShowNotification(false);
+        }, 5000);
+        
+        // Also save to localStorage for immediate display
+        const { saveHostedEvent } = require('@/lib/hosted-events');
+        saveHostedEvent({
+          id: Date.now(),
+          title: formData.title,
+          date: dateStr,
+          venue: formData.location,
+          price: `₹${minPrice}`,
+          imageColor: 'bg-blue-900',
+          category: 'General',
+          imageUrl: images.length > 0 ? URL.createObjectURL(images[0]) : '',
+          createdAt: Date.now()
+        });
+        
+        // Reset form
+        setFormData({
+          title: '',
+          description: '',
+          price: '',
+          organizer: '',
+          location: '',
+          datetime: '',
+          about: '',
+          rules: '',
+        });
+        setImages([]);
+        setTicketCategories([]);
+      } else {
+        const error = await response.json();
+        setNotificationMessage(error.error || 'Failed to submit event request.');
+        setShowNotification(true);
+      }
+    } catch (error) {
+      console.error('Error submitting event:', error);
+      setNotificationMessage('An error occurred while submitting your request.');
+      setShowNotification(true);
+    }
   };
 
   const previewPriceValue =
@@ -148,17 +308,43 @@ export default function SellerFormPage() {
             <span className="text-[#F5F5DC]/50">|</span>
             <span className="text-[#F5F5DC]/70">Create and manage your events</span>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleSubmit}
-            className="px-6 py-2 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center gap-2"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            Publish Event
-          </motion.button>
         </div>
       </div>
+
+      {/* Notification Toast - Glass Morphism Theme */}
+      {showNotification && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] max-w-md w-full mx-4">
+          <div className={`p-4 rounded-xl backdrop-blur-md border shadow-2xl ${
+            notificationMessage.includes('sent to admin') 
+              ? 'bg-[#E5A823]/90 border-[#F5C542] text-[#0D0D0D]' 
+              : 'bg-[#EB4D4B]/90 border-[#FF6B6B] text-white'
+          }`}>
+            <div className="flex items-center gap-3">
+              {notificationMessage.includes('sent to admin') ? (
+                <>
+                  <div className="w-10 h-10 rounded-full bg-[#0D0D0D]/20 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="w-6 h-6 text-[#0D0D0D]" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-[#0D0D0D]">Success!</p>
+                    <p className="text-sm text-[#0D0D0D]/80">{notificationMessage}</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <AlertCircle className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-bold">Error</p>
+                    <p className="text-sm text-white/80">{notificationMessage}</p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Navigation Tabs */}
       <div className="bg-[#1A1A1A] border-b border-[#2A2A2A]">
@@ -656,29 +842,12 @@ export default function SellerFormPage() {
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
                   <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                     <Ticket className="w-5 h-5 text-[#E5A823]" />
-                    Create Promo Code
+                    Submit Event Request
                   </h3>
                   
-                  <form onSubmit={handleSendPromoRequest} className="space-y-6">
+                  <div className="space-y-6">
                     <div>
-                      <label className="block text-sm font-medium mb-3">Select Event</label>
-                      <select 
-                        name="eventId"
-                        value={promoForm.eventId}
-                        onChange={handlePromoInputChange}
-                        className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                      >
-                        <option value="">Choose an event...</option>
-                        {events.map((event) => (
-                          <option key={event.id} value={event.id}>
-                            {event.title} - {event.venue} ({event.date})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-3">Promo Code</label>
+                      <label className="block text-sm font-medium mb-3">Promo Code (Optional)</label>
                       <div className="flex gap-3">
                         <input 
                           type="text" 
@@ -696,11 +865,11 @@ export default function SellerFormPage() {
                           Generate
                         </button>
                       </div>
-                      <p className="text-xs text-[#F5F5DC]/50 mt-2">Click "Generate" to create a unique code automatically</p>
+                      <p className="text-xs text-[#F5F5DC]/50 mt-2">Optional: Add a promo code for this event</p>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-3">Discount Percentage</label>
+                      <label className="block text-sm font-medium mb-3">Discount Percentage (Optional)</label>
                       <input 
                         type="number" 
                         name="discountPercent"
@@ -713,8 +882,15 @@ export default function SellerFormPage() {
                       />
                     </div>
 
+                    <div className="rounded-xl border border-[#E5A823]/20 bg-[#E5A823]/10 p-4">
+                      <p className="text-sm text-[#F5F5DC]/80">
+                        <strong className="text-[#E5A823]">Review your event:</strong> Make sure all details are correct in the Basic Details and Media tabs before submitting.
+                      </p>
+                    </div>
+
                     <motion.button
-                      type="submit"
+                      type="button"
+                      onClick={handleSendEventRequest}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       className="w-full py-4 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center justify-center gap-2"
@@ -722,7 +898,7 @@ export default function SellerFormPage() {
                       <Send className="w-5 h-5" />
                       Send Request
                     </motion.button>
-                  </form>
+                  </div>
                 </div>
 
                 {promoRequests.length > 0 && (
@@ -804,7 +980,7 @@ export default function SellerFormPage() {
 
               <div className="p-4 bg-[#E5A823]/10 border border-[#E5A823]/20 rounded-xl">
                 <p className="text-sm text-[#E5A823]">
-                  Complete all sections and click "Publish Event" to submit your event for review.
+                  Complete all sections, then go to the Promo Codes tab and click "Send Request" to submit your event for admin approval.
                 </p>
               </div>
             </div>
