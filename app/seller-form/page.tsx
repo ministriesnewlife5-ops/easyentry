@@ -26,6 +26,16 @@ import {
 import Navigation from '@/components/ui/Navigation';
 import Footer from '@/components/ui/Footer';
 
+// Converts a File to a base64 data URL so images persist after page reload
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function SellerFormPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -101,6 +111,9 @@ export default function SellerFormPage() {
       const minPrice = ticketCategories.length > 0 
         ? Math.min(...ticketCategories.map(c => c.price))
         : Number(formData.price) || 0;
+
+      // Convert image to base64 so it persists across sessions and pages
+      const imageBase64 = images.length > 0 ? await fileToBase64(images[0]) : '';
       
       const eventData = {
         title: formData.title,
@@ -110,7 +123,7 @@ export default function SellerFormPage() {
         venue: formData.location,
         category: 'General',
         price: `₹${minPrice}`,
-        image: images.length > 0 ? URL.createObjectURL(images[0]) : '',
+        image: imageBase64,
         description: formData.about,
         fullDescription: formData.about,
         gatesOpen: timeStr,
@@ -147,7 +160,7 @@ export default function SellerFormPage() {
           price: `₹${minPrice}`,
           imageColor: 'bg-blue-900',
           category: 'General',
-          imageUrl: images.length > 0 ? URL.createObjectURL(images[0]) : '',
+          imageUrl: imageBase64,
           createdAt: Date.now()
         });
         
@@ -218,6 +231,9 @@ export default function SellerFormPage() {
       const minPrice = ticketCategories.length > 0 
         ? Math.min(...ticketCategories.map(c => c.price))
         : Number(formData.price) || 0;
+
+      // Convert image to base64 so it persists across sessions and pages
+      const imageBase64 = images.length > 0 ? await fileToBase64(images[0]) : '';
       
       const eventData = {
         title: formData.title,
@@ -227,7 +243,7 @@ export default function SellerFormPage() {
         venue: formData.location,
         category: 'General',
         price: `₹${minPrice}`,
-        image: images.length > 0 ? URL.createObjectURL(images[0]) : '',
+        image: imageBase64,
         description: formData.about,
         fullDescription: formData.about,
         gatesOpen: timeStr,
@@ -264,7 +280,7 @@ export default function SellerFormPage() {
           price: `₹${minPrice}`,
           imageColor: 'bg-blue-900',
           category: 'General',
-          imageUrl: images.length > 0 ? URL.createObjectURL(images[0]) : '',
+          imageUrl: imageBase64,
           createdAt: Date.now()
         });
         
