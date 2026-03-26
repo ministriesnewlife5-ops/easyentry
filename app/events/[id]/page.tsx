@@ -11,7 +11,8 @@ export default function EventDetailsPage() {
   const params = useParams();
   const [liked, setLiked] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [showTicketSection, setShowTicketSection] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [event, setEvent] = useState<PublicEvent | null>(null);
@@ -58,17 +59,30 @@ export default function EventDetailsPage() {
     return Number.isFinite(numericPrice) ? numericPrice : 0;
   }, [event]);
 
-  const ticketTypes = useMemo(
-    () => [
+  const ticketTypes = useMemo(() => {
+    if (!event) {
+      return [];
+    }
+    // If event has ticket categories, use them
+    if (event.ticketCategories && event.ticketCategories.length > 0) {
+      return event.ticketCategories.map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        price: cat.price,
+        description: `Category: ${cat.name}`,
+      }));
+    }
+    // Fallback to single ticket type based on event price
+    const numericPrice = Number(event.price.replace(/[^\d.]/g, ''));
+    return [
       {
         id: 'entry',
-        name: 'Get Tickets',
-        price: ticketPrice,
+        name: 'General Admission',
+        price: Number.isFinite(numericPrice) ? numericPrice : 0,
         description: 'Select from available ticket types',
       },
-    ],
-    [ticketPrice]
-  );
+    ];
+  }, [event]);
 
   const shareToWhatsApp = () => {
     if (!event) {
@@ -165,14 +179,14 @@ export default function EventDetailsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
           {/* Left Column - Event Poster & Info */}
           <div className="space-y-6">
-            {/* Event Image Gallery with Thumbnails */}
+            {/* Event Image Gallery with Thumbnails - Mobile Responsive */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex gap-4"
+              className="flex flex-col-reverse md:flex-row gap-4"
             >
-              {/* Thumbnails - Left Side */}
-              <div className="flex flex-col gap-3 w-20 shrink-0 max-h-[500px] overflow-y-auto pr-1 scrollbar-hide">
+              {/* Thumbnails - Bottom on mobile, Left on desktop */}
+              <div className="flex md:flex-col gap-3 md:w-20 md:shrink-0 max-h-[500px] overflow-x-auto md:overflow-y-auto md:pr-1 scrollbar-hide pb-1 md:pb-0">
                 {event.images.map((img, idx) => (
                   <motion.button
                     key={`img-${idx}`}
@@ -182,7 +196,7 @@ export default function EventDetailsPage() {
                       setSelectedImageIndex(idx);
                       setSelectedMediaType('image');
                     }}
-                    className={`relative w-20 h-20 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
+                    className={`relative w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
                       selectedImageIndex === idx && selectedMediaType === 'image'
                         ? 'border-[#EB4D4B] ring-2 ring-[#EB4D4B]/30' 
                         : 'border-[#2A2A2A] hover:border-[#E5A823]'
@@ -204,23 +218,23 @@ export default function EventDetailsPage() {
                       setSelectedImageIndex(idx);
                       setSelectedMediaType('video');
                     }}
-                    className={`relative w-20 h-20 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
+                    className={`relative w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
                       selectedImageIndex === idx && selectedMediaType === 'video'
                         ? 'border-[#EB4D4B] ring-2 ring-[#EB4D4B]/30' 
                         : 'border-[#2A2A2A] hover:border-[#E5A823]'
                     }`}
                   >
                     <div className="w-full h-full bg-[#0D0D0D] flex items-center justify-center">
-                      <Video className="w-7 h-7 text-[#E5A823]" />
+                      <Video className="w-5 h-5 md:w-7 md:h-7 text-[#E5A823]" />
                     </div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <Play className="w-5 h-5 text-white/80" />
+                      <Play className="w-4 h-4 md:w-5 md:h-5 text-white/80" />
                     </div>
                   </motion.button>
                 ))}
               </div>
 
-              {/* Main Display - Right Side */}
+              {/* Main Display - Full width on mobile */}
               <div className="relative flex-1 rounded-xl overflow-hidden shadow-lg border border-[#2A2A2A]">
                 {selectedMediaType === 'video' && event.mediaFiles && event.mediaFiles[selectedImageIndex] ? (
                   <video 
@@ -347,125 +361,78 @@ export default function EventDetailsPage() {
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="sticky top-4 bg-[#2A2A2A] rounded-xl p-6 border border-[#2A2A2A]"
+              className="sticky top-4 bg-[#1A1A1A] rounded-xl p-4 border border-[#2A2A2A]"
             >
-              <h2 className="text-lg font-black text-[#F5F5DC] mb-1">Get Tickets</h2>
-              <p className="text-xs text-[#F5F5DC]/50 mb-6">Select from available ticket types</p>
+              {!showTicketSection ? (
+                // Show Get Tickets button initially
+                <div className="text-center py-4">
+                  <h2 className="text-lg font-black text-[#F5F5DC] mb-4">Get Tickets</h2>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowTicketSection(true)}
+                    className="w-full py-3 bg-gradient-to-r from-[#E5A823] to-[#EB4D4B] text-[#0D0D0D] font-black text-sm rounded-lg hover:from-[#F5C542] hover:to-[#FF6B6B] transition-all"
+                  >
+                    GET TICKETS
+                  </motion.button>
+                </div>
+              ) : (
+                // Show ticket categories after clicking
+                <>
+                  <h2 className="text-base font-semibold text-[#F5F5DC] mb-1">Select Tickets</h2>
 
-              {/* Ticket Types */}
-              <div className="space-y-4">
-                {!selectedTicket ? (
-                  // Show ticket options
-                  ticketTypes.map((ticket) => (
-                    <div 
-                      key={ticket.id}
-                      className="border-2 border-[#2A2A2A] rounded-lg p-4 hover:border-[#E5A823] transition-colors cursor-pointer bg-[#0D0D0D]"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-bold text-[#F5F5DC]">{ticket.name}</p>
-                          <p className="text-xs text-[#F5F5DC]/50">{ticket.description}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-black text-[#F5F5DC]">₹{ticket.price}</p>
-                          <button 
-                            onClick={() => {
-                              setSelectedTicket(ticket.id);
-                              setQuantity(1);
-                            }}
-                            className="mt-1 px-4 py-1.5 bg-gradient-to-r from-[#E5A823] to-[#EB4D4B] text-[#0D0D0D] text-xs font-bold rounded hover:from-[#F5C542] hover:to-[#FF6B6B] transition-colors"
-                          >
-                            SELECT
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  // Show selected ticket with quantity controls
-                  (() => {
-                    const ticket = ticketTypes.find(t => t.id === selectedTicket)!;
-                    const subtotal = ticket.price * quantity;
-                    const total = subtotal + convenienceFee;
-                    return (
-                      <>
-                        <div className="border-2 border-[#EB4D4B] rounded-lg p-4 bg-[#EB4D4B]/10">
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <p className="text-sm font-bold text-[#F5F5DC]">{ticket.name}</p>
-                              <p className="text-xs text-[#F5F5DC]/50">₹{ticket.price}</p>
-                            </div>
+                  {/* Ticket Categories List */}
+                  <div className="space-y-2 mt-4">
+                    {ticketTypes.map((ticket) => (
+                      <div 
+                        key={ticket.id}
+                        className="bg-[#2A2A2A] rounded-lg p-3 border border-[#2A2A2A]"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-[#F5F5DC]">{ticket.name}</p>
+                            <p className="text-sm text-[#F5F5DC]/60">₹{ticket.price.toFixed(2)}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
                             <button 
-                              onClick={() => {
-                                setSelectedTicket(null);
-                                setQuantity(1);
-                              }}
-                              className="px-3 py-1 bg-[#EB4D4B] text-white text-xs font-bold rounded hover:bg-[#d43d3b] flex items-center gap-1"
+                              onClick={() => setQuantities(prev => ({ ...prev, [ticket.id]: Math.max(0, (prev[ticket.id] || 0) - 1) }))}
+                              className="w-8 h-8 flex items-center justify-center bg-[#0D0D0D] rounded text-[#F5F5DC] hover:bg-[#3A3A3A]"
+                              disabled={(quantities[ticket.id] || 0) <= 0}
                             >
-                              <span>X</span> REMOVE
+                              -
+                            </button>
+                            <span className="w-8 text-center text-sm font-medium text-[#F5F5DC]">
+                              {quantities[ticket.id] || 0}
+                            </span>
+                            <button 
+                              onClick={() => setQuantities(prev => ({ ...prev, [ticket.id]: Math.min(maxTickets, (prev[ticket.id] || 0) + 1) }))}
+                              className="w-8 h-8 flex items-center justify-center bg-[#333333] rounded text-white hover:bg-[#444444]"
+                              disabled={(quantities[ticket.id] || 0) >= maxTickets}
+                            >
+                              +
                             </button>
                           </div>
-                          
-                          {/* Quantity Selector */}
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm text-[#F5F5DC]/70">Quantity</span>
-                            <div className="flex items-center border border-[#2A2A2A] rounded">
-                              <button 
-                                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                                className="px-3 py-1.5 text-[#F5F5DC] hover:bg-[#2A2A2A] border-r border-[#2A2A2A]"
-                                disabled={quantity <= 1}
-                              >
-                                -
-                              </button>
-                              <span className="px-4 py-1.5 text-sm font-bold text-[#F5F5DC] min-w-[40px] text-center">
-                                {quantity}
-                              </span>
-                              <button 
-                                onClick={() => setQuantity(Math.min(maxTickets, quantity + 1))}
-                                className="px-3 py-1.5 text-[#F5F5DC] hover:bg-[#2A2A2A] border-l border-[#2A2A2A]"
-                                disabled={quantity >= maxTickets}
-                              >
-                                +
-                              </button>
-                            </div>
-                          </div>
-                          <p className="text-xs text-[#F5F5DC]/40 mt-2">Max {maxTickets} tickets per order</p>
                         </div>
+                      </div>
+                    ))}
+                  </div>
 
-                        {/* Price Breakdown */}
-                        <div className="mt-4 space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-[#F5F5DC]/50">Subtotal</span>
-                            <span className="text-[#F5F5DC]">₹{subtotal.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-[#F5F5DC]/50">Convenience fee</span>
-                            <span className="text-[#F5F5DC]">₹{convenienceFee}</span>
-                          </div>
-                        </div>
-
-                        {/* Total */}
-                        <div className="mt-4 pt-4 border-t border-[#2A2A2A]">
-                          <div className="flex justify-between items-center">
-                            <span className="text-lg font-bold text-[#F5F5DC]">Total</span>
-                            <span className="text-2xl font-black text-[#F5F5DC]">₹{total.toLocaleString()}</span>
-                          </div>
-                        </div>
-
-                        {/* Continue to Checkout */}
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="w-full mt-4 py-3 bg-[#EB4D4B] text-white font-black text-sm rounded-lg hover:bg-[#d43d3b] transition-all flex items-center justify-center gap-2"
-                        >
-                          <Ticket className="w-4 h-4" />
-                          CONTINUE TO CHECKOUT
-                        </motion.button>
-                      </>
-                    );
-                  })()
-                )}
-              </div>
+                  {/* Total Summary Bar */}
+                  <div className="mt-4 bg-[#EB4D4B]/10 rounded-lg p-3 flex items-center justify-between border border-[#EB4D4B]/20">
+                    <div>
+                      <p className="text-sm font-semibold text-[#F5F5DC]">₹{ticketTypes.reduce((sum, t) => sum + (t.price * (quantities[t.id] || 0)), 0).toFixed(2)}</p>
+                      <p className="text-xs text-[#F5F5DC]/60">{Object.values(quantities).reduce((a, b) => a + b, 0)} Tickets</p>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="px-6 py-2 bg-[#EB4D4B] text-white font-semibold text-sm rounded-lg hover:bg-[#d43d3b] transition-all"
+                    >
+                      Proceed
+                    </motion.button>
+                  </div>
+                </>
+              )}
             </motion.div>
           </div>
         </div>

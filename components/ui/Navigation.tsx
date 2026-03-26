@@ -1,15 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Menu, ChevronDown, Mic2, Building2, Megaphone, LogOut, UserCircle2, LayoutDashboard, CalendarDays } from 'lucide-react';
+import { Search, Menu, X, ChevronDown, Mic2, Building2, Megaphone, LogOut, UserCircle2, LayoutDashboard, CalendarDays, Heart, History } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import EyeLogo from './EyeLogo';
 
 export default function Navigation() {
   const [workDropdownOpen, setWorkDropdownOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { data: session } = useSession();
   const isLoggedIn = Boolean(session?.user);
   const isAdmin = session?.user?.role === 'admin';
@@ -21,6 +22,16 @@ export default function Navigation() {
     { name: 'Outlet Provider', href: '/work/register?role=outlet', icon: Building2, desc: 'Host events' },
     { name: 'Promoter', href: '/work/register?role=promoter', icon: Megaphone, desc: 'Sell tickets' },
   ];
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, []);
+
+  const handleSignOut = () => {
+    signOut({ callbackUrl: '/events' });
+    setMobileMenuOpen(false);
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0D0D0D]/95 backdrop-blur-md border-b border-[#2A2A2A] h-16 flex items-center">
@@ -178,6 +189,38 @@ export default function Navigation() {
                             </div>
                           </Link>
 
+                          {/* Wishlist link for regular users */}
+                          {session?.user?.role === 'user' && (
+                            <Link
+                              href="/profile?tab=wishlist"
+                              className="flex items-center gap-3 px-4 py-3 hover:bg-[#E5A823]/10 transition-colors group border-t border-[#2A2A2A]"
+                            >
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#2A2A2A] border border-[#2A2A2A] group-hover:bg-[#E5A823]/20 group-hover:border-[#E5A823] transition-all">
+                                <Heart className="w-4 h-4 text-[#EB4D4B] group-hover:text-[#E5A823]" />
+                              </div>
+                              <div>
+                                <span className="block text-[#F5F5DC] font-medium text-sm group-hover:text-[#E5A823] transition-colors">Wishlist</span>
+                                <span className="block text-[#F5F5DC]/40 text-xs">Saved events</span>
+                              </div>
+                            </Link>
+                          )}
+
+                          {/* History/Bookings link for regular users */}
+                          {session?.user?.role === 'user' && (
+                            <Link
+                              href="/profile?tab=history"
+                              className="flex items-center gap-3 px-4 py-3 hover:bg-[#E5A823]/10 transition-colors group border-t border-[#2A2A2A]"
+                            >
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#2A2A2A] border border-[#2A2A2A] group-hover:bg-[#E5A823]/20 group-hover:border-[#E5A823] transition-all">
+                                <History className="w-4 h-4 text-[#E5A823] group-hover:text-[#F5C542]" />
+                              </div>
+                              <div>
+                                <span className="block text-[#F5F5DC] font-medium text-sm group-hover:text-[#E5A823] transition-colors">History</span>
+                                <span className="block text-[#F5F5DC]/40 text-xs">Past bookings & tickets</span>
+                              </div>
+                            </Link>
+                          )}
+
                           {session?.user?.role === 'outlet' && (
                             <Link
                               href="/outlet/profile?tab=events"
@@ -228,13 +271,203 @@ export default function Navigation() {
                 </Link>
               )}
             </div>
-            
-            <button className="p-2 text-[#F5F5DC] hover:bg-[#2A2A2A] rounded-full transition-colors md:hidden">
-              <Menu className="w-6 h-6" />
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 text-[#F5F5DC] hover:bg-[#2A2A2A] rounded-full transition-colors lg:hidden"
+            >
+              <motion.div
+                animate={{ rotate: mobileMenuOpen ? 90 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </motion.div>
             </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+            />
+            
+            {/* Mobile Menu Panel */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-16 right-0 bottom-0 w-[80%] max-w-[320px] bg-[#0D0D0D] border-l border-[#2A2A2A] z-50 lg:hidden overflow-y-auto"
+            >
+              <div className="p-4 space-y-4">
+                {/* Mobile Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#F5F5DC]/50 w-4 h-4" />
+                  <input 
+                    type="text" 
+                    placeholder="Search events, venues..." 
+                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg py-2.5 pl-9 pr-3 text-sm text-[#F5F5DC] focus:outline-none focus:ring-1 focus:ring-[#E5A823] placeholder:text-[#F5F5DC]/40"
+                  />
+                </div>
+
+                {/* Mobile Navigation Links */}
+                <div className="space-y-1">
+                  <Link 
+                    href="/events" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC] font-medium"
+                  >
+                    <span>Browse Events</span>
+                  </Link>
+                  <Link 
+                    href="/help" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC]/80"
+                  >
+                    <span>Get Help</span>
+                  </Link>
+                  <Link 
+                    href="/blog" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC]/80"
+                  >
+                    <span>Blog</span>
+                  </Link>
+                </div>
+
+                {/* Divider */}
+                <div className="h-px bg-[#2A2A2A]" />
+
+                {/* Work With Us Section */}
+                <div>
+                  <p className="text-xs font-bold text-[#F5F5DC]/50 uppercase tracking-wider px-3 mb-2">Work With Us</p>
+                  <div className="space-y-1">
+                    {workItems.map((item) => (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC]"
+                      >
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#1A1A1A]">
+                          <item.icon className="w-4 h-4 text-[#E5A823]" />
+                        </div>
+                        <div>
+                          <span className="block text-sm font-medium">{item.name}</span>
+                          <span className="block text-xs text-[#F5F5DC]/50">{item.desc}</span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div className="h-px bg-[#2A2A2A]" />
+
+                {/* User Section */}
+                {isLoggedIn ? (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-3 px-3 py-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-[#E5A823] to-[#EB4D4B] flex items-center justify-center text-[#0D0D0D] font-bold">
+                        {userName.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-bold text-[#F5F5DC] text-sm">{userName}</p>
+                        <p className="text-xs text-[#F5F5DC]/50">{userEmail}</p>
+                      </div>
+                    </div>
+                    
+                    <Link
+                      href={isAdmin ? "/admin" : (session?.user?.role && ['artist', 'promoter', 'outlet'].includes(session.user.role)) ? `/${session.user.role}/profile` : "/profile"}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC]"
+                    >
+                      <LayoutDashboard className="w-5 h-5 text-[#E5A823]" />
+                      <span className="text-sm">
+                        {isAdmin ? 'Admin Dashboard' : 
+                         (session?.user?.role && ['artist', 'promoter', 'outlet'].includes(session.user.role)) ? 
+                         `${session.user.role.charAt(0).toUpperCase() + session.user.role.slice(1)} Dashboard` : 
+                         'My Account'}
+                      </span>
+                    </Link>
+
+                    {session?.user?.role === 'user' && (
+                      <>
+                        <Link
+                          href="/profile?tab=wishlist"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC]"
+                        >
+                          <Heart className="w-5 h-5 text-[#EB4D4B]" />
+                          <span className="text-sm">Wishlist</span>
+                        </Link>
+                        <Link
+                          href="/profile?tab=history"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC]"
+                        >
+                          <History className="w-5 h-5 text-[#E5A823]" />
+                          <span className="text-sm">History</span>
+                        </Link>
+                      </>
+                    )}
+
+                    {session?.user?.role === 'outlet' && (
+                      <>
+                        <Link
+                          href="/outlet/profile?tab=events"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC]"
+                        >
+                          <CalendarDays className="w-5 h-5 text-[#E5A823]" />
+                          <span className="text-sm">My Events</span>
+                        </Link>
+                        <Link
+                          href="/seller-form"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC]"
+                        >
+                          <Building2 className="w-5 h-5 text-[#E5A823]" />
+                          <span className="text-sm">Host Event</span>
+                        </Link>
+                      </>
+                    )}
+
+                    <button
+                      onClick={handleSignOut}
+                      className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#EB4D4B]/10 text-[#EB4D4B] w-full"
+                    >
+                      <LogOut className="w-5 h-5" />
+                      <span className="text-sm font-medium">Logout</span>
+                    </button>
+                  </div>
+                ) : (
+                  <Link 
+                    href="/login" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center justify-center gap-2 w-full py-3 bg-[#E5A823] text-[#0D0D0D] font-bold rounded-lg"
+                  >
+                    <UserCircle2 className="w-5 h-5" />
+                    Log in / Sign up
+                  </Link>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </nav>
   );
 }

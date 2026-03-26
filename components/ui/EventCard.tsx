@@ -2,8 +2,9 @@
 
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import Link from 'next/link';
-import { useState, MouseEvent, useRef } from 'react';
+import { useState, MouseEvent, useRef, useEffect } from 'react';
 import { Heart, Share2, Calendar, MapPin, Clock, Sparkles, Zap, Instagram } from 'lucide-react';
+import { toggleWishlist, isInWishlist, type WishlistEvent } from '@/lib/wishlist-store';
 
 interface EventCardProps {
   id: string | number;
@@ -23,6 +24,20 @@ export default function EventCard({ id, title, date, venue, price, imageColor, i
   const [isHovered, setIsHovered] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  // Check wishlist status on mount and when localStorage changes
+  useEffect(() => {
+    setIsLiked(isInWishlist(String(id)));
+  }, [id]);
+
+  // Listen for wishlist updates from other components
+  useEffect(() => {
+    const handleWishlistUpdate = () => {
+      setIsLiked(isInWishlist(String(id)));
+    };
+    window.addEventListener('wishlist-updated', handleWishlistUpdate);
+    return () => window.removeEventListener('wishlist-updated', handleWishlistUpdate);
+  }, [id]);
 
   // 3D tilt effect
   const x = useMotionValue(0);
@@ -63,7 +78,17 @@ export default function EventCard({ id, title, date, venue, price, imageColor, i
   const handleLike = (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsLiked(!isLiked);
+    const event: Omit<WishlistEvent, 'addedAt'> = {
+      id: String(id),
+      title,
+      date,
+      venue,
+      price,
+      imageUrl,
+      category
+    };
+    const newLikedState = toggleWishlist(event);
+    setIsLiked(newLikedState);
   };
 
   const shareToWhatsApp = (e: MouseEvent) => {

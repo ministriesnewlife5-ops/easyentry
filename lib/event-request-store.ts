@@ -19,6 +19,7 @@ export type EventRequest = {
     mediaFiles?: string[];
     numberOfTickets?: string;
     rules?: string[];
+    ticketCategories?: Array<{ id: string; name: string; price: number }>;
     description: string;
     fullDescription: string;
     gatesOpen: string;

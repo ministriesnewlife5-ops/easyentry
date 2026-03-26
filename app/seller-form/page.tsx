@@ -154,7 +154,8 @@ export default function SellerFormPage() {
         entryAge: '18+',
         layout: 'Standing',
         seating: 'General Admission',
-        rules: rules.filter(r => r.text.trim()).map(r => r.text)
+        rules: rules.filter(r => r.text.trim()).map(r => r.text),
+        ticketCategories: ticketCategories
       };
 
       const response = await fetch('/api/admin/event-requests', {
@@ -425,7 +426,7 @@ export default function SellerFormPage() {
       {/* Navigation Tabs */}
       <div className="bg-[#1A1A1A] border-b border-[#2A2A2A]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-8">
+          <div className="flex gap-4 sm:gap-8 overflow-x-auto scrollbar-hide">
             {[
               { id: 'details', label: 'Basic Details', icon: Edit2 },
               { id: 'media', label: 'Event Media', icon: Camera },
@@ -434,14 +435,15 @@ export default function SellerFormPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`flex items-center gap-2 py-4 border-b-2 transition-colors ${
+                className={`flex items-center gap-2 py-4 border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
                   activeTab === tab.id
                     ? 'border-[#E5A823] text-[#E5A823]'
                     : 'border-transparent text-[#F5F5DC]/60 hover:text-[#F5F5DC]'
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
-                {tab.label}
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden text-sm">{tab.label.split(' ')[0]}</span>
               </button>
             ))}
           </div>

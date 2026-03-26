@@ -63,6 +63,7 @@ export type PublicEvent = {
   artists: PublicEventArtist[];
   publishedAt: number;
   sourceRequestId?: string;
+  ticketCategories?: Array<{ id: string; name: string; price: number }>;
 };
 
 export type PublicEventCard = {
@@ -278,6 +279,7 @@ function createApprovedEvent(request: EventRequest): PublicEvent {
     artists: [],
     publishedAt: Date.now(),
     sourceRequestId: request.id,
+    ticketCategories: request.eventData.ticketCategories,
   };
 }
 
