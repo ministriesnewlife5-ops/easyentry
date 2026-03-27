@@ -120,8 +120,10 @@ const DJLightingEffects = () => {
 export default function EventsPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showPromoBanner, setShowPromoBanner] = useState(true);
-  const [displayEvents, setDisplayEvents] = useState<PublicEventCard[]>([]);
+  const [allEvents, setAllEvents] = useState<PublicEventCard[]>([]);
+  const [filteredEvents, setFilteredEvents] = useState<PublicEventCard[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { scrollY } = useScroll();
   
   // Parallax effect for hero
@@ -138,6 +140,18 @@ export default function EventsPage() {
     setShowPromoBanner(!hasActiveFilters);
   };
 
+  const handleCategorySelect = (category: string | null) => {
+    setSelectedCategory(category);
+    if (category) {
+      const filtered = allEvents.filter(event => 
+        event.category?.toLowerCase() === category.toLowerCase()
+      );
+      setFilteredEvents(filtered);
+    } else {
+      setFilteredEvents(allEvents);
+    }
+  };
+
   useEffect(() => {
     const fetchEvents = async () => {
       try {
@@ -147,7 +161,9 @@ export default function EventsPage() {
         }
 
         const data = await response.json();
-        setDisplayEvents(data.events || []);
+        const events = data.events || [];
+        setAllEvents(events);
+        setFilteredEvents(events);
       } catch (error) {
         console.error('Failed to load events:', error);
       } finally {
@@ -160,7 +176,8 @@ export default function EventsPage() {
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">
-      {/* Hero Section with Parallax */}<section className="relative h-screen w-full overflow-hidden">
+      {/* Hero Section with Parallax */}
+      <section className="relative h-screen w-full overflow-hidden">
         {/* DJ Lighting Effects */}
         <DJLightingEffects />
         
@@ -280,7 +297,12 @@ export default function EventsPage() {
           transition={{ delay: 1.3, duration: 0.5 }}
           className="absolute bottom-0 left-0 right-0 z-20 px-6 md:px-12 lg:px-20 pb-6"
         >
-          <BrowseFilters onFilterStateChange={handleFilterStateChange} />
+          <BrowseFilters 
+            events={allEvents}
+            onFilterStateChange={handleFilterStateChange}
+            onCategorySelect={handleCategorySelect}
+            selectedCategory={selectedCategory}
+          />
         </motion.div>
           {/* Promo Banner */}
           {showPromoBanner && (
@@ -299,9 +321,13 @@ export default function EventsPage() {
               <div className="rounded-2xl border border-[#2A2A2A] bg-[#101018] px-6 py-10 text-center text-[#F5F5DC]/60">
                 Loading events...
               </div>
+            ) : filteredEvents.length === 0 ? (
+              <div className="rounded-2xl border border-[#2A2A2A] bg-[#101018] px-6 py-10 text-center text-[#F5F5DC]/60">
+                {selectedCategory ? `No events found in category "${selectedCategory}"` : 'No events available'}
+              </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {displayEvents.map((event, index) => (
+                {filteredEvents.map((event, index) => (
                   <motion.div
                     key={event.id}
                     initial={{ opacity: 0, y: 20 }}

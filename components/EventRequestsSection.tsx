@@ -30,7 +30,10 @@ export default function EventRequestsSection() {
         }
 
         const data = await response.json();
-        setRequests(Array.isArray(data.requests) ? data.requests : []);
+        const sortedRequests = Array.isArray(data.requests) 
+          ? data.requests.sort((a: EventRequest, b: EventRequest) => b.submittedAt - a.submittedAt)
+          : [];
+        setRequests(sortedRequests);
       } catch {
         setError('An error occurred while loading event requests');
       } finally {

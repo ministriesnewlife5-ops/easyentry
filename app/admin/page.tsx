@@ -5,6 +5,8 @@ import { authOptions } from '@/lib/auth-options';
 import Link from 'next/link';
 import SettingsContent from '@/components/SettingsContent';
 import EventRequestsSection from '@/components/EventRequestsSection';
+import AdsBannerManager from '@/components/AdsBannerManager';
+import BrowseFiltersManager from '@/components/BrowseFiltersManager';
 import { getAllPublishedEvents, getPublishedEventCards } from '@/lib/public-events-store';
 import { getAllEventRequests } from '@/lib/event-request-store';
 import { appUsers } from '@/lib/auth-store';
@@ -36,27 +38,6 @@ const recentActivity = [
   { user: 'Vikram Singh', action: 'booked', event: 'Sufi Evening', time: '42 mins ago', amount: '₹2,500' },
   { user: 'Priya Patel', action: 'reviewed', event: 'Retro Bollywood', time: '1 hour ago', amount: null, rating: 5 },
   { user: 'Siddharth M.', action: 'booked', event: 'Techno Underground', time: '2 hours ago', amount: '₹1,800' },
-];
-
-const promoBannerPresets = [
-  {
-    id: 1,
-    tag: 'New Feature',
-    title: "Find Chennai's hottest shows",
-    description: 'Discover the best DJ nights at Gatsby, Pasha, and more. Connect your music for personalized alerts.',
-    image: 'https://images.unsplash.com/photo-1574391884720-2e45599e9633?auto=format&fit=crop&q=80&w=800',
-    primaryButton: 'SPOTIFY',
-    secondaryButton: 'APPLE MUSIC',
-  },
-  {
-    id: 2,
-    tag: 'Exclusive',
-    title: 'Experience Madras Nightlife',
-    description: 'From ECR raves to rooftop parties in OMR, find your vibe in the city.',
-    image: 'https://images.unsplash.com/photo-1514525253440-b393452e3726?auto=format&fit=crop&q=80&w=800',
-    primaryButton: 'EXPLORE EVENTS',
-    secondaryButton: '',
-  },
 ];
 
 export default async function AdminPage({
@@ -176,6 +157,10 @@ export default async function AdminPage({
               <ImageIcon className="h-4 w-4" />
               Ads Banner
             </Link>
+            <Link href="/admin?section=browse-filters" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'browse-filters' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
+              <Settings className="h-4 w-4" />
+              Browse Filters
+            </Link>
           </nav>
         </aside>
 
@@ -185,6 +170,7 @@ export default async function AdminPage({
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">
                   {activeSection === 'ads' ? 'Advertisement Banners' : 
+                   activeSection === 'browse-filters' ? 'Browse Filters' :
                    activeSection === 'events' ? 'All Platform Events' : 
                    activeSection === 'artists' ? 'All Enrolled Artists' :
                    activeSection === 'influencers' ? 'All Influencers' :
@@ -194,6 +180,7 @@ export default async function AdminPage({
                 </h1>
                 <p className="mt-1 text-sm text-[#F5F5DC]/65">
                   {activeSection === 'ads' ? 'Create and manage promotion banners from promo data presets' : 
+                   activeSection === 'browse-filters' ? 'Manage main filters and category filters for browsing events' :
                    activeSection === 'events' ? `Manage and view all ${allWebsiteEvents.length} events across the platform` : 
                    activeSection === 'artists' ? `Manage and view all ${allEnrolledArtists.length} artists enrolled on the platform` :
                    activeSection === 'influencers' ? `Manage and view all ${allInfluencers.length} influencers collaborating on the platform` :
@@ -308,60 +295,9 @@ export default async function AdminPage({
               </table>
             </article>
           ) : activeSection === 'ads' ? (
-            <article className="mt-4 rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5">
-              <div className="grid gap-4 xl:grid-cols-2">
-                <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/80 p-4">
-                  <h3 className="text-sm font-semibold text-[#F5F5DC]/80">Existing Banner Samples</h3>
-                  <ul className="mt-3 space-y-3">
-                    {promoBannerPresets.map((banner) => (
-                      <li key={banner.id} className="rounded-lg border border-[#2A2A2A] bg-[#121212] p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[#E5A823]">{banner.tag}</p>
-                        <p className="mt-1 font-semibold">{banner.title}</p>
-                        <p className="mt-1 text-sm text-[#F5F5DC]/65">{banner.description}</p>
-                        <p className="mt-2 truncate text-xs text-[#F5F5DC]/50">{banner.image}</p>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <form className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/80 p-4">
-                  <h3 className="text-sm font-semibold text-[#F5F5DC]/80">Create Advertisement Banner</h3>
-                  <div className="mt-3 grid gap-3">
-                    <div>
-                      <label className="mb-1 block text-xs text-[#F5F5DC]/60">Banner Tag</label>
-                      <input defaultValue="Exclusive" className="w-full rounded-lg border border-[#2A2A2A] bg-[#161616] px-3 py-2 text-sm outline-none transition focus:border-[#E5A823]" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-[#F5F5DC]/60">Headline</label>
-                      <input defaultValue="Experience Madras Nightlife" className="w-full rounded-lg border border-[#2A2A2A] bg-[#161616] px-3 py-2 text-sm outline-none transition focus:border-[#E5A823]" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-[#F5F5DC]/60">Description</label>
-                      <textarea defaultValue="From ECR raves to rooftop parties in OMR, find your vibe in the city." rows={3} className="w-full rounded-lg border border-[#2A2A2A] bg-[#161616] px-3 py-2 text-sm outline-none transition focus:border-[#E5A823]" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-[#F5F5DC]/60">Banner Image URL</label>
-                      <div className="relative">
-                        <ImageIcon className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#F5F5DC]/45" />
-                        <input defaultValue="https://images.unsplash.com/photo-1514525253440-b393452e3726?auto=format&fit=crop&q=80&w=800" className="w-full rounded-lg border border-[#2A2A2A] bg-[#161616] py-2 pl-8 pr-3 text-sm outline-none transition focus:border-[#E5A823]" />
-                      </div>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block text-xs text-[#F5F5DC]/60">Primary Button</label>
-                        <input defaultValue="EXPLORE EVENTS" className="w-full rounded-lg border border-[#2A2A2A] bg-[#161616] px-3 py-2 text-sm outline-none transition focus:border-[#E5A823]" />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs text-[#F5F5DC]/60">Secondary Button</label>
-                        <input defaultValue="APPLE MUSIC" className="w-full rounded-lg border border-[#2A2A2A] bg-[#161616] px-3 py-2 text-sm outline-none transition focus:border-[#E5A823]" />
-                      </div>
-                    </div>
-                    <button type="button" className="mt-1 rounded-lg bg-[#E5A823] px-4 py-2 text-sm font-semibold text-[#0D0D0D] transition hover:bg-[#F5C542]">
-                      Save Banner
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </article>
+            <AdsBannerManager />
+          ) : activeSection === 'browse-filters' ? (
+            <BrowseFiltersManager />
           ) : activeSection === 'requests' ? (
             <EventRequestsSection />
           ) : activeSection === 'settings' ? (

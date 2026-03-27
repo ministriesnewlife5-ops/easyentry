@@ -1,48 +1,168 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Calendar, Tag, Mic, PartyPopper, Disc, Smile, Drama, Palette, Building2 } from 'lucide-react';
-import { useState } from 'react';
+import { MapPin, Calendar, Tag, Mic, PartyPopper, Disc, Smile, Drama, Palette, Building2, LucideIcon } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import type { PublicEventCard } from '@/lib/public-events-store';
 
-const mainFilters = [
-  { name: 'CHENNAI', icon: MapPin },
-  { name: 'DATE', icon: Calendar },
-  { name: 'PRICE', icon: Tag },
-  { name: 'ARTIST', icon: Tag, href: '/artist' },
-  { name: 'VENUES', icon: Building2, href: '/venues' },
-];
+type Category = {
+  name: string;
+  icon: string;
+  subFilters: string[];
+};
 
-const categories = [
-  { name: 'Gigs', icon: Mic, subFilters: ['Alternative', 'Afropop', 'Alt-rock', 'Black metal', 'Britpop', 'Celtic', 'Chamber pop', 'Chiptune', 'Cumbia', 'Dance'] },
-  { name: 'Party', icon: PartyPopper, subFilters: ['House', 'Techno', 'Trance', 'Drum & Bass', 'Dubstep', 'EDM', 'Garage', 'Disco', 'Funk', 'Soul'] },
-  { name: 'DJ', icon: Disc, subFilters: ['Hip Hop', 'R&B', 'Reggaeton', 'Latin', 'Jazz', 'Blues', 'Folk', 'Country', 'Electronic', 'Ambient'] },
-  { name: 'Comedy', icon: Smile, subFilters: ['Stand-up', 'Improv', 'Sketch', 'Dark Comedy', 'Satire', 'Observational', 'Slapstick', 'Musical Comedy', 'Romantic Comedy'] },
-  { name: 'Theatre', icon: Drama, subFilters: ['Drama', 'Musical', 'Opera', 'Ballet', 'Contemporary', 'Experimental', 'Immersive', 'Street Theatre', 'Puppetry', 'Mime'] },
-  { name: 'Art', icon: Palette, subFilters: ['Painting', 'Sculpture', 'Photography', 'Digital Art', 'Installation', 'Performance Art', 'Mixed Media', 'Printmaking', 'Ceramics', 'Textiles'] },
-];
- 
-export default function BrowseFilters({ onFilterStateChange }: { onFilterStateChange?: (hasActiveFilters: boolean) => void }) {
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+type MainFilter = {
+  name: string;
+  icon: string;
+  href?: string;
+};
+
+type BrowseFiltersData = {
+  mainFilters: MainFilter[];
+  categories: Category[];
+};
+
+const STORAGE_KEY = 'easyentry.browse-filters';
+
+const iconMap: Record<string, LucideIcon> = {
+  MapPin, Calendar, Tag, Mic, PartyPopper, Disc, Smile, Drama, Palette, Building2
+};
+
+const defaultFilters: BrowseFiltersData = {
+  mainFilters: [
+    { name: 'CHENNAI', icon: 'MapPin' },
+    { name: 'DATE', icon: 'Calendar' },
+    { name: 'PRICE', icon: 'Tag' },
+    { name: 'ARTIST', icon: 'Tag', href: '/artist' },
+    { name: 'VENUES', icon: 'Building2', href: '/venues' },
+  ],
+  categories: [
+    { name: 'Gigs', icon: 'Mic', subFilters: ['Alternative', 'Afropop', 'Alt-rock', 'Black metal', 'Britpop', 'Celtic', 'Chamber pop', 'Chiptune', 'Cumbia', 'Dance'] },
+    { name: 'Party', icon: 'PartyPopper', subFilters: ['House', 'Techno', 'Trance', 'Drum & Bass', 'Dubstep', 'EDM', 'Garage', 'Disco', 'Funk', 'Soul'] },
+    { name: 'DJ', icon: 'Disc', subFilters: ['Hip Hop', 'R&B', 'Reggaeton', 'Latin', 'Jazz', 'Blues', 'Folk', 'Country', 'Electronic', 'Ambient'] },
+    { name: 'Comedy', icon: 'Smile', subFilters: ['Stand-up', 'Improv', 'Sketch', 'Dark Comedy', 'Satire', 'Observational', 'Slapstick', 'Musical Comedy', 'Romantic Comedy'] },
+    { name: 'Theatre', icon: 'Drama', subFilters: ['Drama', 'Musical', 'Opera', 'Ballet', 'Contemporary', 'Experimental', 'Immersive', 'Street Theatre', 'Puppetry', 'Mime'] },
+    { name: 'Art', icon: 'Palette', subFilters: ['Painting', 'Sculpture', 'Photography', 'Digital Art', 'Installation', 'Performance Art', 'Mixed Media', 'Printmaking', 'Ceramics', 'Textiles'] },
+  ],
+};
+
+function getStoredFilters(): BrowseFiltersData {
+  if (typeof window === 'undefined') return defaultFilters;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : defaultFilters;
+  } catch (e) {
+    console.error('Error reading filters:', e);
+    return defaultFilters;
+  }
+}
+
+export default function BrowseFilters({ 
+  events = [],
+  onFilterStateChange,
+  onCategorySelect,
+  selectedCategory
+}: { 
+  events?: PublicEventCard[];
+  onFilterStateChange?: (hasActiveFilters: boolean) => void;
+  onCategorySelect?: (category: string | null) => void;
+  selectedCategory?: string | null;
+}) {
+  const [filters, setFilters] = useState<BrowseFiltersData>(defaultFilters);
+  const [activeCategory, setActiveCategory] = useState<string | null>(selectedCategory || null);
   const [activeFilters, setActiveFilters] = useState<string[]>(['CHENNAI']);
   const [activeSubFilters, setActiveSubFilters] = useState<string[]>([]);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+  const [dynamicCategories, setDynamicCategories] = useState<Category[]>([]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const dateInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Extract unique categories from events
+  useEffect(() => {
+    if (events.length > 0) {
+      const categoryMap = new Map<string, string>();
+      
+      events.forEach(event => {
+        if (event.category) {
+          const normalized = event.category.trim();
+          if (normalized && !categoryMap.has(normalized.toLowerCase())) {
+            // Map common categories to icons
+            let icon = 'Mic';
+            const lower = normalized.toLowerCase();
+            if (lower.includes('dj') || lower.includes('disc')) icon = 'Disc';
+            else if (lower.includes('party')) icon = 'PartyPopper';
+            else if (lower.includes('comedy') || lower.includes('smile')) icon = 'Smile';
+            else if (lower.includes('theatre') || lower.includes('drama')) icon = 'Drama';
+            else if (lower.includes('art') || lower.includes('paint')) icon = 'Palette';
+            else if (lower.includes('edm') || lower.includes('techno') || lower.includes('house')) icon = 'PartyPopper';
+            else if (lower.includes('live') || lower.includes('commercial') || lower.includes('bollywood')) icon = 'Mic';
+            
+            categoryMap.set(normalized.toLowerCase(), icon);
+          }
+        }
+      });
+
+      const newCategories: Category[] = Array.from(categoryMap.entries()).map(([name, icon]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        icon,
+        subFilters: []
+      }));
+
+      setDynamicCategories(newCategories);
+    }
+  }, [events]);
+
+  // Update active category when selectedCategory prop changes
+  useEffect(() => {
+    setActiveCategory(selectedCategory || null);
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    setFilters(getStoredFilters());
+
+    const handleStorageChange = () => {
+      setFilters(getStoredFilters());
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Combine default and dynamic categories, avoiding duplicates
+  const allCategories = [...filters.categories];
+  dynamicCategories.forEach(dynamicCat => {
+    const exists = allCategories.some(cat => 
+      cat.name.toLowerCase() === dynamicCat.name.toLowerCase()
+    );
+    if (!exists) {
+      allCategories.push(dynamicCat);
+    }
+  });
 
   // Check if there are any active filters beyond default CHENNAI
   const hasActiveFilters = activeCategory !== null || activeSubFilters.length > 0 || activeFilters.some(f => f !== 'CHENNAI');
+
+  const getIconComponent = (iconName: string) => {
+    return iconMap[iconName] || MapPin;
+  };
 
   const toggleFilter = (name: string, href?: string) => {
     if (href) {
       router.push(href);
       return;
     }
+    // Handle DATE filter - open date picker
+    if (name === 'DATE') {
+      setShowDatePicker(true);
+      return;
+    }
     const newFilters = activeFilters.includes(name)
       ? activeFilters.filter(f => f !== name)
       : [...activeFilters, name];
     setActiveFilters(newFilters);
-    // Notify parent about filter state change after a short delay
     setTimeout(() => {
       const hasActive = activeCategory !== null || activeSubFilters.length > 0 || newFilters.some(f => f !== 'CHENNAI');
       onFilterStateChange?.(hasActive);
@@ -62,10 +182,11 @@ export default function BrowseFilters({ onFilterStateChange }: { onFilterStateCh
   const handleCategoryClick = (catName: string, isActive: boolean) => {
     const newCategory = isActive ? null : catName;
     setActiveCategory(newCategory);
-    // Clear sub-filters when closing category
     if (isActive) {
       setActiveSubFilters([]);
     }
+    // Notify parent component about category selection
+    onCategorySelect?.(newCategory);
     setTimeout(() => {
       const hasActive = newCategory !== null || (!isActive && activeSubFilters.length > 0) || activeFilters.some(f => f !== 'CHENNAI');
       onFilterStateChange?.(hasActive);
@@ -81,8 +202,9 @@ export default function BrowseFilters({ onFilterStateChange }: { onFilterStateCh
       <div className="container mx-auto">
         {/* Main Filters (Location, Date, Price) */}
         <div className="flex gap-3 mb-6 overflow-x-auto scrollbar-hide pb-2 md:pb-0">
-          {mainFilters.map((filter, i) => {
+          {filters.mainFilters.map((filter, i) => {
             const isActive = activeFilters.includes(filter.name);
+            const IconComponent = getIconComponent(filter.icon);
             return (
               <motion.button
                 key={filter.name}
@@ -102,7 +224,7 @@ export default function BrowseFilters({ onFilterStateChange }: { onFilterStateCh
                   animate={{ rotate: isActive ? 360 : 0 }}
                   transition={{ duration: 0.5 }}
                 >
-                  <filter.icon className={`w-3 h-3 ${isActive ? 'text-black' : ''}`} />
+                  <IconComponent className={`w-3 h-3 ${isActive ? 'text-black' : ''}`} />
                 </motion.div>
                 {filter.name}
               </motion.button>
@@ -110,11 +232,53 @@ export default function BrowseFilters({ onFilterStateChange }: { onFilterStateCh
           })}
         </div>
 
-        {/* Category Filters */}
+        {/* Date Picker Modal */}
+        {showDatePicker && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onClick={() => setShowDatePicker(false)}
+          >
+            <div className="rounded-xl border border-[#2A2A2A] bg-[#101018] p-6" onClick={e => e.stopPropagation()}>
+              <label className="block text-sm font-medium mb-3">Select Event Date</label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  if (e.target.value) {
+                    const dateLabel = new Date(e.target.value).toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric' 
+                    });
+                    // Update filters to show selected date
+                    const newFilters = [...activeFilters.filter(f => f !== 'DATE'), dateLabel];
+                    setActiveFilters(newFilters);
+                  }
+                  setShowDatePicker(false);
+                }}
+                className="w-full rounded-lg border border-[#2A2A2A] bg-[#161616] px-4 py-2 text-sm outline-none transition focus:border-[#E5A823]"
+              />
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => setShowDatePicker(false)}
+                  className="flex-1 rounded-lg bg-[#2A2A2A] px-4 py-2 text-sm font-semibold text-[#F5F5DC] transition hover:bg-[#3A3A3A]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Category Filters - Now includes dynamic categories from events */}
         <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 md:pb-0">
-          {categories.map((cat, i) => {
+          {allCategories.map((cat, i) => {
             const isActive = activeCategory === cat.name;
             const isHovered = hoveredCategory === cat.name;
+            const IconComponent = getIconComponent(cat.icon);
             return (
               <motion.button
                 key={cat.name}
@@ -166,7 +330,7 @@ export default function BrowseFilters({ onFilterStateChange }: { onFilterStateCh
                   }}
                   className="relative z-10"
                 >
-                  <cat.icon className={`w-6 h-6 mb-2 transition-all ${
+                  <IconComponent className={`w-6 h-6 mb-2 transition-all ${
                     isActive 
                       ? 'text-[#0D0D0D]' 
                       : isHovered
@@ -207,7 +371,7 @@ export default function BrowseFilters({ onFilterStateChange }: { onFilterStateCh
                 transition={{ delay: 0.1 }}
               >
                 <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-                  {categories
+                  {allCategories
                     .find((cat) => cat.name === activeCategory)
                     ?.subFilters.map((sub, i) => {
                       const isSubActive = activeSubFilters.includes(sub);

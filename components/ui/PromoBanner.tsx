@@ -5,28 +5,17 @@ import { Music, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState, useCallback } from 'react';
 
-const promoSlides = [
-  {
-    id: 1,
-    tag: 'New Feature',
-    title: "Find Chennai's hottest shows",
-    description: 'Discover the best DJ nights at Sin and Tonic, Pasha, and more. Connect your music for personalized alerts.',
-    image: '/ban1.jpg',
-    buttons: [
-      { label: 'Learn More', color: 'bg-white text-black' },
-    ]
-  },
-  {
-    id: 2,
-    tag: 'Exclusive',
-    title: 'Experience Madras Nightlife',
-    description: 'From ECR raves to rooftop parties in OMR, find your vibe in the city.',
-    image: '/ban2.jpg',
-    buttons: [
-      { label: 'EXPLORE EVENTS', color: 'bg-[#E5A823] text-black' }
-    ]
-  }
-];
+type PromoSlide = {
+  id: number;
+  tag: string;
+  title: string;
+  description: string;
+  image: string;
+  buttonLabel: string;
+  buttonLink: string;
+};
+
+const STORAGE_KEY = 'easyentry.promo-banners';
 
 // Pre-defined particle data to avoid hydration mismatch
 const particles = [
@@ -42,27 +31,83 @@ const particles = [
 
 export default function PromoBanner() {
   const [mounted, setMounted] = useState(false);
+  const [promoSlides, setPromoSlides] = useState<PromoSlide[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0); // -1 for left, 1 for right
 
   useEffect(() => {
     setMounted(true);
+    // Load banners from localStorage
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Convert banner format to promo slide format
+        const slides = parsed.map((banner: any) => ({
+          id: banner.id,
+          tag: banner.tag,
+          title: banner.title,
+          description: banner.description,
+          image: banner.image,
+          buttonLabel: banner.buttonLabel || 'Learn More',
+          buttonLink: banner.buttonLink || '#'
+        }));
+        setPromoSlides(slides);
+      }
+    } catch (e) {
+      console.error('Error loading promo banners:', e);
+    }
   }, []);
 
   const nextSlide = useCallback(() => {
+    if (promoSlides.length === 0) return;
     setDirection(1);
     setCurrentIndex((prev) => (prev + 1) % promoSlides.length);
-  }, []);
+  }, [promoSlides.length]);
 
   const prevSlide = useCallback(() => {
+    if (promoSlides.length === 0) return;
     setDirection(-1);
     setCurrentIndex((prev) => (prev - 1 + promoSlides.length) % promoSlides.length);
-  }, []);
+  }, [promoSlides.length]);
 
   useEffect(() => {
+    if (promoSlides.length === 0) return;
     const timer = setInterval(nextSlide, 8000);
     return () => clearInterval(timer);
-  }, [nextSlide]);
+  }, [nextSlide, promoSlides.length]);
+
+  // Handle storage changes from admin panel
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const slides = parsed.map((banner: any) => ({
+            id: banner.id,
+            tag: banner.tag,
+            title: banner.title,
+            description: banner.description,
+            image: banner.image,
+            buttonLabel: banner.buttonLabel || 'Learn More',
+            buttonLink: banner.buttonLink || '#'
+          }));
+          setPromoSlides(slides);
+          if (currentIndex >= slides.length) {
+            setCurrentIndex(0);
+          }
+        } else {
+          setPromoSlides([]);
+        }
+      } catch (e) {
+        console.error('Error syncing promo banners:', e);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [currentIndex]);
 
   if (!mounted) {
     return (
@@ -70,10 +115,25 @@ export default function PromoBanner() {
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0D0D0D] via-[#2A2A2A] to-[#0D0D0D] border border-[#2A2A2A] p-8 md:p-12 shadow-2xl h-[400px] lg:h-[380px]">
           <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8 h-full min-h-[400px] lg:min-h-[380px]">
             <div className="flex flex-col items-start max-w-xl">
-              <span className="text-[#E5A823] text-sm font-bold tracking-wider uppercase mb-4">{promoSlides[0].tag}</span>
-              <h2 className="text-3xl md:text-5xl font-black text-[#F5F5DC] mb-4">{promoSlides[0].title}</h2>
-              <p className="text-[#F5F5DC]/70 text-lg mb-8">{promoSlides[0].description}</p>
+              <span className="text-[#E5A823] text-sm font-bold tracking-wider uppercase mb-4">Loading...</span>
+              <h2 className="text-3xl md:text-5xl font-black text-[#F5F5DC] mb-4">Promo Banner</h2>
+              <p className="text-[#F5F5DC]/70 text-lg mb-8">Loading promotional content...</p>
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state when no banners
+  if (promoSlides.length === 0) {
+    return (
+      <div className="w-full py-8">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0D0D0D] via-[#2A2A2A] to-[#0D0D0D] border border-[#2A2A2A] p-8 md:p-12 shadow-2xl h-[400px] lg:h-[380px]">
+          <div className="relative z-10 flex flex-col items-center justify-center h-full text-center">
+            <Sparkles className="w-16 h-16 text-[#E5A823]/30 mb-4" />
+            <h2 className="text-2xl md:text-3xl font-bold text-[#F5F5DC] mb-2">No Promo Banners</h2>
+            <p className="text-[#F5F5DC]/50 text-lg">Add banners from the admin dashboard to display them here</p>
           </div>
         </div>
       </div>
@@ -174,14 +234,12 @@ export default function PromoBanner() {
                 transition={{ delay: 0.5 }}
                 className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto"
               >
-                {promoSlides[currentIndex].buttons.map((btn, idx) => (
-                  <button 
-                    key={idx}
-                    className={`flex items-center justify-center gap-3 px-8 py-4 ${btn.color} rounded-full font-black hover:scale-105 transition-transform`}
-                  >
-                    {btn.label}
-                  </button>
-                ))}
+                <a 
+                  href={promoSlides[currentIndex].buttonLink}
+                  className="flex items-center justify-center gap-3 px-8 py-4 bg-[#E5A823] text-black rounded-full font-black hover:scale-105 transition-transform"
+                >
+                  {promoSlides[currentIndex].buttonLabel}
+                </a>
               </motion.div>
             </div>
 
