@@ -23,7 +23,8 @@ import {
   Plus,
   Trash2,
   Video,
-  X
+  X,
+  Clock
 } from 'lucide-react';
 import Navigation from '@/components/ui/Navigation';
 import Footer from '@/components/ui/Footer';
@@ -46,7 +47,9 @@ export default function SellerFormPage() {
     price: '',
     organizer: '',
     location: '',
-    datetime: '',
+    date: '',
+    startTime: '',
+    endTime: '',
     about: '',
     rules: '',
     numberOfTickets: '',
@@ -68,7 +71,7 @@ export default function SellerFormPage() {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [ticketCategories, setTicketCategories] = useState<Array<{ id: string; name: string; price: number }>>([]);
+  const [ticketCategories, setTicketCategories] = useState<Array<{ id: string; name: string; price: number; availableFromDate?: string; availableFromTime?: string; availableUntilDate?: string; availableUntilTime?: string }>>([]);
   const [previewCategoryId, setPreviewCategoryId] = useState<string>('female');
   const [customCategory, setCustomCategory] = useState('');
   const [rules, setRules] = useState<Array<{ id: string; text: string }>>([{ id: '1', text: '' }]);
@@ -103,8 +106,8 @@ export default function SellerFormPage() {
     e.preventDefault();
     
     // Validate required fields
-    if (!formData.title || !formData.datetime || !formData.location) {
-      setNotificationMessage('Please fill in all required fields (Title, Date & Time, Location)');
+    if (!formData.title || !formData.date || !formData.startTime || !formData.location) {
+      setNotificationMessage('Please fill in all required fields (Title, Date, Start Time, Location)');
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 5000);
       return;
@@ -113,11 +116,6 @@ export default function SellerFormPage() {
     setIsSubmitting(true);
     
     try {
-      // Format the date and time from datetime input
-      const dateObj = new Date(formData.datetime);
-      const dateStr = dateObj.toISOString().split('T')[0];
-      const timeStr = dateObj.toTimeString().slice(0, 5);
-      
       // Get the minimum price from ticket categories or form
       const minPrice = ticketCategories.length > 0 
         ? Math.min(...ticketCategories.map(c => c.price))
@@ -140,8 +138,9 @@ export default function SellerFormPage() {
       const eventData = {
         title: formData.title,
         subtitle: formData.description,
-        date: dateStr,
-        time: timeStr,
+        date: formData.date,
+        startTime: formData.startTime,
+        endTime: formData.endTime,
         venue: formData.location,
         category: formData.category === 'Other' ? customCategory : (formData.category || 'General'),
         price: `₹${minPrice}`,
@@ -150,12 +149,20 @@ export default function SellerFormPage() {
         mediaFiles: mediaFilesBase64,
         description: formData.about,
         fullDescription: formData.about,
-        gatesOpen: timeStr,
+        gatesOpen: formData.startTime,
         entryAge: '18+',
         layout: 'Standing',
         seating: 'General Admission',
         rules: rules.filter(r => r.text.trim()).map(r => r.text),
-        ticketCategories: ticketCategories
+        ticketCategories: ticketCategories.map(cat => ({
+          ...cat,
+          availableFrom: cat.availableFromDate && cat.availableFromTime 
+            ? `${cat.availableFromDate}T${cat.availableFromTime}` 
+            : (cat.availableFromDate || undefined),
+          availableUntil: cat.availableUntilDate && cat.availableUntilTime 
+            ? `${cat.availableUntilDate}T${cat.availableUntilTime}` 
+            : (cat.availableUntilDate || undefined)
+        }))
       };
 
       const response = await fetch('/api/admin/event-requests', {
@@ -181,7 +188,7 @@ export default function SellerFormPage() {
         saveHostedEvent({
           id: Date.now(),
           title: formData.title,
-          date: dateStr,
+          date: formData.date,
           venue: formData.location,
           price: `₹${minPrice}`,
           imageColor: 'bg-blue-900',
@@ -197,7 +204,9 @@ export default function SellerFormPage() {
           price: '',
           organizer: '',
           location: '',
-          datetime: '',
+          date: '',
+          startTime: '',
+          endTime: '',
           about: '',
           rules: '',
           numberOfTickets: '',
@@ -273,11 +282,6 @@ export default function SellerFormPage() {
     e.preventDefault();
     
     try {
-      // Format the date and time from datetime input
-      const dateObj = new Date(formData.datetime);
-      const dateStr = dateObj.toISOString().split('T')[0];
-      const timeStr = dateObj.toTimeString().slice(0, 5);
-      
       // Get the minimum price from ticket categories or form
       const minPrice = ticketCategories.length > 0 
         ? Math.min(...ticketCategories.map(c => c.price))
@@ -293,15 +297,16 @@ export default function SellerFormPage() {
       const eventData = {
         title: formData.title,
         subtitle: formData.description,
-        date: dateStr,
-        time: timeStr,
+        date: formData.date,
+        time: formData.startTime,
+        endTime: formData.endTime,
         venue: formData.location,
         category: 'General',
         price: `₹${minPrice}`,
         image: imageBase64,
         description: formData.about,
         fullDescription: formData.about,
-        gatesOpen: timeStr,
+        gatesOpen: formData.startTime,
         entryAge: '18+',
         layout: 'Standing',
         seating: 'General Admission'
@@ -330,7 +335,7 @@ export default function SellerFormPage() {
         saveHostedEvent({
           id: Date.now(),
           title: formData.title,
-          date: dateStr,
+          date: formData.date,
           venue: formData.location,
           price: `₹${minPrice}`,
           imageColor: 'bg-blue-900',
@@ -346,7 +351,9 @@ export default function SellerFormPage() {
           price: '',
           organizer: '',
           location: '',
-          datetime: '',
+          date: '',
+          startTime: '',
+          endTime: '',
           about: '',
           rules: '',
           numberOfTickets: '',
@@ -537,62 +544,126 @@ export default function SellerFormPage() {
                       </div>
                     </div>
 
-                    <div>
+                    <div className="md:col-span-2">
                       <label className="block text-sm font-medium mb-3">Ticket Categories *</label>
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {ticketCategories.map((cat, idx) => (
-                          <div key={cat.id} className="flex items-center gap-3">
-                            <input
-                              type="text"
-                              value={cat.name}
-                              onChange={(e) => {
-                                const v = e.target.value.toUpperCase();
-                                setTicketCategories((prev) =>
-                                  prev.map((c) => (c.id === cat.id ? { ...c, name: v } : c))
-                                );
-                              }}
-                              className="flex-1 bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                              placeholder="Category name"
-                              required
-                            />
-                            <div className="relative w-40">
-                              <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/50" />
+                          <div key={cat.id} className="bg-[#0F0F0F] rounded-xl p-4 border border-[#2A2A2A]">
+                            <div className="flex items-center gap-3 mb-3">
                               <input
-                                type="number"
-                                value={cat.price}
+                                type="text"
+                                value={cat.name}
                                 onChange={(e) => {
-                                  const price = Math.max(0, Number(e.target.value));
+                                  const v = e.target.value.toUpperCase();
                                   setTicketCategories((prev) =>
-                                    prev.map((c) => (c.id === cat.id ? { ...c, price } : c))
+                                    prev.map((c) => (c.id === cat.id ? { ...c, name: v } : c))
                                   );
-                                  if (cat.id === previewCategoryId) {
-                                    setPricing((p) => ({ ...p, ticket: price }));
-                                  }
                                 }}
-                                className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-9 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                                placeholder="0"
-                                min={0}
-                                step={0.01}
+                                className="flex-1 bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                placeholder="Category name"
                                 required
                               />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setTicketCategories((prev) => prev.filter((c) => c.id !== cat.id));
-                                if (previewCategoryId === cat.id && ticketCategories.length > 1) {
-                                  const next = ticketCategories.find((c) => c.id !== cat.id);
-                                  if (next) {
-                                    setPreviewCategoryId(next.id);
-                                    setPricing((p) => ({ ...p, ticket: next.price }));
+                              <div className="relative w-32">
+                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/50" />
+                                <input
+                                  type="number"
+                                  value={cat.price}
+                                  onChange={(e) => {
+                                    const price = Math.max(0, Number(e.target.value));
+                                    setTicketCategories((prev) =>
+                                      prev.map((c) => (c.id === cat.id ? { ...c, price } : c))
+                                    );
+                                    if (cat.id === previewCategoryId) {
+                                      setPricing((p) => ({ ...p, ticket: price }));
+                                    }
+                                  }}
+                                  className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-9 pr-3 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                  placeholder="0"
+                                  min={0}
+                                  step={0.01}
+                                  required
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTicketCategories((prev) => prev.filter((c) => c.id !== cat.id));
+                                  if (previewCategoryId === cat.id && ticketCategories.length > 1) {
+                                    const next = ticketCategories.find((c) => c.id !== cat.id);
+                                    if (next) {
+                                      setPreviewCategoryId(next.id);
+                                      setPricing((p) => ({ ...p, ticket: next.price }));
+                                    }
                                   }
-                                }
-                              }}
-                              disabled={ticketCategories.length <= 1}
-                              className="p-2 rounded-lg border border-[#2A2A2A] hover:border-[#EB4D4B] hover:bg-[#EB4D4B]/10 disabled:opacity-40"
-                            >
-                              <Trash2 className="w-4 h-4 text-[#F5F5DC]/70" />
-                            </button>
+                                }}
+                                disabled={ticketCategories.length <= 1}
+                                className="p-2 rounded-lg border border-[#2A2A2A] hover:border-[#EB4D4B] hover:bg-[#EB4D4B]/10 disabled:opacity-40"
+                              >
+                                <Trash2 className="w-4 h-4 text-[#F5F5DC]/70" />
+                              </button>
+                            </div>
+                            <div className="space-y-3">
+                              {/* Available from */}
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-[#F5F5DC]/50 whitespace-nowrap w-24">Available from:</span>
+                                <div className="flex-1">
+                                  <input
+                                    type="date"
+                                    value={cat.availableFromDate || ''}
+                                    onChange={(e) => {
+                                      const date = e.target.value;
+                                      setTicketCategories((prev) =>
+                                        prev.map((c) => (c.id === cat.id ? { ...c, availableFromDate: date } : c))
+                                      );
+                                    }}
+                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
+                                  />
+                                </div>
+                                <div className="w-28">
+                                  <input
+                                    type="time"
+                                    value={cat.availableFromTime || ''}
+                                    onChange={(e) => {
+                                      const time = e.target.value;
+                                      setTicketCategories((prev) =>
+                                        prev.map((c) => (c.id === cat.id ? { ...c, availableFromTime: time } : c))
+                                      );
+                                    }}
+                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
+                                  />
+                                </div>
+                              </div>
+                              {/* Available until */}
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-[#F5F5DC]/50 whitespace-nowrap w-24">Available until:</span>
+                                <div className="flex-1">
+                                  <input
+                                    type="date"
+                                    value={cat.availableUntilDate || ''}
+                                    onChange={(e) => {
+                                      const date = e.target.value;
+                                      setTicketCategories((prev) =>
+                                        prev.map((c) => (c.id === cat.id ? { ...c, availableUntilDate: date } : c))
+                                      );
+                                    }}
+                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
+                                  />
+                                </div>
+                                <div className="w-28">
+                                  <input
+                                    type="time"
+                                    value={cat.availableUntilTime || ''}
+                                    onChange={(e) => {
+                                      const time = e.target.value;
+                                      setTicketCategories((prev) =>
+                                        prev.map((c) => (c.id === cat.id ? { ...c, availableUntilTime: time } : c))
+                                      );
+                                    }}
+                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
+                                  />
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         ))}
                         <button
@@ -740,10 +811,10 @@ export default function SellerFormPage() {
                                       <div className="text-2xl font-black text-[#F5F5DC] mt-1">{fmt(customerPays)}</div>
                                       <div className="text-[10px] text-[#F5F5DC]/40 mt-1">full price</div>
                                     </div>
-                                    <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
-                                      <div className="text-xs text-[#F5F5DC]/50">Outlet</div>
-                                      <div className="text-2xl font-black text-[#F5F5DC] mt-1">{fmt(outletNet)}</div>
-                                      <div className="text-[10px] text-[#F5F5DC]/40 mt-1">bears artist share</div>
+                                    <div className="rounded-xl border border-[#3E83B6]/50 bg-[#3E83B6]/10 p-4">
+                                      <div className="text-xs text-[#3E83B6]">Outlet</div>
+                                      <div className="text-2xl font-black text-[#3E83B6] mt-1">{fmt(outletNet)}</div>
+                                      <div className="text-[10px] text-[#3E83B6]/70 mt-1">bears artist share</div>
                                     </div>
                                     <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
                                       <div className="text-xs text-[#F5F5DC]/50">Artist</div>
@@ -829,15 +900,15 @@ export default function SellerFormPage() {
                     Time & Location
                   </h3>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
-                      <label className="block text-sm font-medium mb-3">Date & Time *</label>
+                      <label className="block text-sm font-medium mb-3">Event Date *</label>
                       <div className="relative">
                         <Calendar className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
                         <input
-                          type="datetime-local"
-                          name="datetime"
-                          value={formData.datetime}
+                          type="date"
+                          name="date"
+                          value={formData.date}
                           onChange={handleInputChange}
                           className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
                           required
@@ -846,6 +917,35 @@ export default function SellerFormPage() {
                     </div>
 
                     <div>
+                      <label className="block text-sm font-medium mb-3">Start Time *</label>
+                      <div className="relative">
+                        <Clock className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
+                        <input
+                          type="time"
+                          name="startTime"
+                          value={formData.startTime}
+                          onChange={handleInputChange}
+                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-3">End Time</label>
+                      <div className="relative">
+                        <Clock className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
+                        <input
+                          type="time"
+                          name="endTime"
+                          value={formData.endTime}
+                          onChange={handleInputChange}
+                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-3">
                       <label className="block text-sm font-medium mb-3">Location / Venue *</label>
                       <div className="relative">
                         <MapPin className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />

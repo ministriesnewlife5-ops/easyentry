@@ -63,7 +63,7 @@ export type PublicEvent = {
   artists: PublicEventArtist[];
   publishedAt: number;
   sourceRequestId?: string;
-  ticketCategories?: Array<{ id: string; name: string; price: number }>;
+  ticketCategories?: Array<{ id: string; name: string; price: number; availableFrom?: string; availableUntil?: string }>;
 };
 
 export type PublicEventCard = {

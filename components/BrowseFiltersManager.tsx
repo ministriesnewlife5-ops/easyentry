@@ -45,9 +45,11 @@ const defaultFilters: BrowseFiltersData = {
     { name: 'DATE', icon: 'Calendar' },
     { name: 'PRICE', icon: 'Tag' },
     { name: 'ARTIST', icon: 'Tag', href: '/artist' },
+    { name: 'OUTLET TYPE', icon: 'Building2' },
     { name: 'VENUES', icon: 'Building2', href: '/venues' },
   ],
   categories: [
+    { name: 'Outlet Type', icon: 'Building2', subFilters: ['Restobar', 'Nightclub', 'Lounge', 'Pub', 'Bar', 'Restaurant', 'Cafe', 'Event Space', 'Auditorium', 'Open Air'] },
     { name: 'Gigs', icon: 'Mic', subFilters: ['Alternative', 'Afropop', 'Alt-rock', 'Black metal', 'Britpop', 'Celtic', 'Chamber pop', 'Chiptune', 'Cumbia', 'Dance'] },
     { name: 'Party', icon: 'PartyPopper', subFilters: ['House', 'Techno', 'Trance', 'Drum & Bass', 'Dubstep', 'EDM', 'Garage', 'Disco', 'Funk', 'Soul'] },
     { name: 'DJ', icon: 'Disc', subFilters: ['Hip Hop', 'R&B', 'Reggaeton', 'Latin', 'Jazz', 'Blues', 'Folk', 'Country', 'Electronic', 'Ambient'] },

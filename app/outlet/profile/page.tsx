@@ -7,14 +7,14 @@ import {
   Building2, Edit2, CheckCircle2,
   Instagram, Phone, Mail,
   Users, Loader2, CalendarDays, Clock3, IndianRupee, ExternalLink,
-  Plus
+  Plus, LayoutDashboard, TrendingUp, DollarSign, Ticket, Eye
 } from 'lucide-react';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
-type ActiveTab = 'details' | 'about' | 'events';
+type ActiveTab = 'dashboard' | 'details' | 'about' | 'events';
 
 type OutletEventItem = {
   requestId: string;
@@ -255,6 +255,7 @@ function OutletProfileContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-8">
             {[
+              { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
               { id: 'details', label: 'Basic Details', icon: Edit2 },
               { id: 'about', label: 'About & Social', icon: Building2 },
               { id: 'events', label: 'Events', icon: CalendarDays },
@@ -291,7 +292,8 @@ function OutletProfileContent() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium mb-3">Venue Photo</label>
+                    <label className="block text-sm font-medium mb-1">Venue Photo</label>
+                    <p className="text-xs text-[#EB4D4B] mb-2">Recommended: 400x400px (1:1 ratio)</p>
                     <div 
                       onClick={() => profileInputRef.current?.click()}
                       className="relative w-40 h-40 rounded-2xl bg-[#2A2A2A] border-2 border-dashed border-[#E5A823]/30 flex items-center justify-center cursor-pointer hover:border-[#E5A823] transition-colors overflow-hidden"
@@ -308,7 +310,8 @@ function OutletProfileContent() {
                     <input ref={profileInputRef} type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'profile')} className="hidden" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-3">Cover Photo</label>
+                    <label className="block text-sm font-medium mb-1">Cover Photo</label>
+                    <p className="text-xs text-[#EB4D4B] mb-2">Recommended: 1200x400px (3:1 ratio)</p>
                     <div 
                       onClick={() => coverInputRef.current?.click()}
                       className="relative w-full h-40 rounded-xl bg-[#2A2A2A] border-2 border-dashed border-[#E5A823]/30 flex items-center justify-center cursor-pointer hover:border-[#E5A823] transition-colors overflow-hidden"

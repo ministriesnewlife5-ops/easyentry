@@ -223,6 +223,21 @@ export default function Navigation() {
 
                           {session?.user?.role === 'outlet' && (
                             <Link
+                              href="/outlet/dashboard"
+                              className="flex items-center gap-3 px-4 py-3 hover:bg-[#E5A823]/10 transition-colors group border-t border-[#2A2A2A]"
+                            >
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#2A2A2A] border border-[#2A2A2A] group-hover:bg-[#E5A823]/20 group-hover:border-[#E5A823] transition-all">
+                                <LayoutDashboard className="w-4 h-4 text-[#E5A823] group-hover:text-[#F5C542]" />
+                              </div>
+                              <div>
+                                <span className="block text-[#F5F5DC] font-medium text-sm group-hover:text-[#E5A823] transition-colors">Dashboard</span>
+                                <span className="block text-[#F5F5DC]/40 text-xs">Analytics & overview</span>
+                              </div>
+                            </Link>
+                          )}
+
+                          {session?.user?.role === 'outlet' && (
+                            <Link
                               href="/outlet/profile?tab=events"
                               className="flex items-center gap-3 px-4 py-3 hover:bg-[#E5A823]/10 transition-colors group border-t border-[#2A2A2A]"
                             >
@@ -426,6 +441,14 @@ export default function Navigation() {
 
                     {session?.user?.role === 'outlet' && (
                       <>
+                        <Link
+                          href="/outlet/dashboard"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC]"
+                        >
+                          <LayoutDashboard className="w-5 h-5 text-[#E5A823]" />
+                          <span className="text-sm">Dashboard</span>
+                        </Link>
                         <Link
                           href="/outlet/profile?tab=events"
                           onClick={() => setMobileMenuOpen(false)}

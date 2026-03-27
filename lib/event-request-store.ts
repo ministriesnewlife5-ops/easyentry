@@ -19,7 +19,7 @@ export type EventRequest = {
     mediaFiles?: string[];
     numberOfTickets?: string;
     rules?: string[];
-    ticketCategories?: Array<{ id: string; name: string; price: number }>;
+    ticketCategories?: Array<{ id: string; name: string; price: number; availableFrom?: string; availableUntil?: string }>;
     description: string;
     fullDescription: string;
     gatesOpen: string;

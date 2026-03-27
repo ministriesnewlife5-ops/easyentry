@@ -36,9 +36,11 @@ const defaultFilters: BrowseFiltersData = {
     { name: 'DATE', icon: 'Calendar' },
     { name: 'PRICE', icon: 'Tag' },
     { name: 'ARTIST', icon: 'Tag', href: '/artist' },
+    { name: 'OUTLET TYPE', icon: 'Building2' },
     { name: 'VENUES', icon: 'Building2', href: '/venues' },
   ],
   categories: [
+    { name: 'Outlet Type', icon: 'Building2', subFilters: ['Restobar', 'Nightclub', 'Lounge', 'Pub', 'Bar', 'Restaurant', 'Cafe', 'Event Space', 'Auditorium', 'Open Air'] },
     { name: 'Gigs', icon: 'Mic', subFilters: ['Alternative', 'Afropop', 'Alt-rock', 'Black metal', 'Britpop', 'Celtic', 'Chamber pop', 'Chiptune', 'Cumbia', 'Dance'] },
     { name: 'Party', icon: 'PartyPopper', subFilters: ['House', 'Techno', 'Trance', 'Drum & Bass', 'Dubstep', 'EDM', 'Garage', 'Disco', 'Funk', 'Soul'] },
     { name: 'DJ', icon: 'Disc', subFilters: ['Hip Hop', 'R&B', 'Reggaeton', 'Latin', 'Jazz', 'Blues', 'Folk', 'Country', 'Electronic', 'Ambient'] },
@@ -78,8 +80,14 @@ export default function BrowseFilters({
   const [dynamicCategories, setDynamicCategories] = useState<Category[]>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
+  const [showOutletTypeDropdown, setShowOutletTypeDropdown] = useState(false);
+  const [selectedOutletType, setSelectedOutletType] = useState<string>('');
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const outletTypeRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  // Outlet type options
+  const outletTypes = ['Restobar', 'Nightclub', 'Lounge', 'Pub', 'Bar', 'Restaurant', 'Cafe', 'Event Space', 'Auditorium', 'Open Air'];
 
   // Extract unique categories from events
   useEffect(() => {
@@ -157,6 +165,11 @@ export default function BrowseFilters({
     // Handle DATE filter - open date picker
     if (name === 'DATE') {
       setShowDatePicker(true);
+      return;
+    }
+    // Handle OUTLET TYPE filter - toggle dropdown
+    if (name === 'OUTLET TYPE') {
+      setShowOutletTypeDropdown(!showOutletTypeDropdown);
       return;
     }
     const newFilters = activeFilters.includes(name)
@@ -268,6 +281,45 @@ export default function BrowseFilters({
                 >
                   Cancel
                 </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Outlet Type Dropdown */}
+        {showOutletTypeDropdown && (
+          <motion.div
+            ref={outletTypeRef}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute top-full left-0 mt-2 z-50"
+          >
+            <div className="rounded-xl border border-[#2A2A2A] bg-[#101018] p-4 shadow-xl">
+              <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto min-w-[200px]">
+                {outletTypes.map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => {
+                      setSelectedOutletType(type);
+                      // Update filters to show selected outlet type
+                      const newFilters = [...activeFilters.filter(f => f !== 'OUTLET TYPE'), type.toUpperCase()];
+                      setActiveFilters(newFilters);
+                      setShowOutletTypeDropdown(false);
+                      setTimeout(() => {
+                        const hasActive = activeCategory !== null || activeSubFilters.length > 0 || newFilters.some(f => f !== 'CHENNAI');
+                        onFilterStateChange?.(hasActive);
+                      }, 0);
+                    }}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all border text-left ${
+                      selectedOutletType === type
+                        ? 'bg-[#E5A823] text-[#0D0D0D] border-[#E5A823]'
+                        : 'bg-[#2A2A2A] text-[#F5F5DC] border-[#2A2A2A] hover:border-[#E5A823]'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
               </div>
             </div>
           </motion.div>
