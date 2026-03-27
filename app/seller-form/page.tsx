@@ -1350,7 +1350,7 @@ export default function SellerFormPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-[#F5F5DC]/60">Date</span>
                       <span className="font-medium text-[#F5F5DC]">
-                        {formData.datetime ? new Date(formData.datetime).toLocaleDateString() : 'Not set'}
+                        {formData.date ? new Date(formData.date).toLocaleDateString() : 'Not set'}
                       </span>
                     </div>
                   </div>
