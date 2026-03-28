@@ -52,15 +52,15 @@ export default function SellerFormPage() {
     endTime: '',
     about: '',
     rules: '',
-    numberOfTickets: '',
     category: '',
+    subcategory: '',
   });
 
   const [images, setImages] = useState<File[]>([]);
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
 
-  const [activeTab, setActiveTab] = useState<'details' | 'media' | 'promo'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'tickets' | 'media' | 'promo'>('details');
   const [events, setEvents] = useState<Array<{ id: number; title: string; venue: string; date: string }>>([]);
   const [promoForm, setPromoForm] = useState({
     eventId: '',
@@ -71,14 +71,16 @@ export default function SellerFormPage() {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [ticketCategories, setTicketCategories] = useState<Array<{ id: string; name: string; price: number; availableFromDate?: string; availableFromTime?: string; availableUntilDate?: string; availableUntilTime?: string }>>([]);
+  const [ticketCategories, setTicketCategories] = useState<Array<{ id: string; name: string; price: number; quantity: number; availableFromDate?: string; availableFromTime?: string; availableUntilDate?: string; availableUntilTime?: string }>>([]);
   const [previewCategoryId, setPreviewCategoryId] = useState<string>('female');
   const [customCategory, setCustomCategory] = useState('');
+  const [customSubcategory, setCustomSubcategory] = useState('');
+  const [categories, setCategories] = useState<Array<{ name: string; icon: string; subFilters: string[] }>>([]);
   const [rules, setRules] = useState<Array<{ id: string; text: string }>>([{ id: '1', text: '' }]);
   const [pricing, setPricing] = useState({
-    ticket: 799,
+    ticket: 0,
     platformFee: 5,
-    artistShare: 4,
+    artistShare: 0,
     discount: 0
   });
 
@@ -87,6 +89,35 @@ export default function SellerFormPage() {
       const { getHostedEvents } = require('@/lib/hosted-events');
       const hostedEvents = getHostedEvents();
       setEvents(hostedEvents);
+      
+      // Load categories from BrowseFiltersManager storage
+      const stored = localStorage.getItem('easyentry.browse-filters');
+      if (stored) {
+        try {
+          const filters = JSON.parse(stored);
+          setCategories(filters.categories || []);
+        } catch (e) {
+          console.error('Error loading categories:', e);
+          setCategories([]);
+        }
+      }
+
+      // Fetch venue profile and pre-populate location
+      const fetchVenueProfile = async () => {
+        try {
+          const response = await fetch('/api/venue/profile');
+          const data = await response.json();
+          if (data.venue && data.venue.location) {
+            setFormData((prev) => ({
+              ...prev,
+              location: data.venue.location
+            }));
+          }
+        } catch (error) {
+          console.error('Error fetching venue profile:', error);
+        }
+      };
+      fetchVenueProfile();
     }
   }, []);
 
@@ -139,13 +170,15 @@ export default function SellerFormPage() {
         title: formData.title,
         subtitle: formData.description,
         date: formData.date,
+        time: formData.startTime, // Changed from startTime to time for compatibility
         startTime: formData.startTime,
         endTime: formData.endTime,
         venue: formData.location,
         category: formData.category === 'Other' ? customCategory : (formData.category || 'General'),
+        subcategory: formData.subcategory === 'Other' ? customSubcategory : (formData.subcategory || undefined),
         price: `₹${minPrice}`,
         image: coverImageBase64,
-        numberOfTickets: formData.numberOfTickets,
+        numberOfTickets: ticketCategories.reduce((sum, cat) => sum + (cat.quantity || 0), 0),
         mediaFiles: mediaFilesBase64,
         description: formData.about,
         fullDescription: formData.about,
@@ -209,14 +242,15 @@ export default function SellerFormPage() {
           endTime: '',
           about: '',
           rules: '',
-          numberOfTickets: '',
           category: '',
+          subcategory: '',
         });
         setImages([]);
         setCoverImage(null);
         setMediaFiles([]);
         setTicketCategories([]);
         setCustomCategory('');
+        setCustomSubcategory('');
         setRules([{ id: '1', text: '' }]);
         
         // Also handle promo code if entered
@@ -275,105 +309,6 @@ export default function SellerFormPage() {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
       setImages((prev) => [...prev, ...selectedFiles]);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      // Get the minimum price from ticket categories or form
-      const minPrice = ticketCategories.length > 0 
-        ? Math.min(...ticketCategories.map(c => c.price))
-        : Number(formData.price) || 0;
-
-      // Convert image to base64 so it persists across sessions and pages
-      const imageBase64 = coverImage 
-        ? await fileToBase64(coverImage) 
-        : (mediaFiles.length > 0 && mediaFiles[0].type.startsWith('image/') 
-            ? await fileToBase64(mediaFiles[0]) 
-            : '');
-      
-      const eventData = {
-        title: formData.title,
-        subtitle: formData.description,
-        date: formData.date,
-        time: formData.startTime,
-        endTime: formData.endTime,
-        venue: formData.location,
-        category: 'General',
-        price: `₹${minPrice}`,
-        image: imageBase64,
-        description: formData.about,
-        fullDescription: formData.about,
-        gatesOpen: formData.startTime,
-        entryAge: '18+',
-        layout: 'Standing',
-        seating: 'General Admission'
-      };
-
-      const response = await fetch('/api/admin/event-requests', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ eventData }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setNotificationMessage('Your request has been sent to admin for approval.');
-        setShowNotification(true);
-        
-        // Hide notification after 5 seconds
-        setTimeout(() => {
-          setShowNotification(false);
-        }, 5000);
-        
-        // Also save to localStorage for immediate display
-        const { saveHostedEvent } = require('@/lib/hosted-events');
-        saveHostedEvent({
-          id: Date.now(),
-          title: formData.title,
-          date: formData.date,
-          venue: formData.location,
-          price: `₹${minPrice}`,
-          imageColor: 'bg-blue-900',
-          category: 'General',
-          imageUrl: imageBase64,
-          createdAt: Date.now()
-        });
-        
-        // Reset form
-        setFormData({
-          title: '',
-          description: '',
-          price: '',
-          organizer: '',
-          location: '',
-          date: '',
-          startTime: '',
-          endTime: '',
-          about: '',
-          rules: '',
-          numberOfTickets: '',
-          category: '',
-        });
-        setImages([]);
-        setCoverImage(null);
-        setMediaFiles([]);
-        setTicketCategories([]);
-        setCustomCategory('');
-        setRules([{ id: '1', text: '' }]);
-      } else {
-        const error = await response.json();
-        setNotificationMessage(error.error || 'Failed to submit event request.');
-        setShowNotification(true);
-      }
-    } catch (error) {
-      console.error('Error submitting event:', error);
-      setNotificationMessage('An error occurred while submitting your request.');
-      setShowNotification(true);
     }
   };
 
@@ -436,6 +371,7 @@ export default function SellerFormPage() {
           <div className="flex gap-4 sm:gap-8 overflow-x-auto scrollbar-hide">
             {[
               { id: 'details', label: 'Basic Details', icon: Edit2 },
+              { id: 'tickets', label: 'Ticket Details', icon: Ticket },
               { id: 'media', label: 'Event Media', icon: Camera },
               { id: 'promo', label: 'Promo Codes', icon: Ticket },
             ].map((tab) => (
@@ -457,7 +393,7 @@ export default function SellerFormPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <form onSubmit={handleSendEventRequest} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
@@ -497,7 +433,7 @@ export default function SellerFormPage() {
                         value={formData.category}
                         onChange={(e) => {
                           const value = e.target.value;
-                          setFormData((prev) => ({ ...prev, category: value }));
+                          setFormData((prev) => ({ ...prev, category: value, subcategory: '' }));
                           if (value !== 'Other') {
                             setCustomCategory('');
                           }
@@ -506,12 +442,9 @@ export default function SellerFormPage() {
                         required
                       >
                         <option value="">Select category</option>
-                        <option value="Gigs">Gigs</option>
-                        <option value="Party">Party</option>
-                        <option value="DJ">DJ</option>
-                        <option value="Comedy">Comedy</option>
-                        <option value="Theatre">Theatre</option>
-                        <option value="Art">Art</option>
+                        {categories.map((cat) => (
+                          <option key={cat.name} value={cat.name}>{cat.name}</option>
+                        ))}
                         <option value="Other">Other</option>
                       </select>
                       {formData.category === 'Other' && (
@@ -522,6 +455,48 @@ export default function SellerFormPage() {
                             onChange={(e) => setCustomCategory(e.target.value)}
                             className="w-full bg-[#2A2A2A] border border-[#E5A823]/50 rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                             placeholder="Enter custom category"
+                            required
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-3">Subcategory *</label>
+                      <select
+                        name="subcategory"
+                        value={formData.subcategory}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData((prev) => ({ ...prev, subcategory: value }));
+                          if (value !== 'Other') {
+                            setCustomSubcategory('');
+                          }
+                        }}
+                        className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                        required
+                        disabled={!formData.category}
+                      >
+                        <option value="">
+                          {!formData.category ? 'Select category first' : 'Select subcategory'}
+                        </option>
+                        {formData.category && formData.category !== 'Other' && categories
+                          .find((cat) => cat.name === formData.category)
+                          ?.subFilters?.map((sub) => (
+                            <option key={sub} value={sub}>{sub}</option>
+                          ))}
+                        {formData.category && (
+                          <option value="Other">Other</option>
+                        )}
+                      </select>
+                      {formData.subcategory === 'Other' && (
+                        <div className="mt-3">
+                          <input
+                            type="text"
+                            value={customSubcategory}
+                            onChange={(e) => setCustomSubcategory(e.target.value)}
+                            className="w-full bg-[#2A2A2A] border border-[#E5A823]/50 rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                            placeholder="Enter custom subcategory"
                             required
                           />
                         </div>
@@ -541,340 +516,6 @@ export default function SellerFormPage() {
                           placeholder="Organizer Name"
                           required
                         />
-                      </div>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium mb-3">Ticket Categories *</label>
-                      <div className="space-y-4">
-                        {ticketCategories.map((cat, idx) => (
-                          <div key={cat.id} className="bg-[#0F0F0F] rounded-xl p-4 border border-[#2A2A2A]">
-                            <div className="flex items-center gap-3 mb-3">
-                              <input
-                                type="text"
-                                value={cat.name}
-                                onChange={(e) => {
-                                  const v = e.target.value.toUpperCase();
-                                  setTicketCategories((prev) =>
-                                    prev.map((c) => (c.id === cat.id ? { ...c, name: v } : c))
-                                  );
-                                }}
-                                className="flex-1 bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                                placeholder="Category name"
-                                required
-                              />
-                              <div className="relative w-32">
-                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/50" />
-                                <input
-                                  type="number"
-                                  value={cat.price}
-                                  onChange={(e) => {
-                                    const price = Math.max(0, Number(e.target.value));
-                                    setTicketCategories((prev) =>
-                                      prev.map((c) => (c.id === cat.id ? { ...c, price } : c))
-                                    );
-                                    if (cat.id === previewCategoryId) {
-                                      setPricing((p) => ({ ...p, ticket: price }));
-                                    }
-                                  }}
-                                  className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-9 pr-3 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                                  placeholder="0"
-                                  min={0}
-                                  step={0.01}
-                                  required
-                                />
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setTicketCategories((prev) => prev.filter((c) => c.id !== cat.id));
-                                  if (previewCategoryId === cat.id && ticketCategories.length > 1) {
-                                    const next = ticketCategories.find((c) => c.id !== cat.id);
-                                    if (next) {
-                                      setPreviewCategoryId(next.id);
-                                      setPricing((p) => ({ ...p, ticket: next.price }));
-                                    }
-                                  }
-                                }}
-                                disabled={ticketCategories.length <= 1}
-                                className="p-2 rounded-lg border border-[#2A2A2A] hover:border-[#EB4D4B] hover:bg-[#EB4D4B]/10 disabled:opacity-40"
-                              >
-                                <Trash2 className="w-4 h-4 text-[#F5F5DC]/70" />
-                              </button>
-                            </div>
-                            <div className="space-y-3">
-                              {/* Available from */}
-                              <div className="flex items-center gap-3">
-                                <span className="text-xs text-[#F5F5DC]/50 whitespace-nowrap w-24">Available from:</span>
-                                <div className="flex-1">
-                                  <input
-                                    type="date"
-                                    value={cat.availableFromDate || ''}
-                                    onChange={(e) => {
-                                      const date = e.target.value;
-                                      setTicketCategories((prev) =>
-                                        prev.map((c) => (c.id === cat.id ? { ...c, availableFromDate: date } : c))
-                                      );
-                                    }}
-                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
-                                  />
-                                </div>
-                                <div className="w-28">
-                                  <input
-                                    type="time"
-                                    value={cat.availableFromTime || ''}
-                                    onChange={(e) => {
-                                      const time = e.target.value;
-                                      setTicketCategories((prev) =>
-                                        prev.map((c) => (c.id === cat.id ? { ...c, availableFromTime: time } : c))
-                                      );
-                                    }}
-                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
-                                  />
-                                </div>
-                              </div>
-                              {/* Available until */}
-                              <div className="flex items-center gap-3">
-                                <span className="text-xs text-[#F5F5DC]/50 whitespace-nowrap w-24">Available until:</span>
-                                <div className="flex-1">
-                                  <input
-                                    type="date"
-                                    value={cat.availableUntilDate || ''}
-                                    onChange={(e) => {
-                                      const date = e.target.value;
-                                      setTicketCategories((prev) =>
-                                        prev.map((c) => (c.id === cat.id ? { ...c, availableUntilDate: date } : c))
-                                      );
-                                    }}
-                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
-                                  />
-                                </div>
-                                <div className="w-28">
-                                  <input
-                                    type="time"
-                                    value={cat.availableUntilTime || ''}
-                                    onChange={(e) => {
-                                      const time = e.target.value;
-                                      setTicketCategories((prev) =>
-                                        prev.map((c) => (c.id === cat.id ? { ...c, availableUntilTime: time } : c))
-                                      );
-                                    }}
-                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const id = Math.random().toString(36).slice(2);
-                            setTicketCategories((prev) => [...prev, { id, name: 'NEW', price: 0 }]);
-                          }}
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#2A2A2A] text-sm hover:border-[#E5A823]"
-                        >
-                          <Plus className="w-4 h-4 text-[#E5A823]" />
-                          Add category
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-3">Number of Tickets *</label>
-                      <div className="relative">
-                        <Ticket className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
-                        <input
-                          type="number"
-                          name="numberOfTickets"
-                          value={formData.numberOfTickets}
-                          onChange={handleInputChange}
-                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                          placeholder="e.g. 100"
-                          min={1}
-                          required
-                        />
-                      </div>
-                      <p className="text-xs text-[#F5F5DC]/50 mt-2">Total number of tickets available for this event</p>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <div className="bg-[#0F0F0F] rounded-2xl p-6 border border-[#2A2A2A]">
-                        <h4 className="text-base font-bold text-[#F5F5DC] mb-1">Per-ticket Money Flow</h4>
-                        <p className="text-xs text-[#F5F5DC]/50 mb-6">Preview the split for one ticket</p>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-5">
-                            <div>
-                              <label className="block text-xs font-medium mb-2 text-[#F5F5DC]/70">Preview category</label>
-                              <select
-                                value={previewCategoryId}
-                                onChange={(e) => {
-                                  const id = e.target.value;
-                                  setPreviewCategoryId(id);
-                                  const cat = ticketCategories.find((c) => c.id === id);
-                                  if (cat) setPricing((p) => ({ ...p, ticket: cat.price }));
-                                }}
-                                className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                              >
-                                {ticketCategories.map((c) => (
-                                  <option key={c.id} value={c.id}>
-                                    {c.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium mb-2 text-[#F5F5DC]/70">Ticket price (₹)</label>
-                              <div className="relative">
-                                <IndianRupee className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
-                                <input
-                                  type="number"
-                                  value={pricing.ticket}
-                                  onChange={(e) => {
-                                    const v = Math.max(0, Number(e.target.value));
-                                    setPricing((p) => ({ ...p, ticket: v }));
-                                    setTicketCategories((prev) =>
-                                      prev.map((c) => (c.id === previewCategoryId ? { ...c, price: v } : c))
-                                    );
-                                  }}
-                                  className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                                  placeholder="0"
-                                  min={0}
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <label className="flex items-center justify-between text-xs font-medium mb-2 text-[#F5F5DC]/70">
-                                <span>Platform fee (%)</span>
-                                <span className="text-[#E5A823] font-bold">{pricing.platformFee.toFixed(1)}%</span>
-                              </label>
-                              <input
-                                type="range"
-                                min={0}
-                                max={15}
-                                step={0.5}
-                                value={pricing.platformFee}
-                                onChange={(e) => setPricing((p) => ({ ...p, platformFee: Number(e.target.value) }))}
-                                className="w-full accent-[#E5A823]"
-                              />
-                            </div>
-                            <div>
-                              <label className="flex items-center justify-between text-xs font-medium mb-2 text-[#F5F5DC]/70">
-                                <span>Artist revenue share (%)</span>
-                                <span className="text-[#E5A823] font-bold">{pricing.artistShare.toFixed(1)}%</span>
-                              </label>
-                              <input
-                                type="range"
-                                min={0}
-                                max={50}
-                                step={0.5}
-                                value={pricing.artistShare}
-                                onChange={(e) => setPricing((p) => ({ ...p, artistShare: Number(e.target.value) }))}
-                                className="w-full accent-[#E5A823]"
-                              />
-                            </div>
-                            <div>
-                              <label className="flex items-center justify-between text-xs font-medium mb-2 text-[#F5F5DC]/70">
-                                <span>Customer discount (%)</span>
-                                <span className="text-[#E5A823] font-bold">{pricing.discount.toFixed(1)}%</span>
-                              </label>
-                              <input
-                                type="range"
-                                min={0}
-                                max={50}
-                                step={0.5}
-                                value={pricing.discount}
-                                onChange={(e) => setPricing((p) => ({ ...p, discount: Number(e.target.value) }))}
-                                className="w-full accent-[#E5A823]"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="space-y-4">
-                            {(() => {
-                              const gross = pricing.ticket || 0;
-                              const discountAmt = gross * (pricing.discount / 100);
-                              const customerPays = Math.max(gross - discountAmt, 0);
-                              const pgFee = customerPays * 0.03 + (customerPays > 0 ? 3 : 0);
-                              const platformFeeAmt = customerPays * (pricing.platformFee / 100);
-                              const artistAmt = gross * (pricing.artistShare / 100);
-                              const outletNet = Math.max(customerPays - pgFee - platformFeeAmt - artistAmt, 0);
-                              const fmt = (n: number) => `₹${n.toFixed(0)}`;
-                              const totalBar = Math.max(customerPays, 1);
-                              const w = (n: number) => `${Math.max(0, Math.min(100, (n / totalBar) * 100))}%`;
-                              return (
-                                <>
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
-                                      <div className="text-xs text-[#F5F5DC]/50">Customer</div>
-                                      <div className="text-2xl font-black text-[#F5F5DC] mt-1">{fmt(customerPays)}</div>
-                                      <div className="text-[10px] text-[#F5F5DC]/40 mt-1">full price</div>
-                                    </div>
-                                    <div className="rounded-xl border border-[#3E83B6]/50 bg-[#3E83B6]/10 p-4">
-                                      <div className="text-xs text-[#3E83B6]">Outlet</div>
-                                      <div className="text-2xl font-black text-[#3E83B6] mt-1">{fmt(outletNet)}</div>
-                                      <div className="text-[10px] text-[#3E83B6]/70 mt-1">bears artist share</div>
-                                    </div>
-                                    <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
-                                      <div className="text-xs text-[#F5F5DC]/50">Artist</div>
-                                      <div className="text-xl font-black text-[#F5F5DC] mt-1">{fmt(artistAmt)}</div>
-                                      <div className="text-[10px] text-[#F5F5DC]/40 mt-1">no code used</div>
-                                    </div>
-                                    <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
-                                      <div className="text-xs text-[#F5F5DC]/50">Razorpay</div>
-                                      <div className="text-xl font-black text-[#F5F5DC] mt-1">{fmt(pgFee)}</div>
-                                      <div className="text-[10px] text-[#F5F5DC]/40 mt-1">3% + ₹3 txn</div>
-                                    </div>
-                                    <div className="col-span-2 rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
-                                      <div className="flex items-center justify-between text-xs text-[#F5F5DC]/50">
-                                        <span>Platform</span>
-                                        <span className="text-[#F5F5DC] font-semibold">{fmt(platformFeeAmt)}</span>
-                                      </div>
-                                      <div className="mt-2 h-1.5 rounded bg-[#2A2A2A] overflow-hidden">
-                                        <div className="h-full bg-gradient-to-r from-[#E5A823] to-[#EB4D4B]" style={{ width: w(platformFeeAmt) }} />
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4 space-y-2">
-                                    <div className="flex items-center justify-between text-xs">
-                                      <span className="text-[#F5F5DC]/60">Customer pays</span>
-                                      <span className="text-[#F5F5DC] font-semibold">{fmt(customerPays)}</span>
-                                    </div>
-                                    <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
-                                      <div className="h-full bg-[#E5A823]" style={{ width: w(customerPays) }} />
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-xs pt-2">
-                                      <span className="text-[#F5F5DC]/60">Razorpay</span>
-                                      <span className="text-[#F5F5DC] font-semibold">-{fmt(pgFee)}</span>
-                                    </div>
-                                    <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
-                                      <div className="h-full bg-[#EB4D4B]" style={{ width: w(pgFee) }} />
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-xs pt-2">
-                                      <span className="text-[#F5F5DC]/60">Platform fee</span>
-                                      <span className="text-[#F5F5DC] font-semibold">-{fmt(platformFeeAmt)}</span>
-                                    </div>
-                                    <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
-                                      <div className="h-full bg-[#7C6F3E]" style={{ width: w(platformFeeAmt) }} />
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-xs pt-2">
-                                      <span className="text-[#F5F5DC]/60">Outlet net</span>
-                                      <span className="text-[#F5F5DC] font-semibold">{fmt(outletNet)}</span>
-                                    </div>
-                                    <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
-                                      <div className="h-full bg-[#3E83B6]" style={{ width: w(outletNet) }} />
-                                    </div>
-                                  </div>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </div>
                       </div>
                     </div>
 
@@ -1029,6 +670,379 @@ export default function SellerFormPage() {
                           <Plus className="w-4 h-4 text-[#E5A823]" />
                           Add Rule
                         </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Tickets Tab */}
+            {activeTab === 'tickets' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                {/* Ticket Categories Section */}
+                <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
+                  <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                    <Ticket className="w-5 h-5 text-[#E5A823]" />
+                    Ticket Details
+                  </h3>
+                  
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-medium mb-3">Ticket Categories *</label>
+                      <div className="space-y-4">
+                        {ticketCategories.map((cat, idx) => (
+                          <div key={cat.id} className="bg-[#0F0F0F] rounded-xl p-4 border border-[#2A2A2A]">
+                            {/* Labels Row */}
+                            <div className="grid grid-cols-12 gap-3 mb-2">
+                              <div className="col-span-5">
+                                <label className="text-xs text-[#F5F5DC]/50">Category Name</label>
+                              </div>
+                              <div className="col-span-3">
+                                <label className="text-xs text-[#F5F5DC]/50">Tickets</label>
+                              </div>
+                              <div className="col-span-3">
+                                <label className="text-xs text-[#F5F5DC]/50">Price</label>
+                              </div>
+                              <div className="col-span-1"></div>
+                            </div>
+                            {/* Inputs Row */}
+                            <div className="grid grid-cols-12 gap-3 mb-3">
+                              <div className="col-span-5">
+                                <input
+                                  type="text"
+                                  value={cat.name}
+                                  onChange={(e) => {
+                                    const v = e.target.value.toUpperCase();
+                                    setTicketCategories((prev) =>
+                                      prev.map((c) => (c.id === cat.id ? { ...c, name: v } : c))
+                                    );
+                                  }}
+                                  className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                  placeholder="Category name"
+                                  required
+                                />
+                              </div>
+                              <div className="col-span-3">
+                                <div className="relative">
+                                  <Ticket className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/50" />
+                                  <input
+                                    type="number"
+                                    value={cat.quantity}
+                                    onChange={(e) => {
+                                      const quantity = Math.max(0, Number(e.target.value));
+                                      setTicketCategories((prev) =>
+                                        prev.map((c) => (c.id === cat.id ? { ...c, quantity } : c))
+                                      );
+                                    }}
+                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-9 pr-3 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                    placeholder="0"
+                                    min={0}
+                                    step={1}
+                                    required
+                                  />
+                                </div>
+                              </div>
+                              <div className="col-span-3">
+                                <div className="relative">
+                                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/50" />
+                                  <input
+                                    type="number"
+                                    value={cat.price}
+                                    onChange={(e) => {
+                                      const price = Math.max(0, Number(e.target.value));
+                                      setTicketCategories((prev) =>
+                                        prev.map((c) => (c.id === cat.id ? { ...c, price } : c))
+                                      );
+                                      if (cat.id === previewCategoryId) {
+                                        setPricing((p) => ({ ...p, ticket: price }));
+                                      }
+                                    }}
+                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-9 pr-3 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                    placeholder="0"
+                                    min={0}
+                                    step={0.01}
+                                    required
+                                  />
+                                </div>
+                              </div>
+                              <div className="col-span-1 flex items-center justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setTicketCategories((prev) => prev.filter((c) => c.id !== cat.id));
+                                    if (previewCategoryId === cat.id && ticketCategories.length > 1) {
+                                      const next = ticketCategories.find((c) => c.id !== cat.id);
+                                      if (next) {
+                                        setPreviewCategoryId(next.id);
+                                        setPricing((p) => ({ ...p, ticket: next.price }));
+                                      }
+                                    }
+                                  }}
+                                  disabled={ticketCategories.length <= 1}
+                                  className="p-2 rounded-lg border border-[#2A2A2A] hover:border-[#EB4D4B] hover:bg-[#EB4D4B]/10 disabled:opacity-40"
+                                >
+                                  <Trash2 className="w-4 h-4 text-[#F5F5DC]/70" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="space-y-3">
+                              {/* Available from */}
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-[#F5F5DC]/50 whitespace-nowrap w-24">Available from:</span>
+                                <div className="flex-1">
+                                  <input
+                                    type="date"
+                                    value={cat.availableFromDate || ''}
+                                    onChange={(e) => {
+                                      const date = e.target.value;
+                                      setTicketCategories((prev) =>
+                                        prev.map((c) => (c.id === cat.id ? { ...c, availableFromDate: date } : c))
+                                      );
+                                    }}
+                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
+                                  />
+                                </div>
+                                <div className="w-28">
+                                  <input
+                                    type="time"
+                                    value={cat.availableFromTime || ''}
+                                    onChange={(e) => {
+                                      const time = e.target.value;
+                                      setTicketCategories((prev) =>
+                                        prev.map((c) => (c.id === cat.id ? { ...c, availableFromTime: time } : c))
+                                      );
+                                    }}
+                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
+                                  />
+                                </div>
+                              </div>
+                              {/* Available until */}
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-[#F5F5DC]/50 whitespace-nowrap w-24">Available until:</span>
+                                <div className="flex-1">
+                                  <input
+                                    type="date"
+                                    value={cat.availableUntilDate || ''}
+                                    onChange={(e) => {
+                                      const date = e.target.value;
+                                      setTicketCategories((prev) =>
+                                        prev.map((c) => (c.id === cat.id ? { ...c, availableUntilDate: date } : c))
+                                      );
+                                    }}
+                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
+                                  />
+                                </div>
+                                <div className="w-28">
+                                  <input
+                                    type="time"
+                                    value={cat.availableUntilTime || ''}
+                                    onChange={(e) => {
+                                      const time = e.target.value;
+                                      setTicketCategories((prev) =>
+                                        prev.map((c) => (c.id === cat.id ? { ...c, availableUntilTime: time } : c))
+                                      );
+                                    }}
+                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const id = Math.random().toString(36).slice(2);
+                            setTicketCategories((prev) => [...prev, { id, name: 'NEW', price: 0, quantity: 0 }]);
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#2A2A2A] text-sm hover:border-[#E5A823]"
+                        >
+                          <Plus className="w-4 h-4 text-[#E5A823]" />
+                          Add category
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="bg-[#0F0F0F] rounded-2xl p-6 border border-[#2A2A2A]">
+                      <h4 className="text-base font-bold text-[#F5F5DC] mb-1">Per-ticket Money Flow</h4>
+                      <p className="text-xs text-[#F5F5DC]/50 mb-6">Preview the split for one ticket</p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-5">
+                          <div>
+                            <label className="block text-xs font-medium mb-2 text-[#F5F5DC]/70">Preview category</label>
+                            <select
+                              value={previewCategoryId}
+                              onChange={(e) => {
+                                const id = e.target.value;
+                                setPreviewCategoryId(id);
+                                const cat = ticketCategories.find((c) => c.id === id);
+                                if (cat) setPricing((p) => ({ ...p, ticket: cat.price }));
+                              }}
+                              className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                            >
+                              {ticketCategories.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium mb-2 text-[#F5F5DC]/70">Ticket price (₹)</label>
+                            <div className="relative">
+                              <IndianRupee className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
+                              <input
+                                type="number"
+                                value={pricing.ticket}
+                                onChange={(e) => {
+                                  const v = Math.max(0, Number(e.target.value));
+                                  setPricing((p) => ({ ...p, ticket: v }));
+                                  setTicketCategories((prev) =>
+                                    prev.map((c) => (c.id === previewCategoryId ? { ...c, price: v } : c))
+                                  );
+                                }}
+                                className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                placeholder="0"
+                                min={0}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="flex items-center justify-between text-xs font-medium mb-2 text-[#F5F5DC]/70">
+                              <span>Platform fee (%)</span>
+                              <span className="text-[#E5A823] font-bold">{pricing.platformFee.toFixed(1)}%</span>
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={15}
+                              step={0.5}
+                              value={pricing.platformFee}
+                              onChange={(e) => setPricing((p) => ({ ...p, platformFee: Number(e.target.value) }))}
+                              className="w-full accent-[#E5A823]"
+                            />
+                          </div>
+                          <div>
+                            <label className="flex items-center justify-between text-xs font-medium mb-2 text-[#F5F5DC]/70">
+                              <span>Artist revenue share (%)</span>
+                              <span className="text-[#E5A823] font-bold">{pricing.artistShare.toFixed(1)}%</span>
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={50}
+                              step={0.5}
+                              value={pricing.artistShare}
+                              onChange={(e) => setPricing((p) => ({ ...p, artistShare: Number(e.target.value) }))}
+                              className="w-full accent-[#E5A823]"
+                            />
+                          </div>
+                          <div>
+                            <label className="flex items-center justify-between text-xs font-medium mb-2 text-[#F5F5DC]/70">
+                              <span>Customer discount (%)</span>
+                              <span className="text-[#E5A823] font-bold">{pricing.discount.toFixed(1)}%</span>
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={50}
+                              step={0.5}
+                              value={pricing.discount}
+                              onChange={(e) => setPricing((p) => ({ ...p, discount: Number(e.target.value) }))}
+                              className="w-full accent-[#E5A823]"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          {(() => {
+                            const gross = pricing.ticket || 0;
+                            const discountAmt = gross * (pricing.discount / 100);
+                            const customerPays = Math.max(gross - discountAmt, 0);
+                            const pgFee = customerPays * 0.05;
+                            const platformFeeAmt = customerPays * (pricing.platformFee / 100);
+                            const artistAmt = gross * (pricing.artistShare / 100);
+                            const outletNet = Math.max(customerPays - pgFee - platformFeeAmt - artistAmt, 0);
+                            const fmt = (n: number) => `₹${n.toFixed(0)}`;
+                            const totalBar = Math.max(customerPays, 1);
+                            const w = (n: number) => `${Math.max(0, Math.min(100, (n / totalBar) * 100))}%`;
+                            return (
+                              <>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
+                                    <div className="text-xs text-[#F5F5DC]/50">Customer</div>
+                                    <div className="text-2xl font-black text-[#F5F5DC] mt-1">{fmt(customerPays)}</div>
+                                    <div className="text-[10px] text-[#F5F5DC]/40 mt-1">full price</div>
+                                  </div>
+                                  <div className="rounded-xl border border-[#3E83B6]/50 bg-[#3E83B6]/10 p-4">
+                                    <div className="text-xs text-[#3E83B6]">Outlet</div>
+                                    <div className="text-2xl font-black text-[#3E83B6] mt-1">{fmt(outletNet)}</div>
+                                    <div className="text-[10px] text-[#3E83B6]/70 mt-1">bears artist share</div>
+                                  </div>
+                                  <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
+                                    <div className="text-xs text-[#F5F5DC]/50">Artist</div>
+                                    <div className="text-xl font-black text-[#F5F5DC] mt-1">{fmt(artistAmt)}</div>
+                                    <div className="text-[10px] text-[#F5F5DC]/40 mt-1">no code used</div>
+                                  </div>
+                                  <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
+                                    <div className="text-xs text-[#F5F5DC]/50">Razorpay</div>
+                                    <div className="text-xl font-black text-[#F5F5DC] mt-1">{fmt(pgFee)}</div>
+                                    <div className="text-[10px] text-[#F5F5DC]/40 mt-1">5%</div>
+                                  </div>
+                                  <div className="col-span-2 rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
+                                    <div className="flex items-center justify-between text-xs text-[#F5F5DC]/50">
+                                      <span>Platform</span>
+                                      <span className="text-[#F5F5DC] font-semibold">{fmt(platformFeeAmt)}</span>
+                                    </div>
+                                    <div className="mt-2 h-1.5 rounded bg-[#2A2A2A] overflow-hidden">
+                                      <div className="h-full bg-gradient-to-r from-[#E5A823] to-[#EB4D4B]" style={{ width: w(platformFeeAmt) }} />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4 space-y-2">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-[#F5F5DC]/60">Customer pays</span>
+                                    <span className="text-[#F5F5DC] font-semibold">{fmt(customerPays)}</span>
+                                  </div>
+                                  <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
+                                    <div className="h-full bg-[#E5A823]" style={{ width: w(customerPays) }} />
+                                  </div>
+
+                                  <div className="flex items-center justify-between text-xs pt-2">
+                                    <span className="text-[#F5F5DC]/60">Razorpay</span>
+                                    <span className="text-[#F5F5DC] font-semibold">-{fmt(pgFee)}</span>
+                                  </div>
+                                  <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
+                                    <div className="h-full bg-[#EB4D4B]" style={{ width: w(pgFee) }} />
+                                  </div>
+
+                                  <div className="flex items-center justify-between text-xs pt-2">
+                                    <span className="text-[#F5F5DC]/60">Platform fee</span>
+                                    <span className="text-[#F5F5DC] font-semibold">-{fmt(platformFeeAmt)}</span>
+                                  </div>
+                                  <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
+                                    <div className="h-full bg-[#7C6F3E]" style={{ width: w(platformFeeAmt) }} />
+                                  </div>
+
+                                  <div className="flex items-center justify-between text-xs pt-2">
+                                    <span className="text-[#F5F5DC]/60">Outlet net</span>
+                                    <span className="text-[#F5F5DC] font-semibold">{fmt(outletNet)}</span>
+                                  </div>
+                                  <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
+                                    <div className="h-full bg-[#3E83B6]" style={{ width: w(outletNet) }} />
+                                  </div>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1366,6 +1380,18 @@ export default function SellerFormPage() {
               {/* Bottom Navigation */}
               <div className="flex justify-end pt-4 border-t border-[#2A2A2A]">
                 {activeTab === 'details' && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('tickets')}
+                    className="px-8 py-3 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity"
+                  >
+                    Next: Ticket Details
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                )}
+                {activeTab === 'tickets' && (
                   <button
                     type="button"
                     onClick={() => setActiveTab('media')}

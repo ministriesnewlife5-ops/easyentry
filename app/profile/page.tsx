@@ -2,7 +2,7 @@
 
 import { signOut, useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Mic2, Megaphone, Building2, Heart, History, UserCircle2, LogOut, Ticket, MapPin, Calendar, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
@@ -11,7 +11,8 @@ import { getWishlist, removeFromWishlist, type WishlistEvent } from '@/lib/wishl
 // Mock data for history - will be replaced with actual booking API
 const mockHistory: any[] = [];
 
-export default function ProfilePage() {
+// Component that uses search params - wrapped in Suspense
+function ProfileContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -332,5 +333,18 @@ export default function ProfilePage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+// Main page component with Suspense wrapper
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC] flex items-center justify-center">
+        Loading profile...
+      </div>
+    }>
+      <ProfileContent />
+    </Suspense>
   );
 }

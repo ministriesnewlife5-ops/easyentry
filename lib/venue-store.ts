@@ -14,8 +14,17 @@ export type VenueProfile = {
   facebook: string;
   imageUrl: string | null;
   coverImage: string | null;
+  venueImages: string[];
   createdAt: string;
   updatedAt: string;
+  firstPointContact?: { name: string; email: string; phone: string };
+  fnbManagerContact?: { name: string; email: string; phone: string };
+  financeContact?: { name: string; email: string; phone: string };
+  gstNumber?: string;
+  gstCertificate?: string;
+  panCard?: string;
+  panCardDocument?: string;
+  termsAccepted?: string;
 };
 
 type VenueInput = Omit<VenueProfile, 'id' | 'createdAt' | 'updatedAt'>;
@@ -89,6 +98,7 @@ export function updateVenueByUserId(userId: string, updates: Partial<VenueInput>
       facebook: updates.facebook || '',
       imageUrl: updates.imageUrl || null,
       coverImage: updates.coverImage || null,
+      venueImages: updates.venueImages || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

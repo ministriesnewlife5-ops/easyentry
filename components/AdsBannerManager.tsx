@@ -233,7 +233,9 @@ export default function AdsBannerManager() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs text-[#F5F5DC]/60">Banner Image</label>
+                <label className="mb-1 block text-xs text-[#F5F5DC]/60">
+                  Banner Image <span className="text-[#F5F5DC]/40">(Recommended: 1200 x 400 px)</span>
+                </label>
                 <div className="relative">
                   <input
                     type="file"

@@ -5,11 +5,12 @@ import { motion } from 'framer-motion';
 import { 
   MapPin, Globe, Users, Mail, Phone, 
   Instagram, Facebook, ArrowLeft, Building2,
-  Calendar, Music, Star, Loader2
+  Calendar, Music, Star, Loader2, Twitter
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 
 type Venue = {
   id: string;
@@ -26,6 +27,10 @@ type Venue = {
   instagram: string;
   facebook: string;
   twitter: string;
+  venueImages?: string[];
+  firstPointContact?: { name: string; email: string; phone: string };
+  fnbManagerContact?: { name: string; email: string; phone: string };
+  financeContact?: { name: string; email: string; phone: string };
 };
 
 const upcomingEvents: any[] = [];
@@ -33,10 +38,13 @@ const upcomingEvents: any[] = [];
 export default function VenueProfilePage() {
   const params = useParams();
   const venueId = params.id as string;
+  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<'about' | 'events'>('about');
   const [venue, setVenue] = useState<Venue | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const isAdmin = session?.user?.role === 'admin';
 
   useEffect(() => {
     if (venueId) {
@@ -235,6 +243,88 @@ export default function VenueProfilePage() {
                 </h2>
                 <p className="text-[#F5F5DC]/80 leading-relaxed">{venue.bio || 'No description available.'}</p>
               </div>
+
+              {/* Venue Gallery Section */}
+              {venue.venueImages && venue.venueImages.length > 0 && (
+                <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
+                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                    <Image className="w-5 h-5 text-[#E5A823]" />
+                    Venue Gallery
+                  </h2>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {venue.venueImages.map((img, idx) => (
+                      <motion.div
+                        key={idx}
+                        whileHover={{ scale: 1.02 }}
+                        className="relative aspect-video rounded-xl overflow-hidden border border-[#2A2A2A]"
+                      >
+                        <img 
+                          src={img} 
+                          alt={`Gallery ${idx + 1}`} 
+                          className="w-full h-full object-cover"
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Admin Only: Contacts Section */}
+              {isAdmin && (
+                <div className="bg-[#1A1A1A] rounded-2xl p-6 border-2 border-[#E5A823]/30">
+                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-[#E5A823]">
+                    <Phone className="w-5 h-5" />
+                    Venue Contacts (Admin Only)
+                  </h2>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {venue.firstPointContact && (
+                      <div className="bg-[#2A2A2A] rounded-xl p-4 border border-[#3A3A3A]">
+                        <p className="text-[#E5A823] font-bold text-sm mb-2">First Point Contact</p>
+                        <p className="font-medium">{venue.firstPointContact.name}</p>
+                        <div className="mt-2 space-y-1">
+                          <div className="flex items-center gap-2 text-sm text-[#F5F5DC]/60">
+                            <Mail className="w-3 h-3" /> {venue.firstPointContact.email}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-[#F5F5DC]/60">
+                            <Phone className="w-3 h-3" /> {venue.firstPointContact.phone}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {venue.fnbManagerContact && (
+                      <div className="bg-[#2A2A2A] rounded-xl p-4 border border-[#3A3A3A]">
+                        <p className="text-[#E5A823] font-bold text-sm mb-2">F&B Manager</p>
+                        <p className="font-medium">{venue.fnbManagerContact.name}</p>
+                        <div className="mt-2 space-y-1">
+                          <div className="flex items-center gap-2 text-sm text-[#F5F5DC]/60">
+                            <Mail className="w-3 h-3" /> {venue.fnbManagerContact.email}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-[#F5F5DC]/60">
+                            <Phone className="w-3 h-3" /> {venue.fnbManagerContact.phone}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {venue.financeContact && (
+                      <div className="bg-[#2A2A2A] rounded-xl p-4 border border-[#3A3A3A]">
+                        <p className="text-[#E5A823] font-bold text-sm mb-2">Finance Contact</p>
+                        <p className="font-medium">{venue.financeContact.name}</p>
+                        <div className="mt-2 space-y-1">
+                          <div className="flex items-center gap-2 text-sm text-[#F5F5DC]/60">
+                            <Mail className="w-3 h-3" /> {venue.financeContact.email}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-[#F5F5DC]/60">
+                            <Phone className="w-3 h-3" /> {venue.financeContact.phone}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Events Preview */}
               <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">

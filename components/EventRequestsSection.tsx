@@ -230,7 +230,7 @@ export default function EventRequestsSection() {
                       <Calendar className="h-3 w-3" />
                       {request.eventData.date}
                     </div>
-                    <p className="text-xs text-[#F5F5DC]/50 ml-4">{request.eventData.time}</p>
+                    <p className="text-xs text-[#F5F5DC]/50 ml-4">{request.eventData.time || (request.eventData as any).startTime}</p>
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-1">
@@ -340,7 +340,7 @@ export default function EventRequestsSection() {
                   <p className="text-xs text-[#F5F5DC]/50 uppercase tracking-wider">Date & Time</p>
                 </div>
                 <p className="text-sm font-medium text-[#F5F5DC]">{viewingRequest.eventData.date}</p>
-                <p className="text-sm text-[#F5F5DC]/70">{viewingRequest.eventData.time}</p>
+                <p className="text-sm text-[#F5F5DC]/70">{viewingRequest.eventData.time || (viewingRequest.eventData as any).startTime}</p>
                 <p className="text-xs text-[#F5F5DC]/50 mt-1">Gates open: {viewingRequest.eventData.gatesOpen}</p>
               </div>
               <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4">

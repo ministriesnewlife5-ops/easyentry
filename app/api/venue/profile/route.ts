@@ -34,37 +34,10 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json();
-    const {
-      venueName,
-      venueType,
-      email,
-      phone,
-      location,
-      bio,
-      capacity,
-      website,
-      instagram,
-      twitter,
-      facebook,
-      imageUrl,
-      coverImage,
-    } = body;
     
     const venue = updateVenueByUserId(token.sub, {
+      ...body,
       userId: token.sub,
-      venueName: venueName || '',
-      venueType: venueType || '',
-      email: email || '',
-      phone: phone || '',
-      location: location || '',
-      bio: bio || '',
-      capacity: capacity || '',
-      website: website || '',
-      instagram: instagram || '',
-      twitter: twitter || '',
-      facebook: facebook || '',
-      imageUrl: imageUrl || null,
-      coverImage: coverImage || null,
     });
     
     return NextResponse.json({ venue }, { status: 201 });

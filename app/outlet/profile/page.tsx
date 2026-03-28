@@ -7,14 +7,15 @@ import {
   Building2, Edit2, CheckCircle2,
   Instagram, Phone, Mail,
   Users, Loader2, CalendarDays, Clock3, IndianRupee, ExternalLink,
-  Plus, LayoutDashboard, TrendingUp, DollarSign, Ticket, Eye
+  Plus, LayoutDashboard, TrendingUp, DollarSign, Ticket, Eye, X,
+  FileText, FileCheck
 } from 'lucide-react';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
-type ActiveTab = 'dashboard' | 'details' | 'about' | 'events';
+type ActiveTab = 'dashboard' | 'details' | 'about' | 'contacts' | 'documents' | 'events';
 
 type OutletEventItem = {
   requestId: string;
@@ -60,6 +61,7 @@ function OutletProfileContent() {
     waitingApprovalEvents: [],
   });
   
+  const [venueImages, setVenueImages] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     venueName: '',
     venueType: '',
@@ -72,10 +74,19 @@ function OutletProfileContent() {
     instagram: '',
     twitter: '',
     facebook: '',
+    firstPointContact: { name: '', email: '', phone: '' },
+    fnbManagerContact: { name: '', email: '', phone: '' },
+    financeContact: { name: '', email: '', phone: '' },
+    gstNumber: '',
+    gstCertificate: '',
+    panCard: '',
+    panCardDocument: '',
+    termsAccepted: '',
   });
 
   const profileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
@@ -87,6 +98,16 @@ function OutletProfileContent() {
 
     if (requestedTab === 'about') {
       setActiveTab('about');
+      return;
+    }
+
+    if (requestedTab === 'contacts') {
+      setActiveTab('contacts');
+      return;
+    }
+
+    if (requestedTab === 'documents') {
+      setActiveTab('documents');
       return;
     }
 
@@ -112,9 +133,18 @@ function OutletProfileContent() {
           instagram: data.venue.instagram || '',
           twitter: data.venue.twitter || '',
           facebook: data.venue.facebook || '',
+          firstPointContact: data.venue.firstPointContact || { name: '', email: '', phone: '' },
+          fnbManagerContact: data.venue.fnbManagerContact || { name: '', email: '', phone: '' },
+          financeContact: data.venue.financeContact || { name: '', email: '', phone: '' },
+          gstNumber: data.venue.gstNumber || '',
+          gstCertificate: data.venue.gstCertificate || '',
+          panCard: data.venue.panCard || '',
+          panCardDocument: data.venue.panCardDocument || '',
+          termsAccepted: data.venue.termsAccepted || '',
         });
         setProfileImage(data.venue.imageUrl);
         setCoverImage(data.venue.coverImage);
+        setVenueImages(data.venue.venueImages || []);
       } else {
         // Pre-fill email from session
         setFormData(prev => ({
@@ -160,20 +190,75 @@ function OutletProfileContent() {
     }
   }, [status, session, fetchVenueProfile, fetchOutletEvents]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'cover') => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'cover' | 'gallery') => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
         if (type === 'profile') {
           setProfileImage(reader.result as string);
-        } else {
+        } else if (type === 'cover') {
           setCoverImage(reader.result as string);
+        } else if (type === 'gallery') {
+          setVenueImages(prev => [...prev, reader.result as string]);
         }
       };
       reader.readAsDataURL(file);
     }
   };
+
+  const handleRemoveVenueImage = (index: number) => {
+    setVenueImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleContactChange = (contactType: 'firstPointContact' | 'fnbManagerContact' | 'financeContact', field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [contactType]: {
+        ...prev[contactType],
+        [field]: value,
+      },
+    }));
+  };
+
+  // Calculate profile completion percentage
+  const calculateCompletion = () => {
+    const fields = [
+      // Basic Details (4 fields)
+      formData.venueName,
+      formData.venueType,
+      formData.capacity,
+      formData.location,
+      // Images (3 fields)
+      profileImage,
+      coverImage,
+      venueImages.length > 0,
+      // About & Social (4 fields)
+      formData.email,
+      formData.phone,
+      formData.bio,
+      formData.instagram || formData.website,
+      // Contacts (9 fields - 3 per contact)
+      formData.firstPointContact.name,
+      formData.firstPointContact.email,
+      formData.firstPointContact.phone,
+      formData.fnbManagerContact.name,
+      formData.fnbManagerContact.email,
+      formData.fnbManagerContact.phone,
+      formData.financeContact.name,
+      formData.financeContact.email,
+      formData.financeContact.phone,
+      // Documents (2 fields)
+      formData.gstNumber,
+      formData.panCard,
+      formData.termsAccepted,
+    ];
+    
+    const filledFields = fields.filter(Boolean).length;
+    return Math.round((filledFields / fields.length) * 100);
+  };
+
+  const completionPercentage = calculateCompletion();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -190,6 +275,7 @@ function OutletProfileContent() {
         ...formData,
         imageUrl: profileImage,
         coverImage: coverImage,
+        venueImages: venueImages,
       };
 
       const response = await fetch('/api/venue/profile', {
@@ -241,6 +327,44 @@ function OutletProfileContent() {
             </Link>
           </div>
         </div>
+        
+        {/* Profile Completion Status Bar */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <div className="flex justify-between mb-1">
+                <span className="text-sm font-medium text-[#F5F5DC]">Profile Completion</span>
+                <span className={`text-sm font-bold ${
+                  completionPercentage === 100 
+                    ? 'text-emerald-400' 
+                    : completionPercentage >= 70 
+                      ? 'text-[#E5A823]' 
+                      : 'text-orange-400'
+                }`}>
+                  {completionPercentage}%
+                </span>
+              </div>
+              <div className="h-2 bg-[#2A2A2A] rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${completionPercentage}%` }}
+                  transition={{ duration: 0.5, ease: 'easeOut' }}
+                  className={`h-full rounded-full ${
+                    completionPercentage === 100 
+                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' 
+                      : 'bg-gradient-to-r from-[#E5A823] to-[#F5C542]'
+                  }`}
+                />
+              </div>
+            </div>
+            {completionPercentage === 100 && (
+              <div className="flex items-center gap-1 text-emerald-400 text-sm font-medium">
+                <CheckCircle2 className="w-4 h-4" />
+                Complete
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {message && (
@@ -258,6 +382,8 @@ function OutletProfileContent() {
               { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
               { id: 'details', label: 'Basic Details', icon: Edit2 },
               { id: 'about', label: 'About & Social', icon: Building2 },
+              { id: 'contacts', label: 'Contacts', icon: Phone },
+              { id: 'documents', label: 'Documents', icon: FileText },
               { id: 'events', label: 'Events', icon: CalendarDays },
             ].map((tab) => (
               <button
@@ -292,7 +418,7 @@ function OutletProfileContent() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Venue Photo</label>
+                    <label className="block text-sm font-medium mb-1">Logo</label>
                     <p className="text-xs text-[#EB4D4B] mb-2">Recommended: 400x400px (1:1 ratio)</p>
                     <div 
                       onClick={() => profileInputRef.current?.click()}
@@ -310,7 +436,7 @@ function OutletProfileContent() {
                     <input ref={profileInputRef} type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'profile')} className="hidden" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Cover Photo</label>
+                    <label className="block text-sm font-medium mb-1">Venue Image</label>
                     <p className="text-xs text-[#EB4D4B] mb-2">Recommended: 1200x400px (3:1 ratio)</p>
                     <div 
                       onClick={() => coverInputRef.current?.click()}
@@ -356,6 +482,47 @@ function OutletProfileContent() {
                     <input type="text" name="location" value={formData.location} onChange={handleInputChange} required className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]" placeholder="e.g. Chennai, Tamil Nadu" />
                   </div>
                 </div>
+
+                {/* Venue Gallery Images */}
+                <div className="mt-8 pt-6 border-t border-[#2A2A2A]">
+                  <h4 className="text-md font-semibold mb-4 flex items-center gap-2">
+                    <Camera className="w-4 h-4 text-[#E5A823]" />
+                    Venue Gallery Images
+                  </h4>
+                  <p className="text-xs text-[#F5F5DC]/50 mb-4">Showcase your venue with additional photos (interior, exterior, seating, etc.)</p>
+                  
+                  {venueImages.length > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-4">
+                      {venueImages.map((img, index) => (
+                        <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-[#2A2A2A] group">
+                          <Image src={img} alt={`Venue image ${index + 1}`} fill className="object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveVenueImage(index)}
+                            className="absolute top-2 right-2 p-1 bg-[#EB4D4B] text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <div
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#2A2A2A] border border-dashed border-[#E5A823]/30 rounded-lg cursor-pointer hover:border-[#E5A823] hover:bg-[#2A2A2A]/80 transition-colors"
+                  >
+                    <Upload className="w-4 h-4 text-[#E5A823]" />
+                    <span className="text-sm text-[#F5F5DC]/70">Add Gallery Image</span>
+                  </div>
+                  <input
+                    ref={galleryInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, 'gallery')}
+                    className="hidden"
+                  />
+                </div>
               </div>
             </motion.div>
           )}
@@ -366,37 +533,295 @@ function OutletProfileContent() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
+              {/* Venue Contact Info */}
               <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
-                <h3 className="text-lg font-bold mb-4">Contact & Social</h3>
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-[#E5A823]" />
+                  Venue Contact Information
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2 flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-[#E5A823]" /> Email
+                      <Mail className="w-4 h-4 text-[#E5A823]" /> Company Email
                     </label>
-                    <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]" />
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      placeholder="company@example.com"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2 flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-[#E5A823]" /> Phone
+                      <Phone className="w-4 h-4 text-[#E5A823]" /> Venue Contact Number
                     </label>
-                    <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]" />
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      placeholder="+91 98765 43210"
+                    />
                   </div>
+                </div>
+              </div>
+
+              {/* Bio Section */}
+              <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
+                <h3 className="text-lg font-bold mb-4">Bio / Description</h3>
+                <textarea
+                  name="bio"
+                  value={formData.bio}
+                  onChange={handleInputChange}
+                  rows={4}
+                  className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                  placeholder="Tell us about your venue, the kind of events you host..."
+                />
+              </div>
+
+              {/* Social & Website */}
+              <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-[#E5A823]" />
+                  Social & Website
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2 flex items-center gap-2">
                       <Globe className="w-4 h-4 text-[#E5A823]" /> Website
                     </label>
-                    <input type="url" name="website" value={formData.website} onChange={handleInputChange} className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]" placeholder="https://..." />
+                    <input
+                      type="url"
+                      name="website"
+                      value={formData.website}
+                      onChange={handleInputChange}
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      placeholder="https://..."
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2 flex items-center gap-2">
                       <Instagram className="w-4 h-4 text-[#E5A823]" /> Instagram
                     </label>
-                    <input type="text" name="instagram" value={formData.instagram} onChange={handleInputChange} className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]" />
+                    <input
+                      type="text"
+                      name="instagram"
+                      value={formData.instagram}
+                      onChange={handleInputChange}
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      placeholder="@username or full URL"
+                    />
                   </div>
                 </div>
-                <div className="mt-6">
-                  <label className="block text-sm font-medium mb-2">Bio / Description</label>
-                  <textarea name="bio" value={formData.bio} onChange={handleInputChange} rows={6} className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]" placeholder="Tell us about your venue, the kind of events you host..." />
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'contacts' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              {/* First Point Contact */}
+              <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <Phone className="w-5 h-5 text-[#E5A823]" />
+                  First Point Contact
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Name</label>
+                    <input
+                      type="text"
+                      value={formData.firstPointContact.name}
+                      onChange={(e) => handleContactChange('firstPointContact', 'name', e.target.value)}
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      placeholder="Contact person name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-[#E5A823]" /> Email
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.firstPointContact.email}
+                      onChange={(e) => handleContactChange('firstPointContact', 'email', e.target.value)}
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      placeholder="email@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-[#E5A823]" /> Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.firstPointContact.phone}
+                      onChange={(e) => handleContactChange('firstPointContact', 'phone', e.target.value)}
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      placeholder="+91 98765 43210"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* F&B Manager Contact */}
+              <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-[#E5A823]" />
+                  F&B Manager Contact
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Name</label>
+                    <input
+                      type="text"
+                      value={formData.fnbManagerContact.name}
+                      onChange={(e) => handleContactChange('fnbManagerContact', 'name', e.target.value)}
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      placeholder="F&B Manager name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-[#E5A823]" /> Email
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.fnbManagerContact.email}
+                      onChange={(e) => handleContactChange('fnbManagerContact', 'email', e.target.value)}
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      placeholder="fnb@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-[#E5A823]" /> Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.fnbManagerContact.phone}
+                      onChange={(e) => handleContactChange('fnbManagerContact', 'phone', e.target.value)}
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      placeholder="+91 98765 43210"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Finance Person Contact */}
+              <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-[#E5A823]" />
+                  Finance Person Contact
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Name</label>
+                    <input
+                      type="text"
+                      value={formData.financeContact.name}
+                      onChange={(e) => handleContactChange('financeContact', 'name', e.target.value)}
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      placeholder="Finance person name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-[#E5A823]" /> Email
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.financeContact.email}
+                      onChange={(e) => handleContactChange('financeContact', 'email', e.target.value)}
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      placeholder="finance@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-[#E5A823]" /> Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.financeContact.phone}
+                      onChange={(e) => handleContactChange('financeContact', 'phone', e.target.value)}
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      placeholder="+91 98765 43210"
+                    />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'documents' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              {/* GST Details */}
+              <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-[#E5A823]" />
+                  GST Details
+                </h3>
+                <div>
+                  <label className="block text-sm font-medium mb-2">GST Number</label>
+                  <input
+                    type="text"
+                    name="gstNumber"
+                    value={formData.gstNumber}
+                    onChange={handleInputChange}
+                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                    placeholder="22AAAAA0000A1Z5"
+                  />
+                  <p className="text-xs text-[#F5F5DC]/40 mt-1">15 digit GST identification number</p>
+                </div>
+              </div>
+
+              {/* PAN Card Details */}
+              <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <FileCheck className="w-5 h-5 text-[#E5A823]" />
+                  PAN Card Details
+                </h3>
+                <div>
+                  <label className="block text-sm font-medium mb-2">PAN Card Number</label>
+                  <input
+                    type="text"
+                    name="panCard"
+                    value={formData.panCard}
+                    onChange={handleInputChange}
+                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                    placeholder="ABCDE1234F"
+                  />
+                  <p className="text-xs text-[#F5F5DC]/40 mt-1">10 character alphanumeric PAN number</p>
+                </div>
+              </div>
+
+              {/* Terms and Conditions */}
+              <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <FileCheck className="w-5 h-5 text-[#E5A823]" />
+                  Terms and Conditions
+                </h3>
+                <div className="space-y-4">
+                  <p className="text-sm text-[#F5F5DC]/60">Enter your venue's terms and conditions that will be shown to customers when they book events.</p>
+                  <textarea
+                    name="termsAccepted"
+                    value={formData.termsAccepted}
+                    onChange={handleInputChange}
+                    rows={6}
+                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                    placeholder="Enter your terms and conditions here...&#10;&#10;Example:&#10;1. Booking must be confirmed at least 48 hours in advance.&#10;2. Cancellation policy: Full refund if cancelled 7 days before event.&#10;3. Venue capacity must not be exceeded.&#10;4. All guests must follow venue dress code."
+                  />
                 </div>
               </div>
             </motion.div>
@@ -466,6 +891,30 @@ function OutletProfileContent() {
             </button>
           )}
           {activeTab === 'about' && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('contacts')}
+              className="px-8 py-3 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity"
+            >
+              Next: Contacts
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+          {activeTab === 'contacts' && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('documents')}
+              className="px-8 py-3 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity"
+            >
+              Next: Documents
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+          {activeTab === 'documents' && (
             <button
               type="submit"
               disabled={isSaving}

@@ -68,7 +68,7 @@ function isValidEventRequest(value: unknown): value is EventRequest {
     typeof eventData?.title === 'string' &&
     typeof eventData?.subtitle === 'string' &&
     typeof eventData?.date === 'string' &&
-    typeof eventData?.time === 'string' &&
+    (typeof eventData?.time === 'string' || typeof (eventData as any)?.startTime === 'string') &&
     typeof eventData?.venue === 'string' &&
     typeof eventData?.category === 'string' &&
     typeof eventData?.price === 'string' &&
