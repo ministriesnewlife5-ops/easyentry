@@ -12,6 +12,7 @@
     "@fontsource/bebas-neue": "^5.2.7",
     "@fontsource/dm-sans": "^5.2.8",
     "@fontsource/space-mono": "^5.2.9",
+    "@supabase/supabase-js": "^2.49.4",
     "bcryptjs": "^3.0.3",
     "framer-motion": "^12.36.0",
     "git": "^0.1.5",
