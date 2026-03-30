@@ -17,7 +17,7 @@ type OutletEventSummary = {
   price: string;
   image: string;
   description: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'cancelled';
   lifecycle: OutletEventLifecycle;
   submittedAt: number;
   reviewedAt?: number;
@@ -46,8 +46,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized - Outlet provider access required' }, { status: 403 });
     }
 
-    const outletRequests = getEventRequestsByOutlet(token.sub || '');
-    const publishedEvents = getAllPublishedEvents();
+    const outletRequests = await getEventRequestsByOutlet(token.sub || '');
+    const publishedEvents = await getAllPublishedEvents();
     const publishedByRequestId = new Map(
       publishedEvents
         .filter((event) => event.sourceRequestId)
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     const completedEvents: OutletEventSummary[] = [];
     const waitingApprovalEvents: OutletEventSummary[] = [];
 
-    outletRequests.forEach((requestItem) => {
+    outletRequests.forEach((requestItem: typeof outletRequests[0]) => {
       if (requestItem.status === 'rejected') {
         return;
       }

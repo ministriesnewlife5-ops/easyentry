@@ -5,7 +5,8 @@ import { motion } from 'framer-motion';
 import { 
   MapPin, Globe, Users, Mail, Phone, 
   Instagram, Facebook, ArrowLeft, Building2,
-  Calendar, Music, Star, Loader2, Twitter
+  Calendar, Music, Star, Loader2, Twitter,
+  Image as ImageIcon
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -248,7 +249,7 @@ export default function VenueProfilePage() {
               {venue.venueImages && venue.venueImages.length > 0 && (
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
                   <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <Image className="w-5 h-5 text-[#E5A823]" />
+                    <ImageIcon className="w-5 h-5 text-[#E5A823]" />
                     Venue Gallery
                   </h2>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">

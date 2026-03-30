@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = getUserByEmail(normalizedEmail);
+    const user = await getUserByEmail(normalizedEmail);
     if (!user) {
       return NextResponse.json(
         { message: "User not found" },
@@ -35,23 +35,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = verifyOtpForEmail(normalizedEmail, trimmedOtp);
-    if (!result.ok) {
+    const isValid = await verifyOtpForEmail(normalizedEmail, trimmedOtp);
+    if (!isValid) {
       return NextResponse.json(
-        { message: result.reason },
+        { message: "Invalid or expired OTP" },
         { status: 400 }
       );
     }
 
     const hashedPassword = await hash(newPassword, 10);
-    const updateResult = await updateUserPassword(normalizedEmail, hashedPassword);
-
-    if (!updateResult.ok) {
-      return NextResponse.json(
-        { message: updateResult.reason },
-        { status: 500 }
-      );
-    }
+    await updateUserPassword(normalizedEmail, hashedPassword);
 
     return NextResponse.json(
       { message: "Password reset successfully" },

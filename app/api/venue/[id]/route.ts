@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const venue = getVenueById(id);
+    const venue = await getVenueById(id);
     
     if (!venue) {
       return NextResponse.json({ error: 'Venue not found' }, { status: 404 });

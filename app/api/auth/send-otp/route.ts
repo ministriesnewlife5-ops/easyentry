@@ -13,12 +13,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Please provide a valid email" }, { status: 400 });
     }
 
-    const existingUser = getUserByEmail(normalizedEmail);
+    const existingUser = await getUserByEmail(normalizedEmail);
     if (existingUser) {
       return NextResponse.json({ message: "User already exists with this email" }, { status: 409 });
     }
 
-    const otp = createOtpForEmail(normalizedEmail);
+    const otp = await createOtpForEmail(normalizedEmail);
     await sendOtpEmail(normalizedEmail, otp);
 
     return NextResponse.json({ message: "OTP sent successfully" }, { status: 200 });

@@ -3,7 +3,7 @@ import { getAllVenues } from '@/lib/venue-store';
 
 export async function GET() {
   try {
-    const venues = getAllVenues();
+    const venues = await getAllVenues();
     
     // Strip out sensitive contact information from all venues
     const publicVenues = venues.map(venue => {

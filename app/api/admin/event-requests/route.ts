@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
     }
 
-    const requests = getAllEventRequests();
+    const requests = await getAllEventRequests();
     return NextResponse.json({ requests });
   } catch (error) {
     console.error('Failed to fetch event requests:', error);
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     const outletName = token.name || 'Unknown Outlet';
-    const newRequest = createEventRequest(
+    const newRequest = await createEventRequest(
       token.sub || '',
       outletName,
       eventData
@@ -96,7 +96,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid request data' }, { status: 400 });
     }
 
-    const updated = updateEventRequestStatus(
+    const updated = await updateEventRequestStatus(
       requestId,
       status,
       token.name || 'Admin',
@@ -108,9 +108,9 @@ export async function PUT(request: NextRequest) {
     }
 
     if (status === 'approved') {
-      publishEventFromRequest(updated);
+      await publishEventFromRequest(updated);
     } else {
-      unpublishEventByRequestId(requestId);
+      await unpublishEventByRequestId(requestId);
     }
 
     return NextResponse.json({ request: updated });

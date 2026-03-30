@@ -11,9 +11,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Email and OTP are required" }, { status: 400 });
     }
 
-    const result = verifyOtpForEmail(normalizedEmail, trimmedOtp);
-    if (!result.ok) {
-      return NextResponse.json({ message: result.reason }, { status: 400 });
+    const isValid = await verifyOtpForEmail(normalizedEmail, trimmedOtp);
+    if (!isValid) {
+      return NextResponse.json({ message: "Invalid or expired OTP" }, { status: 400 });
     }
 
     return NextResponse.json({ message: "OTP verified successfully" }, { status: 200 });

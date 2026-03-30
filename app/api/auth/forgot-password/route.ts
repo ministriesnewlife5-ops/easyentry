@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const existingUser = getUserByEmail(normalizedEmail);
+    const existingUser = await getUserByEmail(normalizedEmail);
     if (!existingUser) {
       return NextResponse.json(
         { message: "No account found with this email" },
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const otp = createOtpForEmail(normalizedEmail, 10);
+    const otp = await createOtpForEmail(normalizedEmail, 10);
     await sendOtpEmail(normalizedEmail, otp);
 
     return NextResponse.json(

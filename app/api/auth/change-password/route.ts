@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = getUserByEmail(normalizedEmail);
+    const user = await getUserByEmail(normalizedEmail);
     if (!user) {
       return NextResponse.json(
         { message: "User not found" },
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const isValid = await compare(oldPassword, user.password);
+    const isValid = await compare(oldPassword, user.hashed_password);
     if (!isValid) {
       return NextResponse.json(
         { message: "Old password is incorrect" },
@@ -43,14 +43,7 @@ export async function POST(request: Request) {
     }
 
     const hashedPassword = await hash(newPassword, 10);
-    const result = await updateUserPassword(normalizedEmail, hashedPassword);
-
-    if (!result.ok) {
-      return NextResponse.json(
-        { message: result.reason },
-        { status: 500 }
-      );
-    }
+    await updateUserPassword(normalizedEmail, hashedPassword);
 
     return NextResponse.json(
       { message: "Password changed successfully" },

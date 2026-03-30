@@ -9,36 +9,12 @@ import AdsBannerManager from '@/components/AdsBannerManager';
 import BrowseFiltersManager from '@/components/BrowseFiltersManager';
 import { getAllPublishedEvents, getPublishedEventCards } from '@/lib/public-events-store';
 import { getAllEventRequests } from '@/lib/event-request-store';
-import { appUsers } from '@/lib/auth-store';
+import { getAllUsers } from '@/lib/auth-store';
 
-const stats = [
-  { label: 'Revenue this month', value: '₹4.82L', delta: '↑ 24% vs last month', icon: IndianRupee },
-  { label: 'Tickets sold', value: '2,481', delta: '↑ 342 this week', icon: Ticket },
-  { label: 'Code-driven bookings', value: '74%', delta: '↑ 12% vs last month', icon: TrendingUp },
-  { label: 'Avg event rating', value: '4.8', delta: '↑ 0.3 this month', icon: CircleCheckBig },
-];
-
-const revenueBars = [
-  28, 42, 30, 55, 48, 36, 66, 52, 58, 70, 
-  34, 44, 60, 78, 51, 40, 84, 62, 88, 64, 
-  76, 55, 68, 92, 45, 72, 85, 58, 95, 70
-];
-
-const bookingSources = [
-  { name: 'Artist codes', value: 58 },
-  { name: 'Instagram', value: 18 },
-  { name: 'Walk-in', value: 12 },
-  { name: 'Direct Search', value: 7 },
-  { name: 'Partners', value: 5 },
-];
-
-const recentActivity = [
-  { user: 'Rahul Sharma', action: 'booked', event: 'DJ Arjun — House Night', time: '2 mins ago', amount: '₹1,200' },
-  { user: 'Ananya Iyer', action: 'joined', event: 'Waitlist: Indie Open Mic', time: '15 mins ago', amount: null },
-  { user: 'Vikram Singh', action: 'booked', event: 'Sufi Evening', time: '42 mins ago', amount: '₹2,500' },
-  { user: 'Priya Patel', action: 'reviewed', event: 'Retro Bollywood', time: '1 hour ago', amount: null, rating: 5 },
-  { user: 'Siddharth M.', action: 'booked', event: 'Techno Underground', time: '2 hours ago', amount: '₹1,800' },
-];
+// Data structures will be populated with real data from database
+let revenueBars: number[] = [];
+let bookingSources: { name: string; value: number }[] = [];
+let recentActivity: any[] = [];
 
 export default async function AdminPage({
   searchParams,
@@ -56,15 +32,16 @@ export default async function AdminPage({
   }
 
   // Fetch real data from the database
-  const publishedEvents = getAllPublishedEvents();
-  const eventCards = getPublishedEventCards();
-  const eventRequests = getAllEventRequests();
+  const publishedEvents = await getAllPublishedEvents();
+  const eventCards = await getPublishedEventCards();
+  const eventRequests = await getAllEventRequests();
+  const allUsers = await getAllUsers();
   
   // Get real artists (users with artist role)
-  const enrolledArtists = appUsers.filter(user => user.role === 'artist');
+  const enrolledArtists = allUsers.filter((user: { role: string }) => user.role === 'artist');
   
   // Get real influencers/promoters (users with promoter role)
-  const enrolledInfluencers = appUsers.filter(user => user.role === 'promoter');
+  const enrolledInfluencers = allUsers.filter((user: { role: string }) => user.role === 'promoter');
 
   // Map published events to the format used in the admin dashboard
   const allWebsiteEvents = publishedEvents.map(event => ({
@@ -78,8 +55,8 @@ export default async function AdminPage({
   // Map artists to the format used in the admin dashboard
   const allEnrolledArtists = enrolledArtists.map(artist => ({
     id: artist.id,
-    name: artist.name.toUpperCase(),
-    image: `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name)}&background=random&color=fff&size=200`,
+    name: (artist.name || 'Unknown').toUpperCase(),
+    image: `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name || 'Unknown')}&background=random&color=fff&size=200`,
     location: 'Chennai, Tamil Nadu',
     completedEvents: 0,
     upcomingEvents: 0,
@@ -89,8 +66,8 @@ export default async function AdminPage({
   // Map influencers to the format used in the admin dashboard
   const allInfluencers = enrolledInfluencers.map(influencer => ({
     id: influencer.id,
-    name: influencer.name,
-    image: `https://ui-avatars.com/api/?name=${encodeURIComponent(influencer.name)}&background=random&color=fff&size=200`,
+    name: influencer.name || 'Unknown',
+    image: `https://ui-avatars.com/api/?name=${encodeURIComponent(influencer.name || 'Unknown')}&background=random&color=fff&size=200`,
     location: 'Chennai, Tamil Nadu',
     ticketsSoldByCode: 0,
   }));
@@ -108,6 +85,14 @@ export default async function AdminPage({
       };
     });
 
+  // Stats based on real data
+  const stats = [
+    { label: 'Total Events', value: publishedEvents.length.toString(), delta: 'Published events', icon: CalendarDays },
+    { label: 'Artists Enrolled', value: enrolledArtists.length.toString(), delta: 'Active artists', icon: Mic2 },
+    { label: 'Promoters', value: enrolledInfluencers.length.toString(), delta: 'Active promoters', icon: Megaphone },
+    { label: 'Total Users', value: allUsers.length.toString(), delta: 'Registered users', icon: Users },
+  ];
+
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">
       <div className="mx-auto flex w-full max-w-[1440px] gap-5 px-4 py-6 md:px-6">
@@ -116,8 +101,8 @@ export default async function AdminPage({
             <p className="text-2xl font-bold tracking-tight text-[#E5A823]">Easy Entry</p>
             <p className="mt-1 text-sm text-[#F5F5DC]/65">Admin Dashboard</p>
             <div className="mt-4 rounded-xl border border-[#2A2A2A] bg-[#1B1B1B]/60 px-3 py-2">
-              <p className="text-base font-semibold">Pasha Chennai</p>
-              <p className="text-xs text-[#F5F5DC]/50">Anna Salai · Outlet ID #1412</p>
+              <p className="text-base font-semibold">{session?.user?.name || 'Admin'}</p>
+              <p className="text-xs text-[#F5F5DC]/50">{session?.user?.email}</p>
             </div>
           </div>
           <nav className="space-y-1 p-3 text-sm font-medium">
@@ -176,7 +161,7 @@ export default async function AdminPage({
                    activeSection === 'influencers' ? 'All Influencers' :
                    activeSection === 'requests' ? 'Event Requests' :
                    activeSection === 'settings' ? 'Settings' :
-                   'Good evening, Pasha'}
+                   'Admin Dashboard'}
                 </h1>
                 <p className="mt-1 text-sm text-[#F5F5DC]/65">
                   {activeSection === 'ads' ? 'Create and manage promotion banners from promo data presets' : 
@@ -186,7 +171,7 @@ export default async function AdminPage({
                    activeSection === 'influencers' ? `Manage and view all ${allInfluencers.length} influencers collaborating on the platform` :
                    activeSection === 'requests' ? 'Review and approve event requests from outlet providers' :
                    activeSection === 'settings' ? 'Manage your account settings and security' :
-                   `Thursday, 20 March 2026 · ${upcomingEvents.length} events this week`}
+                   `${upcomingEvents.length} upcoming events · ${allUsers.length} total users`}
                 </p>
               </div>
               {activeSection === 'ads' && (
@@ -336,30 +321,16 @@ export default async function AdminPage({
                 </article>
                 <article className="rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5">
                   <h2 className="text-xl font-semibold">Revenue this month</h2>
-                  <div className="mt-6 flex h-44 items-end gap-2 overflow-hidden rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/90 px-3 pb-3 pt-4">
-                    {revenueBars.map((height, index) => (
-                      <div key={`${height}-${index}`} className="flex flex-1 flex-col justify-end">
-                        <div className="rounded-t-sm bg-gradient-to-t from-[#E5A823]/80 to-[#EB4D4B]/80" style={{ height: `${height * 1.3}px` }} />
-                      </div>
-                    ))}
+                  <div className="mt-6 flex h-44 items-center justify-center rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/90">
+                    <p className="text-[#F5F5DC]/50">Revenue data coming soon</p>
                   </div>
                 </article>
               </div>
               <div className="mt-4 grid gap-4 xl:grid-cols-2">
                 <article className="rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5">
                   <h2 className="text-xl font-semibold">Bookings by source</h2>
-                  <div className="mt-4 space-y-4">
-                    {bookingSources.map((item) => (
-                      <div key={item.name}>
-                        <div className="mb-1 flex items-center justify-between text-sm">
-                          <p className="text-[#F5F5DC]/80">{item.name}</p>
-                          <p className="font-semibold text-[#E5A823]">{item.value}%</p>
-                        </div>
-                        <div className="h-2 rounded-full bg-[#2A2A2A]">
-                          <div className="h-full rounded-full bg-gradient-to-r from-[#E5A823] to-[#EB4D4B]" style={{ width: `${item.value}%` }} />
-                        </div>
-                      </div>
-                    ))}
+                  <div className="mt-4 flex h-40 items-center justify-center">
+                    <p className="text-[#F5F5DC]/50">Analytics coming soon</p>
                   </div>
                 </article>
                 <article className="rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5">
@@ -381,39 +352,8 @@ export default async function AdminPage({
               </div>
               <article className="mt-4 rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5">
                 <h2 className="text-xl font-semibold">Recent Activity</h2>
-                <div className="mt-4 overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-[#2A2A2A] text-[#F5F5DC]/50">
-                        <th className="pb-3 font-medium">Customer</th>
-                        <th className="pb-3 font-medium">Action</th>
-                        <th className="pb-3 font-medium">Event</th>
-                        <th className="pb-3 font-medium">Time</th>
-                        <th className="pb-3 text-right font-medium">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#2A2A2A]">
-                      {recentActivity.map((activity, idx) => (
-                        <tr key={idx} className="group transition-colors hover:bg-[#2A2A2A]/20">
-                          <td className="py-4 font-medium text-[#F5F5DC]">{activity.user}</td>
-                          <td className="py-4">
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                              activity.action === 'booked' ? 'bg-emerald-400/10 text-emerald-400' :
-                              activity.action === 'reviewed' ? 'bg-blue-400/10 text-blue-400' :
-                              'bg-orange-400/10 text-orange-400'
-                            }`}>
-                              {activity.action}
-                            </span>
-                          </td>
-                          <td className="py-4 text-[#F5F5DC]/80">{activity.event}</td>
-                          <td className="py-4 text-[#F5F5DC]/60">{activity.time}</td>
-                          <td className="py-4 text-right font-semibold text-[#E5A823]">
-                            {activity.amount || '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="mt-4 flex h-40 items-center justify-center">
+                  <p className="text-[#F5F5DC]/50">Activity feed coming soon</p>
                 </div>
               </article>
             </>

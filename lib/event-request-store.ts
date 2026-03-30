@@ -1,7 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
+import { supabase } from './supabase';
 
-export type EventRequestStatus = 'pending' | 'approved' | 'rejected';
+export type EventRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
 export type EventRequest = {
   id: string;
@@ -34,172 +33,270 @@ export type EventRequest = {
   rejectionReason?: string;
 };
 
-const STORAGE_KEY = 'easyentry.event-requests';
-const STORAGE_DIR = path.join(process.cwd(), '.easyentry-data');
-const STORAGE_FILE = path.join(STORAGE_DIR, 'event-requests.json');
+export type CreateEventRequestInput = {
+  title: string;
+  date: string;
+  description?: string;
+  userId?: string;
+  venueId?: string;
+  eventType?: string;
+  expectedAttendance?: number;
+  budget?: number;
+  requirements?: string[];
+  attachments?: string[];
+  contactEmail?: string;
+  contactPhone?: string;
+  notes?: string;
+  outletUserId?: string;
+  outletName?: string;
+  eventData?: EventRequest['eventData'];
+};
 
-let eventRequestsCache: EventRequest[] | null = null;
+export type UpdateEventRequestInput = Partial<Omit<CreateEventRequestInput, 'userId' | 'outletUserId'>> & {
+  status?: EventRequestStatus;
+  reviewedAt?: number;
+  reviewedBy?: string;
+  rejectionReason?: string;
+};
 
-function ensureServerStorageFile() {
-  if (!existsSync(STORAGE_DIR)) {
-    mkdirSync(STORAGE_DIR, { recursive: true });
-  }
-
-  if (!existsSync(STORAGE_FILE)) {
-    writeFileSync(STORAGE_FILE, '[]', 'utf8');
-  }
+// Map legacy EventRequest to database schema
+function mapLegacyToDb(request: Partial<EventRequest> & { outletUserId?: string; outletName?: string; eventData?: EventRequest['eventData'] }) {
+  return {
+    title: request.eventData?.title || 'Untitled Event',
+    date: request.eventData?.date || new Date().toISOString().split('T')[0],
+    description: request.eventData?.description || request.eventData?.fullDescription || null,
+    user_id: request.outletUserId || null,
+    venue_id: null,
+    event_type: request.eventData?.category || null,
+    expected_attendance: request.eventData?.numberOfTickets ? parseInt(request.eventData.numberOfTickets) : null,
+    budget: request.eventData?.price ? parseFloat(request.eventData.price) : null,
+    requirements: request.eventData?.rules || null,
+    attachments: request.eventData?.mediaFiles || null,
+    contact_email: null,
+    contact_phone: null,
+    notes: request.rejectionReason || null,
+    status: request.status || 'pending',
+  };
 }
 
-function isValidEventRequest(value: unknown): value is EventRequest {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const request = value as Partial<EventRequest>;
-  const eventData = request.eventData as EventRequest['eventData'] | undefined;
-
-  return (
-    typeof request.id === 'string' &&
-    typeof request.outletUserId === 'string' &&
-    typeof request.outletName === 'string' &&
-    typeof request.status === 'string' &&
-    typeof request.submittedAt === 'number' &&
-    Boolean(eventData) &&
-    typeof eventData?.title === 'string' &&
-    typeof eventData?.subtitle === 'string' &&
-    typeof eventData?.date === 'string' &&
-    (typeof eventData?.time === 'string' || typeof (eventData as any)?.startTime === 'string') &&
-    typeof eventData?.venue === 'string' &&
-    typeof eventData?.category === 'string' &&
-    typeof eventData?.price === 'string' &&
-    typeof eventData?.image === 'string' &&
-    (eventData?.mediaFiles === undefined || Array.isArray(eventData?.mediaFiles)) &&
-    (eventData?.numberOfTickets === undefined || typeof eventData?.numberOfTickets === 'string') &&
-    typeof eventData?.description === 'string' &&
-    typeof eventData?.fullDescription === 'string' &&
-    typeof eventData?.gatesOpen === 'string' &&
-    typeof eventData?.entryAge === 'string' &&
-    typeof eventData?.layout === 'string' &&
-    typeof eventData?.seating === 'string'
-  );
+// Map database record to legacy EventRequest
+function mapDbToLegacy(record: Record<string, unknown>): EventRequest {
+  return {
+    id: record.id as string,
+    outletUserId: (record.user_id as string) || '',
+    outletName: '',
+    eventData: {
+      title: (record.title as string) || '',
+      subtitle: '',
+      date: (record.date as string) || '',
+      time: '',
+      venue: '',
+      category: (record.event_type as string) || '',
+      price: (record.budget as string) || '',
+      image: (record.attachments as string[])?.[0] || '',
+      mediaFiles: (record.attachments as string[]) || [],
+      description: (record.description as string) || '',
+      fullDescription: (record.description as string) || '',
+      gatesOpen: '',
+      entryAge: '',
+      layout: '',
+      seating: '',
+    },
+    status: (record.status as EventRequestStatus) || 'pending',
+    submittedAt: new Date(record.created_at as string).getTime(),
+    reviewedAt: record.reviewed_at ? new Date(record.reviewed_at as string).getTime() : undefined,
+    reviewedBy: (record.reviewed_by as string) || undefined,
+    rejectionReason: (record.notes as string) || undefined,
+  };
 }
 
-function readServerStorage(): EventRequest[] {
-  ensureServerStorageFile();
+/**
+ * Get all event requests
+ */
+export async function getAllEventRequests(): Promise<EventRequest[]> {
+  const { data, error } = await supabase
+    .from('event_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-  try {
-    const stored = readFileSync(STORAGE_FILE, 'utf8');
-    const parsed = JSON.parse(stored) as unknown;
+  if (error) {
+    throw new Error(`Failed to get event requests: ${error.message}`);
+  }
 
-    if (!Array.isArray(parsed)) {
-      return [];
+  return (data as Record<string, unknown>[])?.map(mapDbToLegacy) || [];
+}
+
+/**
+ * Get event requests by user/outlet ID
+ */
+export async function getEventRequestsByOutlet(outletUserId: string): Promise<EventRequest[]> {
+  const { data, error } = await supabase
+    .from('event_requests')
+    .select('*')
+    .eq('user_id', outletUserId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to get outlet event requests: ${error.message}`);
+  }
+
+  return (data as Record<string, unknown>[])?.map(mapDbToLegacy) || [];
+}
+
+/**
+ * Get a single event request by ID
+ */
+export async function getEventRequestById(id: string): Promise<EventRequest | undefined> {
+  const { data, error } = await supabase
+    .from('event_requests')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return undefined;
     }
-
-    return parsed.filter(isValidEventRequest);
-  } catch (error) {
-    console.error('Error reading event requests from file storage:', error);
-    return [];
-  }
-}
-
-function writeServerStorage(requests: EventRequest[]): void {
-  ensureServerStorageFile();
-
-  try {
-    writeFileSync(STORAGE_FILE, JSON.stringify(requests, null, 2), 'utf8');
-  } catch (error) {
-    console.error('Error saving event requests to file storage:', error);
-  }
-}
-
-function getStorage(): EventRequest[] {
-  if (typeof window === 'undefined') {
-    if (eventRequestsCache === null) {
-      eventRequestsCache = readServerStorage();
-    }
-    return eventRequestsCache;
+    throw new Error(`Failed to get event request: ${error.message}`);
   }
 
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.error('Error reading event requests from localStorage:', e);
-  }
-  return [];
+  return mapDbToLegacy(data as Record<string, unknown>);
 }
 
-function setStorage(requests: EventRequest[]): void {
-  if (typeof window === 'undefined') {
-    eventRequestsCache = requests;
-    writeServerStorage(requests);
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
-  } catch (e) {
-    console.error('Error saving event requests to localStorage:', e);
-  }
-}
-
-export function getAllEventRequests(): EventRequest[] {
-  return [...getStorage()];
-}
-
-export function getEventRequestsByOutlet(outletUserId: string): EventRequest[] {
-  return getStorage().filter(r => r.outletUserId === outletUserId);
-}
-
-export function getEventRequestById(id: string): EventRequest | undefined {
-  return getStorage().find(r => r.id === id);
-}
-
-export function createEventRequest(
+/**
+ * Create a new event request
+ */
+export async function createEventRequest(
   outletUserId: string,
   outletName: string,
   eventData: EventRequest['eventData']
-): EventRequest {
-  const requests = getStorage();
-  const newRequest: EventRequest = {
-    id: `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+): Promise<EventRequest> {
+  const dbData = mapLegacyToDb({
     outletUserId,
     outletName,
     eventData,
     status: 'pending',
-    submittedAt: Date.now(),
-  };
-  requests.push(newRequest);
-  setStorage(requests);
-  return newRequest;
+  });
+
+  const { data, error } = await supabase
+    .from('event_requests')
+    .insert(dbData)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to create event request: ${error.message}`);
+  }
+
+  return mapDbToLegacy(data as Record<string, unknown>);
 }
 
-export function updateEventRequestStatus(
+/**
+ * Update event request status
+ */
+export async function updateEventRequestStatus(
   id: string,
   status: EventRequestStatus,
   reviewedBy: string,
   rejectionReason?: string
-): EventRequest | undefined {
-  const requests = getStorage();
-  const request = requests.find(r => r.id === id);
-  if (!request) return undefined;
-  
-  request.status = status;
-  request.reviewedAt = Date.now();
-  request.reviewedBy = reviewedBy;
+): Promise<EventRequest | undefined> {
+  const updateData: Record<string, unknown> = {
+    status,
+    reviewed_at: new Date().toISOString(),
+    reviewed_by: reviewedBy,
+  };
+
   if (rejectionReason) {
-    request.rejectionReason = rejectionReason;
+    updateData.notes = rejectionReason;
   }
-  setStorage(requests);
-  return request;
+
+  const { data, error } = await supabase
+    .from('event_requests')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return undefined;
+    }
+    throw new Error(`Failed to update event request: ${error.message}`);
+  }
+
+  return mapDbToLegacy(data as Record<string, unknown>);
 }
 
-export function deleteEventRequest(id: string): boolean {
-  const requests = getStorage();
-  const initialLength = requests.length;
-  const filtered = requests.filter(r => r.id !== id);
-  setStorage(filtered);
-  return filtered.length < initialLength;
+/**
+ * Delete an event request
+ */
+export async function deleteEventRequest(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('event_requests')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Failed to delete event request:', error.message);
+    return false;
+  }
+
+  return true;
 }
+
+/**
+ * Update an event request (legacy compatibility)
+ */
+export async function updateEventRequest(
+  id: string,
+  input: UpdateEventRequestInput
+): Promise<EventRequest | undefined> {
+  const updateData: Record<string, unknown> = {};
+
+  if (input.status !== undefined) updateData.status = input.status;
+  if (input.reviewedAt !== undefined) updateData.reviewed_at = new Date(input.reviewedAt).toISOString();
+  if (input.reviewedBy !== undefined) updateData.reviewed_by = input.reviewedBy;
+  if (input.rejectionReason !== undefined) updateData.notes = input.rejectionReason;
+  if (input.eventData?.title !== undefined) updateData.title = input.eventData.title;
+  if (input.eventData?.date !== undefined) updateData.date = input.eventData.date;
+  if (input.eventData?.description !== undefined) updateData.description = input.eventData.description;
+  if (input.eventData?.category !== undefined) updateData.event_type = input.eventData.category;
+
+  const { data, error } = await supabase
+    .from('event_requests')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return undefined;
+    }
+    throw new Error(`Failed to update event request: ${error.message}`);
+  }
+
+  return mapDbToLegacy(data as Record<string, unknown>);
+}
+
+/**
+ * Approve an event request
+ */
+export async function approveEventRequest(
+  id: string,
+  reviewedBy: string
+): Promise<EventRequest | undefined> {
+  return updateEventRequestStatus(id, 'approved', reviewedBy);
+}
+
+/**
+ * Reject an event request
+ */
+export async function rejectEventRequest(
+  id: string,
+  reviewedBy: string,
+  rejectionReason?: string
+): Promise<EventRequest | undefined> {
+  return updateEventRequestStatus(id, 'rejected', reviewedBy, rejectionReason);
+}
+

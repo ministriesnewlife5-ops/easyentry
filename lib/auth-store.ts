@@ -1,144 +1,279 @@
-import { randomInt } from "crypto";
+import { supabase, type AppUser, type OtpRecord } from './supabase';
+import { randomInt } from 'crypto';
 
-export type AppRole = "artist" | "promoter" | "outlet" | "user" | "admin";
+export type AppRole = 'artist' | 'promoter' | 'outlet' | 'user' | 'admin' | 'outlet_provider';
 
-type AppUser = {
-  id: string;
-  name: string;
-  email: string;
-  password: string;
-  role: AppRole;
-};
+/**
+ * Find a user by their email address
+ */
+export async function findUserByEmail(email: string): Promise<AppUser | null> {
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('*')
+    .eq('email', email.toLowerCase().trim())
+    .single();
 
-type OtpRecord = {
-  otp: string;
-  expiresAt: number;
-  verified: boolean;
-};
-
-const globalStore = globalThis as unknown as {
-  appUsers?: AppUser[];
-  otpRecords?: Map<string, OtpRecord>;
-};
-
-const normalizeEmail = (email: string) => email.trim().toLowerCase();
-
-const initialUsers: AppUser[] = [
-  {
-    id: "1",
-    name: "Demo User",
-    email: "test@example.com",
-    password: "$2b$10$bb9KZo9iaM1KBUXFvjHqGOUmqGLG9sn/PSItMXPjfICbU3wisGzLC",
-    role: "user" as AppRole,
-  },
-  {
-    id: "2",
-    name: "Admin",
-    email: "admin@easyentry.com",
-    password: "$2b$10$M4TaRySopD0Gp0B9EYslnOCsY7yXpB9BplXdAhnSVF6JQGqhz3Vsy", // hash for 'admin123'
-    role: "admin" as AppRole,
-  },
-  {
-    id: "3",
-    name: "Outlet Provider",
-    email: "provider@athryan.com",
-    password: "$2b$10$P9H5i9J1vHq.v9dixqsiCu6p3j5nPHI2k9D66STQcyEIq36BFsE7q", // hash for 'provider123'
-    role: "outlet" as AppRole,
-  },
-  {
-    id: "4",
-    name: "Artist",
-    email: "artist@athryan.com",
-    password: "$2b$10$8dRlrPtXhSRZSUXeOJeyi./y03McyYgI0sP0TKkc4gUQUFUc/S.7C", // hash for 'artist123'
-    role: "artist" as AppRole,
-  },
-  {
-    id: "5",
-    name: "Influencer",
-    email: "influencer@athryan.com",
-    password: "$2b$10$zsy1c5fPukQg.rHjhTBfkeqwVRokAzDfvuzhHOon7iZ7P4bx3QqRu", // hash for 'influencer123'
-    role: "promoter" as AppRole,
-  },
-];
-
-export const appUsers = globalStore.appUsers ?? [...initialUsers];
-
-if (!globalStore.appUsers) {
-  globalStore.appUsers = appUsers;
-}
-
-// Ensure admin exists and has the correct password if somehow lost or outdated in global state
-const adminUser = appUsers.find(u => u.email === "admin@easyentry.com");
-if (!adminUser) {
-  appUsers.push(initialUsers[1]);
-} else if (adminUser.password !== initialUsers[1].password) {
-  adminUser.password = initialUsers[1].password;
-}
-
-const otpRecords = globalStore.otpRecords ?? new Map<string, OtpRecord>();
-
-if (!globalStore.otpRecords) {
-  globalStore.otpRecords = otpRecords;
-}
-
-export function getUserByEmail(email: string) {
-  const normalizedEmail = normalizeEmail(email);
-  return appUsers.find((user) => normalizeEmail(user.email) === normalizedEmail);
-}
-
-export function addUser(user: AppUser) {
-  appUsers.push(user);
-}
-
-export function createOtpForEmail(email: string, ttlMinutes = 10) {
-  const normalizedEmail = normalizeEmail(email);
-  const otp = randomInt(100000, 1000000).toString();
-  const expiresAt = Date.now() + ttlMinutes * 60 * 1000;
-  otpRecords.set(normalizedEmail, { otp, expiresAt, verified: false });
-  return otp;
-}
-
-export function verifyOtpForEmail(email: string, otp: string) {
-  const normalizedEmail = normalizeEmail(email);
-  const record = otpRecords.get(normalizedEmail);
-  if (!record) {
-    return { ok: false, reason: "OTP not found" };
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null;
+    }
+    throw new Error(`Failed to find user: ${error.message}`);
   }
-  if (Date.now() > record.expiresAt) {
-    otpRecords.delete(normalizedEmail);
-    return { ok: false, reason: "OTP expired" };
-  }
-  if (record.otp !== otp) {
-    return { ok: false, reason: "Invalid OTP" };
-  }
-  otpRecords.set(normalizedEmail, { ...record, verified: true });
-  return { ok: true as const };
+
+  return data as AppUser;
 }
 
-export function isEmailOtpVerified(email: string) {
-  const normalizedEmail = normalizeEmail(email);
-  const record = otpRecords.get(normalizedEmail);
-  if (!record) {
+/**
+ * Find a user by their ID
+ */
+export async function findUserById(id: string): Promise<AppUser | null> {
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null;
+    }
+    throw new Error(`Failed to find user: ${error.message}`);
+  }
+
+  return data as AppUser;
+}
+
+/**
+ * Create a new user
+ */
+export async function createUser(
+  email: string,
+  hashedPassword: string,
+  role: AppRole = 'user',
+  name?: string
+): Promise<AppUser> {
+  const { data, error } = await supabase
+    .from('app_users')
+    .insert({
+      email: email.toLowerCase().trim(),
+      hashed_password: hashedPassword,
+      role,
+      name: name || null,
+      is_verified: false,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('User with this email already exists');
+    }
+    throw new Error(`Failed to create user: ${error.message}`);
+  }
+
+  return data as AppUser;
+}
+
+/**
+ * Update a user's verification status
+ */
+export async function verifyUser(email: string): Promise<void> {
+  const { error } = await supabase
+    .from('app_users')
+    .update({ is_verified: true } as any)
+    .eq('email', email.toLowerCase().trim());
+
+  if (error) {
+    throw new Error(`Failed to verify user: ${error.message}`);
+  }
+}
+
+/**
+ * Update user's password
+ */
+export async function updateUserPassword(
+  email: string,
+  hashedPassword: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('app_users')
+    .update({ hashed_password: hashedPassword } as any)
+    .eq('email', email.toLowerCase().trim());
+
+  if (error) {
+    throw new Error(`Failed to update password: ${error.message}`);
+  }
+}
+
+/**
+ * Create a new OTP record
+ * Returns the generated OTP code
+ */
+export async function createOtp(
+  email: string,
+  ttlMinutes: number = 10
+): Promise<string> {
+  const code = randomInt(100000, 1000000).toString();
+  const expiresAt = new Date();
+  expiresAt.setMinutes(expiresAt.getMinutes() + ttlMinutes);
+
+  // Mark any existing OTPs for this email as used
+  await supabase
+    .from('otp_records')
+    .update({ is_used: true } as any)
+    .eq('email', email.toLowerCase().trim())
+    .eq('is_used', false);
+
+  const { data, error } = await supabase
+    .from('otp_records')
+    .insert({
+      email: email.toLowerCase().trim(),
+      code,
+      expires_at: expiresAt.toISOString(),
+      is_used: false,
+    } as any)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to create OTP: ${error.message}`);
+  }
+
+  return code;
+}
+
+/**
+ * Verify an OTP code
+ * Returns true if valid and not expired, false otherwise
+ */
+export async function verifyOtp(email: string, code: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('otp_records')
+    .select('*')
+    .eq('email', email.toLowerCase().trim())
+    .eq('code', code)
+    .eq('is_used', false)
+    .gt('expires_at', new Date().toISOString())
+    .single();
+
+  if (error || !data) {
     return false;
   }
-  if (Date.now() > record.expiresAt) {
-    otpRecords.delete(normalizedEmail);
+
+  // Mark OTP as used
+  await supabase
+    .from('otp_records')
+    .update({ is_used: true } as any)
+    .eq('id', data.id);
+
+  return true;
+}
+
+/**
+ * Check if email has a verified OTP (legacy compatibility)
+ */
+export async function isEmailOtpVerified(email: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('otp_records')
+    .select('*')
+    .eq('email', email.toLowerCase().trim())
+    .eq('is_used', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error || !data) {
     return false;
   }
-  return record.verified;
+
+  // Check if verified within last hour
+  const verifiedAt = new Date(data.created_at);
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  return verifiedAt > oneHourAgo;
 }
 
-export function consumeOtpVerification(email: string) {
-  const normalizedEmail = normalizeEmail(email);
-  otpRecords.delete(normalizedEmail);
-}
+/**
+ * Clean up expired OTP records
+ */
+export async function cleanupExpiredOtps(): Promise<void> {
+  const { error } = await supabase
+    .from('otp_records')
+    .delete()
+    .lt('expires_at', new Date().toISOString());
 
-export async function updateUserPassword(email: string, newPasswordHash: string) {
-  const normalizedEmail = normalizeEmail(email);
-  const user = appUsers.find((u) => normalizeEmail(u.email) === normalizedEmail);
-  if (!user) {
-    return { ok: false, reason: "User not found" };
+  if (error) {
+    console.error('Failed to cleanup expired OTPs:', error.message);
   }
-  user.password = newPasswordHash;
-  return { ok: true };
+}
+
+/**
+ * Get all users (for admin purposes)
+ */
+export async function getAllUsers(): Promise<AppUser[]> {
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to get users: ${error.message}`);
+  }
+
+  return data as AppUser[];
+}
+
+/**
+ * Delete a user by ID
+ */
+export async function deleteUser(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('app_users')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(`Failed to delete user: ${error.message}`);
+  }
+}
+
+/**
+ * Update user role
+ */
+export async function updateUserRole(id: string, role: AppRole): Promise<void> {
+  const { error } = await supabase
+    .from('app_users')
+    .update({ role } as any)
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(`Failed to update user role: ${error.message}`);
+  }
+}
+
+// Legacy compatibility exports
+export async function getUserByEmail(email: string): Promise<AppUser | null> {
+  return findUserByEmail(email);
+}
+
+export async function addUser(user: { email: string; password: string; role: AppRole; name: string }): Promise<AppUser> {
+  return createUser(user.email, user.password, user.role, user.name);
+}
+
+export async function createOtpForEmail(email: string, ttlMinutes = 10): Promise<string> {
+  return createOtp(email, ttlMinutes);
+}
+
+export async function verifyOtpForEmail(email: string, otp: string): Promise<{ ok: boolean; reason?: string }> {
+  const isValid = await verifyOtp(email, otp);
+  if (isValid) {
+    return { ok: true };
+  }
+  return { ok: false, reason: 'Invalid or expired OTP' };
+}
+
+export async function consumeOtpVerification(email: string): Promise<void> {
+  await supabase
+    .from('otp_records')
+    .delete()
+    .eq('email', email.toLowerCase().trim());
 }
