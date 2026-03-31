@@ -237,6 +237,12 @@ export default function EventRequestsSection() {
                       <IndianRupee className="h-3 w-3 text-[#E5A823]" />
                       {request.eventData.price}
                     </div>
+                    {request.eventData.ticketCategories && request.eventData.ticketCategories.length > 0 && (
+                      <p className="text-xs text-[#E5A823] mt-1 flex items-center gap-1">
+                        <Ticket className="h-3 w-3" />
+                        {request.eventData.ticketCategories.length} categories
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-4">
                     {getStatusBadge(request.status)}
@@ -400,6 +406,47 @@ export default function EventRequestsSection() {
             <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4 mb-6">
               <h4 className="font-semibold text-[#F5F5DC] mb-3">Full Description</h4>
               <p className="text-sm text-[#F5F5DC]/80 leading-relaxed">{viewingRequest.eventData.fullDescription}</p>
+            </div>
+
+            {/* Ticket Categories Section */}
+            <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4 mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Ticket className="h-5 w-5 text-[#E5A823]" />
+                <h4 className="font-semibold text-[#F5F5DC]">Ticket Details</h4>
+              </div>
+              
+              {viewingRequest.eventData.numberOfTickets && (
+                <div className="mb-4 p-3 rounded-lg bg-[#2A2A2A]/50">
+                  <p className="text-xs text-[#F5F5DC]/50 mb-1">Total Tickets Available</p>
+                  <p className="text-lg font-bold text-[#E5A823]">{viewingRequest.eventData.numberOfTickets} tickets</p>
+                </div>
+              )}
+
+              {viewingRequest.eventData.ticketCategories && viewingRequest.eventData.ticketCategories.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-[#F5F5DC]/60 uppercase tracking-wider mb-3">Ticket Categories</p>
+                  {viewingRequest.eventData.ticketCategories.map((category: any, index: number) => (
+                    <div key={category.id || index} className="flex items-start justify-between p-3 rounded-lg bg-[#2A2A2A]/50 border border-[#E5A823]/20">
+                      <div className="flex-1">
+                        <p className="font-medium text-[#E5A823]">{category.name}</p>
+                        <p className="text-sm text-[#F5F5DC]/80 mt-1">
+                          <IndianRupee className="h-3 w-3 inline mr-1" />
+                          {category.price}
+                        </p>
+                        {(category.availableFrom || category.availableUntil) && (
+                          <p className="text-xs text-[#F5F5DC]/50 mt-2">
+                            {category.availableFrom && `Available from: ${new Date(category.availableFrom).toLocaleDateString()} ${new Date(category.availableFrom).toLocaleTimeString()}`}
+                            {category.availableFrom && category.availableUntil && <br />}
+                            {category.availableUntil && `Available until: ${new Date(category.availableUntil).toLocaleDateString()} ${new Date(category.availableUntil).toLocaleTimeString()}`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-[#F5F5DC]/50">No ticket categories specified</p>
+              )}
             </div>
 
             {/* Status & Actions */}

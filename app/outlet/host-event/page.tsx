@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { Calendar, Clock3, ImageIcon, IndianRupee, Info, MapPin, Sparkles, Ticket, Upload, X, Loader2 } from 'lucide-react';
+import { Calendar, Clock3, ImageIcon, IndianRupee, Info, MapPin, Sparkles, Ticket, Upload, X, Loader2, Users } from 'lucide-react';
 
 type EventTemplate = {
   id: number;
@@ -21,6 +21,14 @@ type EventTemplate = {
   entryAge: string;
   layout: string;
   seating: string;
+};
+
+type TicketCategory = {
+  id: string;
+  name: string;
+  price: number;
+  availableFrom?: string;
+  availableUntil?: string;
 };
 
 const websiteEventTemplates: EventTemplate[] = [
@@ -84,6 +92,15 @@ export default function OutletHostEventPage() {
   const [eventImages, setEventImages] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [numberOfTickets, setNumberOfTickets] = useState('');
+  const [ticketCategories, setTicketCategories] = useState<TicketCategory[]>([]);
+  const [newTicketCategory, setNewTicketCategory] = useState<TicketCategory>({
+    id: '',
+    name: '',
+    price: 0,
+    availableFrom: '',
+    availableUntil: '',
+  });
   const [eventData, setEventData] = useState({
     title: '',
     subtitle: '',
@@ -148,6 +165,32 @@ export default function OutletHostEventPage() {
     setEventImages((prev) => [...prev, ...selectedFiles]);
   };
 
+  const addTicketCategory = () => {
+    if (!newTicketCategory.name || newTicketCategory.price <= 0) {
+      alert('Please fill in ticket category name and price');
+      return;
+    }
+    const category: TicketCategory = {
+      id: Date.now().toString(),
+      name: newTicketCategory.name,
+      price: newTicketCategory.price,
+      availableFrom: newTicketCategory.availableFrom || undefined,
+      availableUntil: newTicketCategory.availableUntil || undefined,
+    };
+    setTicketCategories([...ticketCategories, category]);
+    setNewTicketCategory({
+      id: '',
+      name: '',
+      price: 0,
+      availableFrom: '',
+      availableUntil: '',
+    });
+  };
+
+  const removeTicketCategory = (categoryId: string) => {
+    setTicketCategories(ticketCategories.filter(c => c.id !== categoryId));
+  };
+
   const removeImageAt = (indexToRemove: number) => {
     setEventImages((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
@@ -179,6 +222,8 @@ export default function OutletHostEventPage() {
             entryAge: eventData.entryAge,
             layout: eventData.layout,
             seating: eventData.seating,
+            numberOfTickets: numberOfTickets ? parseInt(numberOfTickets) : 0,
+            ticketCategories: ticketCategories,
           },
         }),
       });
@@ -209,6 +254,8 @@ export default function OutletHostEventPage() {
         });
         setSelectedTemplate('');
         setEventImages([]);
+        setNumberOfTickets('');
+        setTicketCategories([]);
       } else {
         const errorData = await response.json();
         setSubmitMessage({ 
@@ -379,6 +426,112 @@ export default function OutletHostEventPage() {
                 <div className="md:col-span-2">
                   <label className="block text-sm mb-2">Full Description</label>
                   <textarea name="fullDescription" value={eventData.fullDescription} onChange={handleInputChange} rows={5} required className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-4 py-2.5 focus:outline-none focus:border-[#E5A823]" />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/70 p-4 md:p-5">
+              <div className="flex items-center gap-2 mb-4 text-[#E5A823]">
+                <Ticket className="w-4 h-4" />
+                <h2 className="font-semibold">Ticket Details</h2>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm mb-2">Total Number of Tickets</label>
+                  <div className="relative">
+                    <Users className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#F5F5DC]/55" />
+                    <input
+                      type="number"
+                      value={numberOfTickets}
+                      onChange={(e) => setNumberOfTickets(e.target.value)}
+                      placeholder="e.g., 500"
+                      className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg pl-9 pr-4 py-2.5 focus:outline-none focus:border-[#E5A823]"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <h3 className="text-sm font-medium mb-3">Ticket Categories</h3>
+                  <div className="space-y-3 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Category Name</label>
+                        <input
+                          type="text"
+                          value={newTicketCategory.name}
+                          onChange={(e) => setNewTicketCategory({ ...newTicketCategory, name: e.target.value })}
+                          placeholder="e.g., General, VIP, Premium"
+                          className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Price (₹)</label>
+                        <input
+                          type="number"
+                          value={newTicketCategory.price || ''}
+                          onChange={(e) => setNewTicketCategory({ ...newTicketCategory, price: parseFloat(e.target.value) || 0 })}
+                          placeholder="e.g., 1500"
+                          className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Available From (Optional)</label>
+                        <input
+                          type="datetime-local"
+                          value={newTicketCategory.availableFrom || ''}
+                          onChange={(e) => setNewTicketCategory({ ...newTicketCategory, availableFrom: e.target.value })}
+                          className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Available Until (Optional)</label>
+                        <input
+                          type="datetime-local"
+                          value={newTicketCategory.availableUntil || ''}
+                          onChange={(e) => setNewTicketCategory({ ...newTicketCategory, availableUntil: e.target.value })}
+                          className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addTicketCategory}
+                      className="w-full bg-[#E5A823]/20 border border-[#E5A823]/40 text-[#E5A823] rounded-lg px-3 py-2 text-sm font-medium hover:bg-[#E5A823]/30 transition-colors"
+                    >
+                      + Add Ticket Category
+                    </button>
+                  </div>
+
+                  {ticketCategories.length > 0 && (
+                    <div className="bg-[#1A1A1A] rounded-lg border border-[#2A2A2A] overflow-hidden">
+                      <div className="divide-y divide-[#2A2A2A]">
+                        {ticketCategories.map((category) => (
+                          <div key={category.id} className="p-3 flex items-center justify-between hover:bg-[#2A2A2A]/50 transition-colors">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-[#E5A823]">{category.name}</p>
+                              <p className="text-xs text-[#F5F5DC]/60">₹{category.price}</p>
+                              {(category.availableFrom || category.availableUntil) && (
+                                <p className="text-xs text-[#F5F5DC]/50 mt-1">
+                                  {category.availableFrom && `From: ${new Date(category.availableFrom).toLocaleDateString()}`}
+                                  {category.availableFrom && category.availableUntil && ' - '}
+                                  {category.availableUntil && `To: ${new Date(category.availableUntil).toLocaleDateString()}`}
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeTicketCategory(category.id)}
+                              className="text-[#EB4D4B] hover:bg-[#EB4D4B]/10 rounded-lg p-2 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

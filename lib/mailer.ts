@@ -52,6 +52,8 @@ type EventRequestEmailInput = {
     category: string;
     price: string;
     description: string;
+    numberOfTickets?: number;
+    ticketCategories?: Array<{ id: string; name: string; price: number; availableFrom?: string; availableUntil?: string }>;
   };
 };
 
@@ -64,6 +66,34 @@ export async function sendEventRequestNotificationEmail({
   eventData,
 }: EventRequestEmailInput) {
   const transporter = getTransporter();
+  
+  let ticketCategoriesHtml = '';
+  if (eventData.ticketCategories && eventData.ticketCategories.length > 0) {
+    ticketCategoriesHtml = `
+      <p style="margin-bottom: 8px; font-weight: 700; margin-top: 16px;">Ticket Categories</p>
+      <table style="border-collapse: collapse; width: 100%; margin: 12px 0;">
+        <thead>
+          <tr style="background-color: #f3f4f6;">
+            <th style="padding: 8px 12px; border: 1px solid #e5e7eb; text-align: left;">Category</th>
+            <th style="padding: 8px 12px; border: 1px solid #e5e7eb; text-align: left;">Price</th>
+            <th style="padding: 8px 12px; border: 1px solid #e5e7eb; text-align: left;">Availability</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${eventData.ticketCategories.map(cat => `
+            <tr>
+              <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${cat.name}</td>
+              <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">₹${cat.price}</td>
+              <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">
+                ${cat.availableFrom || cat.availableUntil ? `From ${cat.availableFrom ? new Date(cat.availableFrom).toLocaleDateString('en-IN') : 'N/A'} to ${cat.availableUntil ? new Date(cat.availableUntil).toLocaleDateString('en-IN') : 'N/A'}` : 'Always available'}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
   await transporter.sendMail({
     from,
     to: adminEmail,
@@ -106,6 +136,12 @@ export async function sendEventRequestNotificationEmail({
               <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 700;">Price</td>
               <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${eventData.price}</td>
             </tr>
+            ${eventData.numberOfTickets ? `
+            <tr>
+              <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 700;">Total Tickets</td>
+              <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${eventData.numberOfTickets}</td>
+            </tr>
+            ` : ''}
             <tr>
               <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 700;">Submitted At</td>
               <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${new Date(submittedAt).toLocaleString('en-IN')}</td>
@@ -115,6 +151,7 @@ export async function sendEventRequestNotificationEmail({
         <p style="margin-bottom: 8px; font-weight: 700;">Event Summary</p>
         <p style="margin-top: 0;">${eventData.subtitle}</p>
         <p>${eventData.description}</p>
+        ${ticketCategoriesHtml}
       </div>
     `,
   });
