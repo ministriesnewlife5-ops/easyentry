@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { Calendar, Clock3, ImageIcon, IndianRupee, Info, MapPin, Sparkles, Ticket, Upload, X, Loader2, Users } from 'lucide-react';
+import { Calendar, Clock3, ImageIcon, IndianRupee, Info, MapPin, Percent, Sparkles, Ticket, Upload, X, Loader2, Users } from 'lucide-react';
 
 type EventTemplate = {
   id: number;
@@ -27,6 +27,8 @@ type TicketCategory = {
   id: string;
   name: string;
   price: number;
+  quantity: number;
+  commissionPercent: number;
   availableFrom?: string;
   availableUntil?: string;
 };
@@ -98,6 +100,8 @@ export default function OutletHostEventPage() {
     id: '',
     name: '',
     price: 0,
+    quantity: 0,
+    commissionPercent: 0,
     availableFrom: '',
     availableUntil: '',
   });
@@ -131,9 +135,7 @@ export default function OutletHostEventPage() {
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplate(templateId);
     const template = websiteEventTemplates.find((item) => String(item.id) === templateId);
-    if (!template) {
-      return;
-    }
+    if (!template) return;
     setEventData({
       title: template.title,
       subtitle: template.subtitle,
@@ -158,11 +160,8 @@ export default function OutletHostEventPage() {
   };
 
   const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) {
-      return;
-    }
-    const selectedFiles = Array.from(e.target.files);
-    setEventImages((prev) => [...prev, ...selectedFiles]);
+    if (!e.target.files) return;
+    setEventImages((prev) => [...prev, ...Array.from(e.target.files!)]);
   };
 
   const addTicketCategory = () => {
@@ -170,21 +169,21 @@ export default function OutletHostEventPage() {
       alert('Please fill in ticket category name and price');
       return;
     }
+    if (newTicketCategory.quantity <= 0) {
+      alert('Please enter a valid quantity for this ticket category');
+      return;
+    }
     const category: TicketCategory = {
       id: Date.now().toString(),
       name: newTicketCategory.name,
       price: newTicketCategory.price,
+      quantity: newTicketCategory.quantity,
+      commissionPercent: newTicketCategory.commissionPercent,
       availableFrom: newTicketCategory.availableFrom || undefined,
       availableUntil: newTicketCategory.availableUntil || undefined,
     };
     setTicketCategories([...ticketCategories, category]);
-    setNewTicketCategory({
-      id: '',
-      name: '',
-      price: 0,
-      availableFrom: '',
-      availableUntil: '',
-    });
+    setNewTicketCategory({ id: '', name: '', price: 0, quantity: 0, commissionPercent: 0, availableFrom: '', availableUntil: '' });
   };
 
   const removeTicketCategory = (categoryId: string) => {
@@ -195,17 +194,29 @@ export default function OutletHostEventPage() {
     setEventImages((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  // Derived totals for the summary preview
+  const totalTicketsFromCategories = ticketCategories.reduce((sum, t) => sum + t.quantity, 0);
+  const estimatedTotalRevenue = ticketCategories.reduce((sum, t) => sum + t.price * t.quantity, 0);
+  const estimatedTotalCommission = ticketCategories.reduce(
+    (sum, t) => sum + (t.price * t.commissionPercent / 100) * t.quantity,
+    0
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitMessage(null);
 
     try {
+      // Enrich ticket categories with computed commissionAmount
+      const enrichedTicketCategories = ticketCategories.map((t) => ({
+        ...t,
+        commissionAmount: parseFloat(((t.price * t.commissionPercent) / 100).toFixed(2)),
+      }));
+
       const response = await fetch('/api/admin/event-requests', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           eventData: {
             title: eventData.title,
@@ -222,52 +233,37 @@ export default function OutletHostEventPage() {
             entryAge: eventData.entryAge,
             layout: eventData.layout,
             seating: eventData.seating,
-            numberOfTickets: numberOfTickets ? parseInt(numberOfTickets) : 0,
-            ticketCategories: ticketCategories,
+            numberOfTickets: numberOfTickets ? parseInt(numberOfTickets) : totalTicketsFromCategories,
+            ticketCategories: enrichedTicketCategories,
+            // Commission summary fields
+            commissionPercent: enrichedTicketCategories.length > 0
+              ? enrichedTicketCategories[0].commissionPercent   // keep first as a reference, full detail is in each tier
+              : 0,
+            estimatedTotalRevenue,
+            estimatedTotalCommission,
           },
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        setSubmitMessage({ 
-          type: 'success', 
+        setSubmitMessage({
+          type: 'success',
           text: data.adminNotificationSent
             ? 'Event request submitted successfully. It is now in the admin dashboard and has been emailed to admin for approval.'
-            : 'Event request submitted successfully. It is now in the admin dashboard and waiting for admin approval.'
+            : 'Event request submitted successfully. It is now in the admin dashboard and waiting for admin approval.',
         });
-        setEventData({
-          title: '',
-          subtitle: '',
-          date: '',
-          time: '',
-          venue: '',
-          category: '',
-          price: '',
-          image: '',
-          description: '',
-          fullDescription: '',
-          gatesOpen: '',
-          entryAge: '21+',
-          layout: 'Indoor Club',
-          seating: 'Standing',
-        });
+        setEventData({ title: '', subtitle: '', date: '', time: '', venue: '', category: '', price: '', image: '', description: '', fullDescription: '', gatesOpen: '', entryAge: '21+', layout: 'Indoor Club', seating: 'Standing' });
         setSelectedTemplate('');
         setEventImages([]);
         setNumberOfTickets('');
         setTicketCategories([]);
       } else {
         const errorData = await response.json();
-        setSubmitMessage({ 
-          type: 'error', 
-          text: errorData.error || 'Failed to submit event request' 
-        });
+        setSubmitMessage({ type: 'error', text: errorData.error || 'Failed to submit event request' });
       }
     } catch {
-      setSubmitMessage({ 
-        type: 'error', 
-        text: 'An error occurred while submitting the request' 
-      });
+      setSubmitMessage({ type: 'error', text: 'An error occurred while submitting the request' });
     } finally {
       setIsSubmitting(false);
     }
@@ -305,6 +301,8 @@ export default function OutletHostEventPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+
+            {/* ── Basic Information ── */}
             <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/70 p-4 md:p-5">
               <div className="flex items-center gap-2 mb-4 text-[#E5A823]">
                 <Info className="w-4 h-4" />
@@ -331,15 +329,16 @@ export default function OutletHostEventPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm mb-2">Ticket Price</label>
+                  <label className="block text-sm mb-2">Ticket Price (base / display)</label>
                   <div className="relative">
                     <IndianRupee className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#F5F5DC]/55" />
-                    <input name="price" value={eventData.price} onChange={handleInputChange} required className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg pl-9 pr-4 py-2.5 focus:outline-none focus:border-[#E5A823]" />
+                    <input name="price" value={eventData.price} onChange={handleInputChange} required placeholder="₹1500" className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg pl-9 pr-4 py-2.5 focus:outline-none focus:border-[#E5A823]" />
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* ── Schedule & Venue ── */}
             <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/70 p-4 md:p-5">
               <div className="flex items-center gap-2 mb-4 text-[#E5A823]">
                 <Calendar className="w-4 h-4" />
@@ -378,6 +377,7 @@ export default function OutletHostEventPage() {
               </div>
             </div>
 
+            {/* ── Experience Details ── */}
             <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/70 p-4 md:p-5">
               <div className="flex items-center gap-2 mb-4 text-[#E5A823]">
                 <Sparkles className="w-4 h-4" />
@@ -430,32 +430,34 @@ export default function OutletHostEventPage() {
               </div>
             </div>
 
+            {/* ── Ticket Details & Commission ── */}
             <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/70 p-4 md:p-5">
               <div className="flex items-center gap-2 mb-4 text-[#E5A823]">
                 <Ticket className="w-4 h-4" />
-                <h2 className="font-semibold">Ticket Details</h2>
+                <h2 className="font-semibold">Ticket Details & Commission</h2>
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm mb-2">Total Number of Tickets</label>
+                  <label className="block text-sm mb-2">Total Number of Tickets (optional override)</label>
                   <div className="relative">
                     <Users className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#F5F5DC]/55" />
                     <input
                       type="number"
                       value={numberOfTickets}
                       onChange={(e) => setNumberOfTickets(e.target.value)}
-                      placeholder="e.g., 500"
+                      placeholder="Auto-calculated from categories below"
                       className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg pl-9 pr-4 py-2.5 focus:outline-none focus:border-[#E5A823]"
                     />
                   </div>
                 </div>
 
-                <div className="mt-6">
+                {/* Add ticket category form */}
+                <div className="mt-4">
                   <h3 className="text-sm font-medium mb-3">Ticket Categories</h3>
-                  <div className="space-y-3 mb-4">
+                  <div className="space-y-3 mb-4 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A]/50 p-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Category Name</label>
+                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Category Name <span className="text-[#EB4D4B]">*</span></label>
                         <input
                           type="text"
                           value={newTicketCategory.name}
@@ -465,7 +467,7 @@ export default function OutletHostEventPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Price (₹)</label>
+                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Price (₹) <span className="text-[#EB4D4B]">*</span></label>
                         <input
                           type="number"
                           value={newTicketCategory.price || ''}
@@ -473,6 +475,44 @@ export default function OutletHostEventPage() {
                           placeholder="e.g., 1500"
                           className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
                         />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Quantity <span className="text-[#EB4D4B]">*</span></label>
+                        <div className="relative">
+                          <Users className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#F5F5DC]/55" />
+                          <input
+                            type="number"
+                            value={newTicketCategory.quantity || ''}
+                            onChange={(e) => setNewTicketCategory({ ...newTicketCategory, quantity: parseInt(e.target.value) || 0 })}
+                            placeholder="e.g., 200"
+                            className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">
+                          Commission % <span className="text-[#EB4D4B]">*</span>
+                          <span className="ml-1 text-[#F5F5DC]/40">(your cut per ticket sold)</span>
+                        </label>
+                        <div className="relative">
+                          <Percent className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#F5F5DC]/55" />
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={newTicketCategory.commissionPercent || ''}
+                            onChange={(e) => setNewTicketCategory({ ...newTicketCategory, commissionPercent: parseFloat(e.target.value) || 0 })}
+                            placeholder="e.g., 10"
+                            className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
+                          />
+                        </div>
+                        {newTicketCategory.price > 0 && newTicketCategory.commissionPercent > 0 && (
+                          <p className="mt-1 text-xs text-[#E5A823]/80">
+                            = ₹{((newTicketCategory.price * newTicketCategory.commissionPercent) / 100).toFixed(2)} per ticket
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -504,31 +544,52 @@ export default function OutletHostEventPage() {
                     </button>
                   </div>
 
+                  {/* Added categories */}
                   {ticketCategories.length > 0 && (
                     <div className="bg-[#1A1A1A] rounded-lg border border-[#2A2A2A] overflow-hidden">
+                      <div className="px-3 py-2 border-b border-[#2A2A2A] text-xs text-[#F5F5DC]/50 uppercase tracking-wider grid grid-cols-5 gap-2">
+                        <span className="col-span-2">Category</span>
+                        <span className="text-right">Qty</span>
+                        <span className="text-right">Commission</span>
+                        <span className="text-right">Rev (est.)</span>
+                      </div>
                       <div className="divide-y divide-[#2A2A2A]">
-                        {ticketCategories.map((category) => (
-                          <div key={category.id} className="p-3 flex items-center justify-between hover:bg-[#2A2A2A]/50 transition-colors">
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-[#E5A823]">{category.name}</p>
-                              <p className="text-xs text-[#F5F5DC]/60">₹{category.price}</p>
-                              {(category.availableFrom || category.availableUntil) && (
-                                <p className="text-xs text-[#F5F5DC]/50 mt-1">
-                                  {category.availableFrom && `From: ${new Date(category.availableFrom).toLocaleDateString()}`}
-                                  {category.availableFrom && category.availableUntil && ' - '}
-                                  {category.availableUntil && `To: ${new Date(category.availableUntil).toLocaleDateString()}`}
-                                </p>
-                              )}
+                        {ticketCategories.map((category) => {
+                          const commAmt = (category.price * category.commissionPercent / 100);
+                          const totalRev = category.price * category.quantity;
+                          const totalComm = commAmt * category.quantity;
+                          return (
+                            <div key={category.id} className="p-3 grid grid-cols-5 gap-2 items-center hover:bg-[#2A2A2A]/50 transition-colors">
+                              <div className="col-span-2">
+                                <p className="text-sm font-medium text-[#E5A823]">{category.name}</p>
+                                <p className="text-xs text-[#F5F5DC]/60">₹{category.price} / ticket</p>
+                              </div>
+                              <p className="text-sm text-right text-[#F5F5DC]/80">{category.quantity}</p>
+                              <div className="text-right">
+                                <p className="text-sm text-emerald-400 font-medium">{category.commissionPercent}%</p>
+                                <p className="text-xs text-[#F5F5DC]/50">₹{commAmt.toFixed(2)}/ticket</p>
+                                <p className="text-xs text-emerald-400/70">Total: ₹{totalComm.toFixed(2)}</p>
+                              </div>
+                              <div className="flex items-center justify-end gap-2">
+                                <p className="text-sm text-[#F5F5DC]/70">₹{totalRev.toLocaleString('en-IN')}</p>
+                                <button
+                                  type="button"
+                                  onClick={() => removeTicketCategory(category.id)}
+                                  className="text-[#EB4D4B] hover:bg-[#EB4D4B]/10 rounded-lg p-1.5 transition-colors"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => removeTicketCategory(category.id)}
-                              className="text-[#EB4D4B] hover:bg-[#EB4D4B]/10 rounded-lg p-2 transition-colors"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
+                          );
+                        })}
+                      </div>
+                      {/* Totals row */}
+                      <div className="px-3 py-2.5 border-t border-[#2A2A2A] bg-[#0D0D0D]/60 grid grid-cols-5 gap-2 text-sm font-semibold">
+                        <span className="col-span-2 text-[#F5F5DC]/70">Totals</span>
+                        <span className="text-right text-[#F5F5DC]/70">{totalTicketsFromCategories}</span>
+                        <span className="text-right text-emerald-400">₹{estimatedTotalCommission.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                        <span className="text-right text-[#F5F5DC]/70">₹{estimatedTotalRevenue.toLocaleString('en-IN')}</span>
                       </div>
                     </div>
                   )}
@@ -536,6 +597,7 @@ export default function OutletHostEventPage() {
               </div>
             </div>
 
+            {/* ── Submit ── */}
             <div className="space-y-4">
               {submitMessage && (
                 <div className={`rounded-lg px-4 py-3 ${submitMessage.type === 'success' ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-[#EB4D4B]/10 border border-[#EB4D4B]/20 text-[#EB4D4B]'}`}>
@@ -543,8 +605,8 @@ export default function OutletHostEventPage() {
                 </div>
               )}
               <div className="flex justify-end">
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSubmitting}
                   className="rounded-lg bg-[#E5A823] px-6 py-3 font-bold text-[#0D0D0D] hover:bg-[#F5C542] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >

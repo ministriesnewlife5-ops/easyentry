@@ -66,6 +66,8 @@ export async function POST(request: NextRequest) {
           category: eventData.category,
           price: eventData.price,
           description: eventData.description,
+          numberOfTickets: eventData.numberOfTickets,
+          ticketCategories: eventData.ticketCategories,
         },
       });
       adminNotificationSent = true;

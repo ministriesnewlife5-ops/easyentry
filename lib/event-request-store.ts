@@ -2,10 +2,22 @@ import { supabase } from './supabase';
 
 export type EventRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
+export type TicketCategory = {
+  id: string;
+  name: string;
+  price: number;
+  quantity?: number;
+  commissionPercent?: number;
+  commissionAmount?: number;
+  availableFrom?: string;
+  availableUntil?: string;
+};
+
 export type EventRequest = {
   id: string;
   outletUserId: string;
   outletName: string;
+  outletEmail?: string;
   eventData: {
     title: string;
     subtitle: string;
@@ -18,13 +30,17 @@ export type EventRequest = {
     mediaFiles?: string[];
     numberOfTickets?: string;
     rules?: string[];
-    ticketCategories?: Array<{ id: string; name: string; price: number; availableFrom?: string; availableUntil?: string }>;
+    ticketCategories?: TicketCategory[];
     description: string;
     fullDescription: string;
     gatesOpen: string;
     entryAge: string;
     layout: string;
     seating: string;
+    // Commission fields
+    commissionPercent?: number;
+    estimatedTotalRevenue?: number;
+    estimatedTotalCommission?: number;
   };
   status: EventRequestStatus;
   submittedAt: number;
@@ -49,6 +65,7 @@ export type CreateEventRequestInput = {
   notes?: string;
   outletUserId?: string;
   outletName?: string;
+  outletEmail?: string;
   eventData?: EventRequest['eventData'];
 };
 
@@ -60,39 +77,76 @@ export type UpdateEventRequestInput = Partial<Omit<CreateEventRequestInput, 'use
 };
 
 // Map legacy EventRequest to database schema
-function mapLegacyToDb(request: Partial<EventRequest> & { outletUserId?: string; outletName?: string; eventData?: EventRequest['eventData'] }) {
+function mapLegacyToDb(request: Partial<EventRequest> & {
+  outletUserId?: string;
+  outletName?: string;
+  outletEmail?: string;
+  eventData?: EventRequest['eventData'];
+}) {
+  const ticketCategories = request.eventData?.ticketCategories || [];
+  const commissionPercent = request.eventData?.commissionPercent ?? 0;
+
+  // Compute totals from ticket categories
+  const estimatedTotalRevenue = ticketCategories.reduce(
+    (sum, t) => sum + (t.price * (t.quantity ?? 1)),
+    0
+  );
+  const estimatedTotalCommission = ticketCategories.reduce(
+    (sum, t) => sum + ((t.commissionAmount ?? (t.price * commissionPercent / 100)) * (t.quantity ?? 1)),
+    0
+  );
+
   return {
     title: request.eventData?.title || 'Untitled Event',
     date: request.eventData?.date || new Date().toISOString().split('T')[0],
     description: request.eventData?.description || request.eventData?.fullDescription || null,
     user_id: request.outletUserId || null,
+    outlet_name: request.outletName || null,
+    outlet_email: request.outletEmail || null,
     venue_id: null,
     event_type: request.eventData?.category || null,
     expected_attendance: request.eventData?.numberOfTickets ? parseInt(request.eventData.numberOfTickets) : null,
-    budget: request.eventData?.price ? parseFloat(request.eventData.price) : null,
+    budget: request.eventData?.price ? parseFloat(request.eventData.price.replace(/[^0-9.]/g, '')) : null,
     requirements: request.eventData?.rules || null,
     attachments: request.eventData?.mediaFiles || null,
     contact_email: null,
     contact_phone: null,
     notes: request.rejectionReason || null,
     status: request.status || 'pending',
+    // Full event data as JSONB
+    event_data: request.eventData ? {
+      ...request.eventData,
+      ticketCategories: ticketCategories,
+      commissionPercent,
+      estimatedTotalRevenue,
+      estimatedTotalCommission,
+    } : null,
+    commission_percent: commissionPercent,
+    ticket_categories: ticketCategories.length > 0 ? ticketCategories : null,
+    estimated_total_revenue: estimatedTotalRevenue || null,
+    estimated_total_commission: estimatedTotalCommission || null,
   };
 }
 
 // Map database record to legacy EventRequest
 function mapDbToLegacy(record: Record<string, unknown>): EventRequest {
+  // Prefer the full event_data JSONB if present
+  const storedEventData = record.event_data as EventRequest['eventData'] | null;
+  const ticketCategories = (record.ticket_categories as TicketCategory[]) || storedEventData?.ticketCategories || [];
+
   return {
     id: record.id as string,
     outletUserId: (record.user_id as string) || '',
-    outletName: '',
-    eventData: {
+    outletName: (record.outlet_name as string) || '',
+    outletEmail: (record.outlet_email as string) || '',
+    eventData: storedEventData ?? {
       title: (record.title as string) || '',
       subtitle: '',
       date: (record.date as string) || '',
       time: '',
       venue: '',
       category: (record.event_type as string) || '',
-      price: (record.budget as string) || '',
+      price: (record.budget as number)?.toString() || '',
       image: (record.attachments as string[])?.[0] || '',
       mediaFiles: (record.attachments as string[]) || [],
       description: (record.description as string) || '',
@@ -101,6 +155,10 @@ function mapDbToLegacy(record: Record<string, unknown>): EventRequest {
       entryAge: '',
       layout: '',
       seating: '',
+      ticketCategories,
+      commissionPercent: (record.commission_percent as number) || 0,
+      estimatedTotalRevenue: (record.estimated_total_revenue as number) || 0,
+      estimatedTotalCommission: (record.estimated_total_commission as number) || 0,
     },
     status: (record.status as EventRequestStatus) || 'pending',
     submittedAt: new Date(record.created_at as string).getTime(),
@@ -169,11 +227,13 @@ export async function getEventRequestById(id: string): Promise<EventRequest | un
 export async function createEventRequest(
   outletUserId: string,
   outletName: string,
-  eventData: EventRequest['eventData']
+  eventData: EventRequest['eventData'],
+  outletEmail?: string,
 ): Promise<EventRequest> {
   const dbData = mapLegacyToDb({
     outletUserId,
     outletName,
+    outletEmail,
     eventData,
     status: 'pending',
   });
@@ -299,4 +359,3 @@ export async function rejectEventRequest(
 ): Promise<EventRequest | undefined> {
   return updateEventRequestStatus(id, 'rejected', reviewedBy, rejectionReason);
 }
-

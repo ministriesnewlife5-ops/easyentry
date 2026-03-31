@@ -1,500 +1,430 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, X, Loader2, Clock, AlertCircle, Calendar, MapPin, IndianRupee, FileText, Eye, Ticket, Users, Star, Zap } from 'lucide-react';
-import type { EventRequest } from '@/lib/event-request-store';
+import {
+  CalendarDays, MapPin, Tag, Ticket, Users, Percent,
+  IndianRupee, Clock3, CheckCircle2, XCircle, ChevronDown,
+  ChevronUp, Loader2, RefreshCw, User, Mail
+} from 'lucide-react';
+
+type TicketCategory = {
+  id: string;
+  name: string;
+  price: number;
+  quantity?: number;
+  commissionPercent?: number;
+  commissionAmount?: number;
+  availableFrom?: string;
+  availableUntil?: string;
+};
+
+type EventRequest = {
+  id: string;
+  outletUserId: string;
+  outletName: string;
+  outletEmail?: string;
+  eventData: {
+    title: string;
+    subtitle: string;
+    date: string;
+    time: string;
+    venue: string;
+    category: string;
+    price: string;
+    image: string;
+    mediaFiles?: string[];
+    numberOfTickets?: string | number;
+    ticketCategories?: TicketCategory[];
+    description: string;
+    fullDescription: string;
+    gatesOpen: string;
+    entryAge: string;
+    layout: string;
+    seating: string;
+    commissionPercent?: number;
+    estimatedTotalRevenue?: number;
+    estimatedTotalCommission?: number;
+  };
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  submittedAt: number;
+  reviewedAt?: number;
+  reviewedBy?: string;
+  rejectionReason?: string;
+};
+
+const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
+  pending:  { bg: 'bg-yellow-500/10 border-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
+  approved: { bg: 'bg-emerald-500/10 border-emerald-500/20', text: 'text-emerald-400', dot: 'bg-emerald-400' },
+  rejected: { bg: 'bg-[#EB4D4B]/10 border-[#EB4D4B]/20',   text: 'text-[#EB4D4B]',   dot: 'bg-[#EB4D4B]' },
+  cancelled:{ bg: 'bg-[#2A2A2A] border-[#2A2A2A]',          text: 'text-[#F5F5DC]/50', dot: 'bg-[#F5F5DC]/30' },
+};
+
+function DetailRow({ label, value }: { label: string; value?: string | number | null }) {
+  if (!value && value !== 0) return null;
+  return (
+    <div className="flex items-start justify-between gap-4 py-2 border-b border-[#2A2A2A] last:border-0">
+      <span className="text-xs text-[#F5F5DC]/50 shrink-0 w-36">{label}</span>
+      <span className="text-sm text-[#F5F5DC]/90 text-right">{value}</span>
+    </div>
+  );
+}
 
 export default function EventRequestsSection() {
   const [requests, setRequests] = useState<EventRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
-  const [selectedRequest, setSelectedRequest] = useState<EventRequest | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [viewingRequest, setViewingRequest] = useState<EventRequest | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadRequests = async () => {
-      try {
-        setError(null);
-        const response = await fetch('/api/admin/event-requests', {
-          cache: 'no-store',
-        });
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => null);
-          setError(data?.error || 'Failed to load event requests');
-          return;
-        }
-
-        const data = await response.json();
-        const sortedRequests = Array.isArray(data.requests) 
-          ? data.requests.sort((a: EventRequest, b: EventRequest) => b.submittedAt - a.submittedAt)
-          : [];
-        setRequests(sortedRequests);
-      } catch {
-        setError('An error occurred while loading event requests');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadRequests();
-  }, []);
-
-  const handleApprove = async (requestId: string) => {
-    setActionInProgress(requestId);
+  const fetchRequests = async () => {
+    setLoading(true);
     try {
-      const response = await fetch('/api/admin/event-requests', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, status: 'approved' }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const updatedRequest = data.request as EventRequest;
-        const updatedRequests = requests.map(r =>
-          r.id === requestId ? updatedRequest : r
-        );
-        setRequests(updatedRequests);
-      } else {
-        const data = await response.json().catch(() => null);
-        setError(data?.error || 'Failed to approve request');
+      const res = await fetch('/api/admin/event-requests');
+      if (res.ok) {
+        const data = await res.json();
+        setRequests(data.requests || []);
       }
-    } catch {
-      setError('An error occurred while approving');
+    } catch (err) {
+      console.error('Failed to fetch event requests', err);
     } finally {
-      setActionInProgress(null);
+      setLoading(false);
     }
   };
 
-  const handleReject = async () => {
-    if (!selectedRequest) return;
-    
-    setActionInProgress(selectedRequest.id);
-    try {
-      const response = await fetch('/api/admin/event-requests', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          requestId: selectedRequest.id, 
-          status: 'rejected',
-          rejectionReason 
-        }),
-      });
+  useEffect(() => { fetchRequests(); }, []);
 
-      if (response.ok) {
-        const data = await response.json();
-        const updatedRequest = data.request as EventRequest;
-        const updatedRequests = requests.map(r =>
-          r.id === selectedRequest.id ? updatedRequest : r
-        );
-        setRequests(updatedRequests);
-        setShowRejectModal(false);
+  const handleApprove = async (id: string) => {
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/event-requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve' }),
+      });
+      if (res.ok) {
+        setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'approved' } : r));
+      }
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/event-requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject', rejectionReason }),
+      });
+      if (res.ok) {
+        setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'rejected' } : r));
+        setRejectingId(null);
         setRejectionReason('');
-        setSelectedRequest(null);
-      } else {
-        const data = await response.json().catch(() => null);
-        setError(data?.error || 'Failed to reject request');
       }
-    } catch {
-      setError('An error occurred while rejecting');
     } finally {
-      setActionInProgress(null);
+      setActionLoading(null);
     }
   };
 
-  const openRejectModal = (request: EventRequest) => {
-    setSelectedRequest(request);
-    setShowRejectModal(true);
-  };
+  const pending   = requests.filter(r => r.status === 'pending');
+  const reviewed  = requests.filter(r => r.status !== 'pending');
 
-  const openViewModal = (request: EventRequest) => {
-    setViewingRequest(request);
-    setShowViewModal(true);
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-orange-400/10 px-2 py-1 text-xs font-medium text-orange-400">
-            <Clock className="h-3 w-3" />
-            Pending
-          </span>
-        );
-      case 'approved':
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/10 px-2 py-1 text-xs font-medium text-emerald-400">
-            <Check className="h-3 w-3" />
-            Approved
-          </span>
-        );
-      case 'rejected':
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#EB4D4B]/10 px-2 py-1 text-xs font-medium text-[#EB4D4B]">
-            <X className="h-3 w-3" />
-            Rejected
-          </span>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const pendingCount = requests.filter(r => r.status === 'pending').length;
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="mt-4 rounded-2xl border border-[#2A2A2A] bg-[#101018] p-10">
-        <div className="flex items-center justify-center gap-3">
-          <Loader2 className="h-5 w-5 animate-spin text-[#E5A823]" />
-          <span className="text-[#F5F5DC]/70">Loading event requests...</span>
-        </div>
+      <div className="mt-4 flex items-center justify-center py-24">
+        <Loader2 className="w-6 h-6 animate-spin text-[#E5A823]" />
       </div>
     );
   }
 
-  if (error) {
+  if (requests.length === 0) {
     return (
-      <div className="mt-4 rounded-2xl border border-[#EB4D4B]/20 bg-[#EB4D4B]/10 p-6">
-        <div className="flex items-center gap-2 text-[#EB4D4B]">
-          <AlertCircle className="h-5 w-5" />
-          <span>{error}</span>
-        </div>
+      <div className="mt-4 rounded-2xl border border-[#2A2A2A] bg-[#101018] p-12 text-center">
+        <Ticket className="w-10 h-10 mx-auto mb-3 text-[#F5F5DC]/20" />
+        <p className="text-[#F5F5DC]/50 text-sm">No event requests yet.</p>
       </div>
     );
   }
 
-  return (
-    <>
-      {/* Stats */}
-      <div className="mt-4 grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-[#2A2A2A] bg-[#101018] p-4">
-          <p className="text-sm text-[#F5F5DC]/60">Total Requests</p>
-          <p className="mt-1 text-3xl font-bold text-[#F5F5DC]">{requests.length}</p>
-        </div>
-        <div className="rounded-xl border border-[#2A2A2A] bg-[#101018] p-4">
-          <p className="text-sm text-[#F5F5DC]/60">Pending</p>
-          <p className="mt-1 text-3xl font-bold text-orange-400">{pendingCount}</p>
-        </div>
-        <div className="rounded-xl border border-[#2A2A2A] bg-[#101018] p-4">
-          <p className="text-sm text-[#F5F5DC]/60">Approved</p>
-          <p className="mt-1 text-3xl font-bold text-emerald-400">
-            {requests.filter(r => r.status === 'approved').length}
-          </p>
-        </div>
-      </div>
+  const RequestCard = ({ request }: { request: EventRequest }) => {
+    const isExpanded = expandedId === request.id;
+    const style = STATUS_STYLES[request.status] ?? STATUS_STYLES.pending;
+    const ed = request.eventData;
+    const tiers = ed.ticketCategories ?? [];
 
-      {/* Requests Table */}
-      <article className="mt-4 rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5 overflow-x-auto">
-        {requests.length === 0 ? (
-          <div className="py-10 text-center text-[#F5F5DC]/50">
-            <FileText className="h-12 w-12 mx-auto mb-3 text-[#F5F5DC]/20" />
-            <p>No event requests found</p>
-            <p className="text-sm mt-1">Outlet providers have not submitted any event requests yet.</p>
+    // Compute totals from tier data
+    const totalQty     = tiers.reduce((s, t) => s + (t.quantity ?? 0), 0);
+    const totalRev     = ed.estimatedTotalRevenue  ?? tiers.reduce((s, t) => s + (t.price * (t.quantity ?? 0)), 0);
+    const totalComm    = ed.estimatedTotalCommission ?? tiers.reduce((s, t) => s + ((t.commissionAmount ?? (t.price * (t.commissionPercent ?? 0) / 100)) * (t.quantity ?? 0)), 0);
+
+    return (
+      <div className={`rounded-xl border bg-[#101018] overflow-hidden transition-all ${isExpanded ? 'border-[#E5A823]/40' : 'border-[#2A2A2A]'}`}>
+
+        {/* ── Card Header (always visible) ── */}
+        <button
+          type="button"
+          onClick={() => setExpandedId(isExpanded ? null : request.id)}
+          className="w-full text-left p-4 md:p-5 hover:bg-[#1A1A1A]/40 transition-colors"
+        >
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold text-[#E5A823] truncate">{ed.title}</h3>
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${style.bg} ${style.text}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+                  {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                </span>
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#F5F5DC]/55">
+                <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3" />{ed.date}</span>
+                <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{ed.venue}</span>
+                <span className="flex items-center gap-1"><Tag className="w-3 h-3" />{ed.category}</span>
+                <span className="flex items-center gap-1"><User className="w-3 h-3" />{request.outletName || 'Unknown outlet'}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {/* Quick stats */}
+              {tiers.length > 0 && (
+                <div className="hidden md:flex items-center gap-4 text-xs">
+                  <div className="text-right">
+                    <p className="text-[#F5F5DC]/40">Total Rev.</p>
+                    <p className="font-semibold text-[#F5F5DC]/80">₹{totalRev.toLocaleString('en-IN')}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[#F5F5DC]/40">Commission</p>
+                    <p className="font-semibold text-emerald-400">₹{totalComm.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
+              )}
+              {isExpanded
+                ? <ChevronUp className="w-4 h-4 text-[#F5F5DC]/40" />
+                : <ChevronDown className="w-4 h-4 text-[#F5F5DC]/40" />
+              }
+            </div>
           </div>
-        ) : (
-          <table className="w-full text-left text-sm text-[#F5F5DC]">
-            <thead className="border-b border-[#2A2A2A] text-xs uppercase text-[#F5F5DC]/60">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Event</th>
-                <th className="px-4 py-3 font-semibold">Outlet</th>
-                <th className="px-4 py-3 font-semibold">Date</th>
-                <th className="px-4 py-3 font-semibold">Price</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#2A2A2A]">
-              {requests.map((request) => (
-                <tr key={request.id} className="hover:bg-[#2A2A2A]/40 transition-colors">
-                  <td className="px-4 py-4">
-                    <div>
-                      <p className="font-medium text-[#E5A823]">{request.eventData.title}</p>
-                      <p className="text-xs text-[#F5F5DC]/50">{request.eventData.category}</p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <p className="font-medium">{request.outletName}</p>
-                    <p className="text-xs text-[#F5F5DC]/50 flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {request.eventData.venue}
-                    </p>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-1 text-[#F5F5DC]/80">
-                      <Calendar className="h-3 w-3" />
-                      {request.eventData.date}
-                    </div>
-                    <p className="text-xs text-[#F5F5DC]/50 ml-4">{request.eventData.time || (request.eventData as any).startTime}</p>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-1">
-                      <IndianRupee className="h-3 w-3 text-[#E5A823]" />
-                      {request.eventData.price}
-                    </div>
-                    {request.eventData.ticketCategories && request.eventData.ticketCategories.length > 0 && (
-                      <p className="text-xs text-[#E5A823] mt-1 flex items-center gap-1">
-                        <Ticket className="h-3 w-3" />
-                        {request.eventData.ticketCategories.length} categories
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-4 py-4">
-                    {getStatusBadge(request.status)}
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <button
-                        onClick={() => openViewModal(request)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-[#E5A823]/10 px-3 py-1.5 text-xs font-medium text-[#E5A823] hover:bg-[#E5A823]/20 transition-colors"
-                      >
-                        <Eye className="h-3 w-3" />
-                        View Details
-                      </button>
-                      {request.status === 'pending' ? (
-                        <>
-                          <button
-                            onClick={() => handleApprove(request.id)}
-                            disabled={actionInProgress === request.id}
-                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
-                          >
-                            {actionInProgress === request.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Check className="h-3 w-3" />
-                            )}
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => openRejectModal(request)}
-                            disabled={actionInProgress === request.id}
-                            className="inline-flex items-center gap-1 rounded-lg bg-[#EB4D4B]/10 px-3 py-1.5 text-xs font-medium text-[#EB4D4B] hover:bg-[#EB4D4B]/20 transition-colors disabled:opacity-50"
-                          >
-                            <X className="h-3 w-3" />
-                            Reject
-                          </button>
-                        </>
-                      ) : (
-                        <span className="text-xs text-[#F5F5DC]/50">
-                          {request.reviewedAt && `Reviewed ${new Date(request.reviewedAt).toLocaleDateString()}`}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </article>
+        </button>
 
-      {/* View Details Modal */}
-      {showViewModal && viewingRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 overflow-y-auto">
-          <div className="w-full max-w-4xl rounded-2xl border border-[#2A2A2A] bg-[#101018] p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-xl font-semibold text-[#F5F5DC]">Event Request Details</h3>
-                <p className="text-sm text-[#F5F5DC]/60 mt-1">
-                  Submitted by {viewingRequest.outletName} on {new Date(viewingRequest.submittedAt).toLocaleDateString()}
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowViewModal(false);
-                  setViewingRequest(null);
-                }}
-                className="rounded-lg p-2 text-[#F5F5DC]/70 hover:text-[#F5F5DC] hover:bg-[#2A2A2A] transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        {/* ── Expanded Detail Panel ── */}
+        {isExpanded && (
+          <div className="border-t border-[#2A2A2A] px-4 md:px-5 pb-5 space-y-5">
 
-            {/* Event Image */}
-            {viewingRequest.eventData.image && (
-              <div className="mb-6 rounded-xl overflow-hidden border border-[#2A2A2A]">
-                <img
-                  src={viewingRequest.eventData.image}
-                  alt={viewingRequest.eventData.title}
-                  className="w-full h-48 object-cover"
-                />
-              </div>
-            )}
-
-            {/* Basic Info */}
-            <div className="grid gap-4 md:grid-cols-2 mb-6">
-              <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4">
-                <p className="text-xs text-[#F5F5DC]/50 uppercase tracking-wider mb-1">Event Title</p>
-                <p className="text-lg font-semibold text-[#E5A823]">{viewingRequest.eventData.title}</p>
-              </div>
-              <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4">
-                <p className="text-xs text-[#F5F5DC]/50 uppercase tracking-wider mb-1">Category</p>
-                <p className="text-lg font-semibold text-[#F5F5DC]">{viewingRequest.eventData.category}</p>
+            {/* Outlet Provider Info */}
+            <div className="mt-4 rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/60 p-3">
+              <p className="text-xs font-semibold text-[#F5F5DC]/40 uppercase tracking-wider mb-2">Outlet Provider</p>
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-[#E5A823]" />{request.outletName || '—'}</span>
+                {request.outletEmail && (
+                  <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-[#E5A823]" />{request.outletEmail}</span>
+                )}
               </div>
             </div>
 
-            {/* Date & Venue */}
-            <div className="grid gap-4 md:grid-cols-3 mb-6">
-              <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-4 w-4 text-[#E5A823]" />
-                  <p className="text-xs text-[#F5F5DC]/50 uppercase tracking-wider">Date & Time</p>
-                </div>
-                <p className="text-sm font-medium text-[#F5F5DC]">{viewingRequest.eventData.date}</p>
-                <p className="text-sm text-[#F5F5DC]/70">{viewingRequest.eventData.time || (viewingRequest.eventData as any).startTime}</p>
-                <p className="text-xs text-[#F5F5DC]/50 mt-1">Gates open: {viewingRequest.eventData.gatesOpen}</p>
-              </div>
-              <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <MapPin className="h-4 w-4 text-[#E5A823]" />
-                  <p className="text-xs text-[#F5F5DC]/50 uppercase tracking-wider">Venue</p>
-                </div>
-                <p className="text-sm font-medium text-[#F5F5DC]">{viewingRequest.eventData.venue}</p>
-              </div>
-              <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="h-4 w-4 text-[#E5A823]" />
-                  <p className="text-xs text-[#F5F5DC]/50 uppercase tracking-wider">Entry Requirements</p>
-                </div>
-                <p className="text-sm font-medium text-[#F5F5DC]">Age: {viewingRequest.eventData.entryAge}</p>
-                <p className="text-xs text-[#F5F5DC]/50 mt-1">Layout: {viewingRequest.eventData.layout}</p>
-                <p className="text-xs text-[#F5F5DC]/50">Seating: {viewingRequest.eventData.seating}</p>
-              </div>
-            </div>
-
-            {/* Pricing Details */}
-            <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4 mb-6">
-              <div className="flex items-center gap-2 mb-4">
-                <IndianRupee className="h-5 w-5 text-[#E5A823]" />
-                <h4 className="font-semibold text-[#F5F5DC]">Pricing & Commission Details</h4>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-lg bg-[#2A2A2A]/50 p-3">
-                  <p className="text-xs text-[#F5F5DC]/50 mb-1">Ticket Price</p>
-                  <p className="text-xl font-bold text-[#E5A823]">{viewingRequest.eventData.price}</p>
-                </div>
-                <div className="rounded-lg bg-[#2A2A2A]/50 p-3">
-                  <p className="text-xs text-[#F5F5DC]/50 mb-1">Platform Fee</p>
-                  <p className="text-xl font-bold text-[#F5F5DC]">5%</p>
-                  <p className="text-xs text-[#F5F5DC]/50">Per transaction</p>
-                </div>
-                <div className="rounded-lg bg-[#2A2A2A]/50 p-3">
-                  <p className="text-xs text-[#F5F5DC]/50 mb-1">Outlet Revenue Share</p>
-                  <p className="text-xl font-bold text-emerald-400">95%</p>
-                  <p className="text-xs text-[#F5F5DC]/50">After platform fee</p>
-                </div>
-              </div>
-              <div className="mt-4 p-3 rounded-lg bg-[#E5A823]/10 border border-[#E5A823]/20">
-                <p className="text-sm text-[#F5F5DC]/80">
-                  <span className="text-[#E5A823] font-medium">Commission Structure:</span> The outlet provider receives 95% of the ticket price, while Easy Entry retains 5% as a platform fee for payment processing, hosting, and marketing services.
-                </p>
+            {/* Event Details */}
+            <div>
+              <p className="text-xs font-semibold text-[#F5F5DC]/40 uppercase tracking-wider mb-2">Event Details</p>
+              <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/60 px-3 py-1">
+                <DetailRow label="Date" value={ed.date} />
+                <DetailRow label="Time" value={ed.time} />
+                <DetailRow label="Venue" value={ed.venue} />
+                <DetailRow label="Category" value={ed.category} />
+                <DetailRow label="Gates Open" value={ed.gatesOpen} />
+                <DetailRow label="Entry Age" value={ed.entryAge} />
+                <DetailRow label="Layout" value={ed.layout} />
+                <DetailRow label="Seating" value={ed.seating} />
+                <DetailRow label="Total Tickets" value={
+                  totalQty || ed.numberOfTickets
+                    ? `${totalQty || ed.numberOfTickets} tickets`
+                    : null
+                } />
+                <DetailRow label="Submitted" value={new Date(request.submittedAt).toLocaleString('en-IN')} />
               </div>
             </div>
 
             {/* Description */}
-            <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4 mb-6">
-              <h4 className="font-semibold text-[#F5F5DC] mb-3">Event Description</h4>
-              <p className="text-sm text-[#F5F5DC]/80 leading-relaxed">{viewingRequest.eventData.description}</p>
-            </div>
-
-            {/* Full Description */}
-            <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4 mb-6">
-              <h4 className="font-semibold text-[#F5F5DC] mb-3">Full Description</h4>
-              <p className="text-sm text-[#F5F5DC]/80 leading-relaxed">{viewingRequest.eventData.fullDescription}</p>
-            </div>
-
-            {/* Ticket Categories Section */}
-            <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-4 mb-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Ticket className="h-5 w-5 text-[#E5A823]" />
-                <h4 className="font-semibold text-[#F5F5DC]">Ticket Details</h4>
+            {ed.description && (
+              <div>
+                <p className="text-xs font-semibold text-[#F5F5DC]/40 uppercase tracking-wider mb-2">Description</p>
+                <p className="text-sm text-[#F5F5DC]/70 bg-[#0D0D0D]/60 rounded-lg border border-[#2A2A2A] p-3 leading-relaxed">{ed.description}</p>
               </div>
-              
-              {viewingRequest.eventData.numberOfTickets && (
-                <div className="mb-4 p-3 rounded-lg bg-[#2A2A2A]/50">
-                  <p className="text-xs text-[#F5F5DC]/50 mb-1">Total Tickets Available</p>
-                  <p className="text-lg font-bold text-[#E5A823]">{viewingRequest.eventData.numberOfTickets} tickets</p>
-                </div>
-              )}
+            )}
 
-              {viewingRequest.eventData.ticketCategories && viewingRequest.eventData.ticketCategories.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-xs text-[#F5F5DC]/60 uppercase tracking-wider mb-3">Ticket Categories</p>
-                  {viewingRequest.eventData.ticketCategories.map((category: any, index: number) => (
-                    <div key={category.id || index} className="flex items-start justify-between p-3 rounded-lg bg-[#2A2A2A]/50 border border-[#E5A823]/20">
-                      <div className="flex-1">
-                        <p className="font-medium text-[#E5A823]">{category.name}</p>
-                        <p className="text-sm text-[#F5F5DC]/80 mt-1">
-                          <IndianRupee className="h-3 w-3 inline mr-1" />
-                          {category.price}
-                        </p>
-                        {(category.availableFrom || category.availableUntil) && (
-                          <p className="text-xs text-[#F5F5DC]/50 mt-2">
-                            {category.availableFrom && `Available from: ${new Date(category.availableFrom).toLocaleDateString()} ${new Date(category.availableFrom).toLocaleTimeString()}`}
-                            {category.availableFrom && category.availableUntil && <br />}
-                            {category.availableUntil && `Available until: ${new Date(category.availableUntil).toLocaleDateString()} ${new Date(category.availableUntil).toLocaleTimeString()}`}
-                          </p>
-                        )}
-                      </div>
+            {/* Ticket Tiers & Commission Table */}
+            {tiers.length > 0 ? (
+              <div>
+                <p className="text-xs font-semibold text-[#F5F5DC]/40 uppercase tracking-wider mb-2">Ticket Tiers & Commission Breakdown</p>
+                <div className="rounded-lg border border-[#2A2A2A] overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-[#1A1A1A] text-xs text-[#F5F5DC]/40 uppercase tracking-wider">
+                          <th className="px-3 py-2.5 text-left">Tier</th>
+                          <th className="px-3 py-2.5 text-right">Price</th>
+                          <th className="px-3 py-2.5 text-right">Qty</th>
+                          <th className="px-3 py-2.5 text-right">Comm %</th>
+                          <th className="px-3 py-2.5 text-right">Comm / Ticket</th>
+                          <th className="px-3 py-2.5 text-right">Total Revenue</th>
+                          <th className="px-3 py-2.5 text-right">Total Commission</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#2A2A2A]">
+                        {tiers.map((tier, i) => {
+                          const qty      = tier.quantity ?? 0;
+                          const commAmt  = tier.commissionAmount ?? ((tier.price * (tier.commissionPercent ?? 0)) / 100);
+                          const tierRev  = tier.price * qty;
+                          const tierComm = commAmt * qty;
+                          return (
+                            <tr key={tier.id || i} className="hover:bg-[#1A1A1A]/60 transition-colors">
+                              <td className="px-3 py-3 font-medium text-[#E5A823]">{tier.name}</td>
+                              <td className="px-3 py-3 text-right">₹{tier.price.toLocaleString('en-IN')}</td>
+                              <td className="px-3 py-3 text-right text-[#F5F5DC]/70">{qty}</td>
+                              <td className="px-3 py-3 text-right">
+                                <span className="inline-flex items-center gap-0.5 text-[#F5F5DC]/80">
+                                  <Percent className="w-3 h-3" />{tier.commissionPercent ?? 0}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 text-right text-emerald-400">₹{commAmt.toFixed(2)}</td>
+                              <td className="px-3 py-3 text-right text-[#F5F5DC]/70">₹{tierRev.toLocaleString('en-IN')}</td>
+                              <td className="px-3 py-3 text-right font-semibold text-emerald-400">₹{tierComm.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-[#1A1A1A] font-bold text-sm border-t border-[#2A2A2A]">
+                          <td className="px-3 py-3 text-[#F5F5DC]/70">Totals</td>
+                          <td className="px-3 py-3" />
+                          <td className="px-3 py-3 text-right text-[#F5F5DC]/80">{totalQty}</td>
+                          <td className="px-3 py-3" />
+                          <td className="px-3 py-3" />
+                          <td className="px-3 py-3 text-right text-[#F5F5DC]">₹{totalRev.toLocaleString('en-IN')}</td>
+                          <td className="px-3 py-3 text-right text-emerald-400">₹{totalComm.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Fallback if no tiers — show the base price */
+              <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/60 p-3">
+                <p className="text-xs font-semibold text-[#F5F5DC]/40 uppercase tracking-wider mb-1">Ticket Price</p>
+                <p className="text-sm flex items-center gap-1"><IndianRupee className="w-3.5 h-3.5 text-[#E5A823]" />{ed.price}</p>
+              </div>
+            )}
+
+            {/* Rejection reason (if rejected) */}
+            {request.status === 'rejected' && request.rejectionReason && (
+              <div className="rounded-lg border border-[#EB4D4B]/20 bg-[#EB4D4B]/5 p-3">
+                <p className="text-xs font-semibold text-[#EB4D4B]/70 uppercase tracking-wider mb-1">Rejection Reason</p>
+                <p className="text-sm text-[#F5F5DC]/70">{request.rejectionReason}</p>
+              </div>
+            )}
+
+            {/* Actions (only for pending) */}
+            {request.status === 'pending' && (
+              <div className="pt-1 space-y-3">
+                {rejectingId === request.id ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Reason for rejection (optional)"
+                      rows={2}
+                      className="w-full bg-[#1A1A1A] border border-[#EB4D4B]/30 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#EB4D4B] resize-none"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleReject(request.id)}
+                        disabled={actionLoading === request.id}
+                        className="flex items-center gap-1.5 rounded-lg bg-[#EB4D4B] px-4 py-2 text-sm font-semibold text-white hover:bg-[#EB4D4B]/80 transition-colors disabled:opacity-50"
+                      >
+                        {actionLoading === request.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                        Confirm Reject
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setRejectingId(null); setRejectionReason(''); }}
+                        className="rounded-lg border border-[#2A2A2A] px-4 py-2 text-sm text-[#F5F5DC]/70 hover:bg-[#2A2A2A] transition-colors"
+                      >
+                        Cancel
+                      </button>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-[#F5F5DC]/50">No ticket categories specified</p>
-              )}
-            </div>
-
-            {/* Status & Actions */}
-            <div className="flex items-center justify-between pt-4 border-t border-[#2A2A2A]">
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-[#F5F5DC]/70">Status:</span>
-                {getStatusBadge(viewingRequest.status)}
-              </div>
-              <div className="flex items-center gap-3">
-                {viewingRequest.status === 'pending' && (
-                  <>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => {
-                        handleApprove(viewingRequest.id);
-                        setShowViewModal(false);
-                      }}
-                      disabled={actionInProgress === viewingRequest.id}
-                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                      type="button"
+                      onClick={() => handleApprove(request.id)}
+                      disabled={actionLoading === request.id}
+                      className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-400 transition-colors disabled:opacity-50"
                     >
-                      <Check className="h-4 w-4" />
+                      {actionLoading === request.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                       Approve
                     </button>
                     <button
-                      onClick={() => {
-                        setShowViewModal(false);
-                        openRejectModal(viewingRequest);
-                      }}
-                      className="inline-flex items-center gap-2 rounded-lg bg-[#EB4D4B] px-4 py-2 text-sm font-medium text-white hover:bg-[#d64545] transition-colors"
+                      type="button"
+                      onClick={() => setRejectingId(request.id)}
+                      className="flex items-center gap-1.5 rounded-lg border border-[#EB4D4B]/30 bg-[#EB4D4B]/10 px-5 py-2.5 text-sm font-semibold text-[#EB4D4B] hover:bg-[#EB4D4B]/20 transition-colors"
                     >
-                      <X className="h-4 w-4" />
+                      <XCircle className="w-3.5 h-3.5" />
                       Reject
                     </button>
-                  </>
+                  </div>
                 )}
-                <button
-                  onClick={() => {
-                    setShowViewModal(false);
-                    setViewingRequest(null);
-                  }}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-[#F5F5DC]/70 hover:text-[#F5F5DC] transition-colors"
-                >
-                  Close
-                </button>
               </div>
-            </div>
+            )}
           </div>
-        </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="mt-4 space-y-5">
+      {/* Refresh button */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={fetchRequests}
+          className="flex items-center gap-1.5 rounded-lg border border-[#2A2A2A] px-3 py-1.5 text-xs text-[#F5F5DC]/60 hover:bg-[#2A2A2A] hover:text-[#F5F5DC] transition-colors"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Refresh
+        </button>
+      </div>
+
+      {/* Pending */}
+      {pending.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-2 h-2 rounded-full bg-yellow-400" />
+            <h2 className="text-sm font-semibold text-[#F5F5DC]/70 uppercase tracking-wider">
+              Pending Review <span className="text-yellow-400 ml-1">{pending.length}</span>
+            </h2>
+          </div>
+          <div className="space-y-3">
+            {pending.map(r => <RequestCard key={r.id} request={r} />)}
+          </div>
+        </section>
       )}
-    </>
+
+      {/* Reviewed */}
+      {reviewed.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-2 h-2 rounded-full bg-[#F5F5DC]/30" />
+            <h2 className="text-sm font-semibold text-[#F5F5DC]/70 uppercase tracking-wider">
+              Reviewed <span className="text-[#F5F5DC]/40 ml-1">{reviewed.length}</span>
+            </h2>
+          </div>
+          <div className="space-y-3">
+            {reviewed.map(r => <RequestCard key={r.id} request={r} />)}
+          </div>
+        </section>
+      )}
+    </div>
   );
 }
