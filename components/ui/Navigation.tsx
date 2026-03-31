@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Menu, X, ChevronDown, Mic2, Building2, Megaphone, LogOut, UserCircle2, LayoutDashboard, CalendarDays, Heart, History } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
-import EyeLogo from './EyeLogo';
 
 export default function Navigation() {
   const [workDropdownOpen, setWorkDropdownOpen] = useState(false);
@@ -39,8 +39,8 @@ export default function Navigation() {
         <div className="flex items-center justify-between w-full">
           {/* Logo - Left Side */}
           <Link href="/" className="flex items-center gap-2 group mr-8">
-            <div className="w-8 h-8 bg-[#000000] border border-[#000000] rounded flex items-center justify-center group-hover:bg-[#000000] transition-colors overflow-hidden">
-               <EyeLogo />
+            <div className="w-8 h-8 rounded flex items-center justify-center overflow-hidden">
+               <Image src="/logo.png" alt="Easy Entry" width={32} height={32} className="object-contain" />
             </div>
             <span className="text-xl font-bold text-[#E5A823] tracking-tighter group-hover:text-[#E84545] transition-colors hidden md:inline">
               Easy Entry
