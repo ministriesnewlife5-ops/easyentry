@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAllVenues, getVenueByUserId, updateVenueByUserId, VenueProfile } from '@/lib/venue-store';
 import { getToken } from 'next-auth/jwt';
 
+// Allow larger request bodies for base64-encoded images
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
 export async function GET(request: NextRequest) {
   try {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });

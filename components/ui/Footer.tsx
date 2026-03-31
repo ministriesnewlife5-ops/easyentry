@@ -41,7 +41,7 @@ export default function Footer() {
         </div>
         
         <div className="border-t border-gray-900 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
-          <p>&copy; {new Date().getFullYear()} © 2026 Easy Entry. All rights reserved: Designed and Developed ❤️ Athryan Tech Solutions</p>
+          <p>&copy; {new Date().getFullYear()} All rights reserved: Designed and Developed ❤️ Athryan Tech Solutions</p>
           <div className="flex gap-4 mt-4 md:mt-0">
              <span>Privacy Policy</span>
              <span>Cookie Settings</span>
