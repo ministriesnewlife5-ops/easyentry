@@ -360,15 +360,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_app_users_updated_at ON app_users;
 CREATE TRIGGER update_app_users_updated_at BEFORE UPDATE ON app_users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_venue_profiles_updated_at ON venue_profiles;
 CREATE TRIGGER update_venue_profiles_updated_at BEFORE UPDATE ON venue_profiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_event_requests_updated_at ON event_requests;
 CREATE TRIGGER update_event_requests_updated_at BEFORE UPDATE ON event_requests
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_published_events_updated_at ON published_events;
 CREATE TRIGGER update_published_events_updated_at BEFORE UPDATE ON published_events
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
