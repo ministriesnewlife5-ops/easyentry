@@ -139,6 +139,32 @@ CREATE INDEX IF NOT EXISTS idx_published_events_status ON published_events(statu
 CREATE INDEX IF NOT EXISTS idx_published_events_venue ON published_events(venue_id);
 CREATE INDEX IF NOT EXISTS idx_published_events_featured ON published_events(is_featured) WHERE is_featured = TRUE;
 
+-- ============================================
+-- 6. TICKET_BOOKINGS TABLE (user purchase history)
+-- ============================================
+CREATE TABLE IF NOT EXISTS ticket_bookings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  user_email TEXT,
+  user_name TEXT,
+  event_id UUID REFERENCES published_events(id) ON DELETE SET NULL,
+  event_title TEXT,
+  event_date DATE,
+  event_venue TEXT,
+  event_image TEXT,
+  ticket_categories JSONB NOT NULL DEFAULT '[]'::jsonb,
+  total_tickets INTEGER NOT NULL DEFAULT 0,
+  amount_paid NUMERIC(10, 2) NOT NULL,
+  payment_id TEXT NOT NULL UNIQUE,
+  order_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'confirmed',
+  booked_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ticket_bookings_user_booked_at ON ticket_bookings(user_id, booked_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ticket_bookings_event_id ON ticket_bookings(event_id);
+
 -- Add archive columns to published_events if they don't exist
 ALTER TABLE published_events 
   ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE,
@@ -152,6 +178,7 @@ ALTER TABLE otp_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE venue_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE event_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE published_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ticket_bookings ENABLE ROW LEVEL SECURITY;
 
 -- Create storage bucket for event files
 INSERT INTO storage.buckets (id, name, public)

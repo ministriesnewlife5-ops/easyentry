@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized - Outlet provider access required' }, { status: 403 });
     }
 
-    const requests = getEventRequestsByOutlet(token.sub || '');
+    const requests = await getEventRequestsByOutlet(token.sub || '');
     return NextResponse.json({ requests });
   } catch (error) {
     console.error('Failed to fetch event requests:', error);

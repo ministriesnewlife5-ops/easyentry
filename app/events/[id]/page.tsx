@@ -288,6 +288,12 @@ export default function EventDetailsPage() {
                 eventId: event.id,
                 ticketCategories: selectedCategories,
                 amount: orderData.amount,
+                eventSnapshot: {
+                  title: event.title,
+                  date: event.date,
+                  venue: event.venue,
+                  image: event.image,
+                },
               }),
             });
 

@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     
     // If user is authenticated, try to get their venue profile
     if (token?.sub) {
-      const userVenue = getVenueByUserId(token.sub);
+      const userVenue = await getVenueByUserId(token.sub);
       if (userVenue) {
         return NextResponse.json({ venue: userVenue });
       }
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     
     const body = await request.json();
     
-    const venue = updateVenueByUserId(token.sub, {
+    const venue = await updateVenueByUserId(token.sub, {
       ...body,
       userId: token.sub,
     });
@@ -70,7 +70,7 @@ export async function PUT(request: NextRequest) {
     
     const body = await request.json();
     
-    const venue = updateVenueByUserId(token.sub, body);
+    const venue = await updateVenueByUserId(token.sub, body);
     
     if (!venue) {
       return NextResponse.json({ error: 'Failed to update venue profile' }, { status: 500 });

@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
+import { getSupabaseServerClient } from '@/lib/supabase';
 
-// Create Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_KEY || ''
-);
+const STORAGE_BUCKET = 'event-files';
 
 // Allow larger request bodies for file uploads
 export const config = {
@@ -19,6 +15,7 @@ export const config = {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseServerClient();
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const type = formData.get('type') as string;
@@ -51,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     // Upload to Supabase Storage
     const { data, error: uploadError } = await supabase.storage
-      .from('events')
+      .from(STORAGE_BUCKET)
       .upload(filePath, buffer, {
         contentType: file.type,
         cacheControl: '3600',
@@ -65,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     // Get public URL
     const { data: urlData } = supabase.storage
-      .from('events')
+      .from(STORAGE_BUCKET)
       .getPublicUrl(filePath);
 
     return NextResponse.json({

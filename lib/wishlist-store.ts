@@ -37,7 +37,9 @@ export async function getWishlist(): Promise<WishlistEvent[]> {
 // Check if event is in wishlist
 export async function isInWishlist(eventId: string): Promise<boolean> {
   try {
-    const response = await fetch(`/api/wishlist/check?event_id=${eventId}`);
+    const response = await fetch(`/api/wishlist?event_id=${encodeURIComponent(eventId)}`, {
+      method: 'PATCH',
+    });
     if (!response.ok) {
       return false;
     }

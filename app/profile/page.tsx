@@ -8,8 +8,16 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { getWishlist, removeFromWishlist, type WishlistEvent } from '@/lib/wishlist-store';
 
-// Mock data for history - will be replaced with actual booking API
-const mockHistory: any[] = [];
+type BookingHistoryItem = {
+  id: string;
+  title: string;
+  date: string;
+  venue: string;
+  image: string;
+  status: 'Completed' | 'Upcoming';
+  tickets: number;
+  price: string;
+};
 
 // Component that uses search params - wrapped in Suspense
 function ProfileContent() {
@@ -18,11 +26,50 @@ function ProfileContent() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'profile' | 'wishlist' | 'history'>('profile');
   const [wishlist, setWishlist] = useState<WishlistEvent[]>([]);
+  const [bookingHistory, setBookingHistory] = useState<BookingHistoryItem[]>([]);
   
   // Load wishlist from API
   const loadWishlist = async () => {
     const wishlistData = await getWishlist();
     setWishlist(wishlistData);
+  };
+
+  // Load booking history from API
+  const loadBookingHistory = async () => {
+    try {
+      const response = await fetch('/api/bookings');
+      if (!response.ok) {
+        setBookingHistory([]);
+        return;
+      }
+
+      const data = await response.json();
+      const mapped: BookingHistoryItem[] = (data.bookings || []).map((booking: any) => {
+        const ticketCategories = Array.isArray(booking.ticket_categories) ? booking.ticket_categories : [];
+        const totalTickets = typeof booking.total_tickets === 'number'
+          ? booking.total_tickets
+          : ticketCategories.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+
+        const eventDate = booking.event_date || booking.booked_at;
+        const parsedEventDate = eventDate ? new Date(eventDate) : new Date();
+        const isCompleted = parsedEventDate.getTime() < Date.now();
+
+        return {
+          id: booking.id,
+          title: booking.event_title || 'Untitled Event',
+          date: booking.event_date ? new Date(booking.event_date).toLocaleDateString() : 'Date TBD',
+          venue: booking.event_venue || 'Venue TBD',
+          image: booking.event_image || '/dj1.jfif',
+          status: isCompleted ? 'Completed' : 'Upcoming',
+          tickets: totalTickets,
+          price: `₹${Number(booking.amount_paid || 0).toLocaleString('en-IN')}`,
+        };
+      });
+
+      setBookingHistory(mapped);
+    } catch {
+      setBookingHistory([]);
+    }
   };
   
   // Get tab from URL query parameter
@@ -36,6 +83,7 @@ function ProfileContent() {
   // Load wishlist on mount and listen for updates
   useEffect(() => {
     loadWishlist();
+    loadBookingHistory();
     
     const handleWishlistUpdate = () => {
       loadWishlist();
@@ -268,7 +316,7 @@ function ProfileContent() {
           {activeTab === 'history' && isRegularUser && (
             <div>
               <h2 className="text-xl font-bold text-[#F5F5DC] mb-4">Booking History</h2>
-              {mockHistory.length === 0 ? (
+              {bookingHistory.length === 0 ? (
                 <div className="text-center py-12">
                   <History className="w-12 h-12 text-[#F5F5DC]/30 mx-auto mb-4" />
                   <p className="text-[#F5F5DC]/60">No bookings yet</p>
@@ -282,7 +330,7 @@ function ProfileContent() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {mockHistory.map((booking) => (
+                  {bookingHistory.map((booking) => (
                     <div key={booking.id} className="bg-[#2A2A2A] rounded-xl p-4">
                       <div className="flex gap-4">
                         <div className="w-24 h-24 rounded-lg bg-[#0D0D0D] overflow-hidden flex-shrink-0">

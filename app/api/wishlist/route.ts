@@ -115,7 +115,7 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-// GET /api/wishlist/check?event_id=xxx - Check if event is in wishlist
+// PATCH /api/wishlist?event_id=xxx - Check if event is in wishlist
 export async function PATCH(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
