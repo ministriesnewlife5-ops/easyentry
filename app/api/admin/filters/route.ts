@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getSupabaseServerClient } from '@/lib/supabase';
 
 const SETTINGS_KEY = 'browse_filters';
@@ -92,21 +93,55 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing filters data' }, { status: 400 });
     }
 
-    const supabase = getSupabaseServerClient();
-
-    // Upsert into app_settings
-    const { error } = await supabase
-      .from('app_settings')
-      .upsert({ key: SETTINGS_KEY, value: filters, updated_at: new Date().toISOString() }, { onConflict: 'key' });
-
-    if (error) {
-      console.error('Supabase upsert error:', error);
-      return NextResponse.json({ error: 'Failed to save filters' }, { status: 500 });
+    if (!filters.categories || !Array.isArray(filters.categories)) {
+      return NextResponse.json({ error: 'Invalid filters structure' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true });
+    const supabase = getSupabaseServerClient();
+
+    // First, try to update if exists, otherwise insert
+    const { data, error: upsertError } = await supabase
+      .from('app_settings')
+      .upsert(
+        { key: SETTINGS_KEY, value: filters, updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      )
+      .select();
+
+    if (upsertError) {
+      console.error('Supabase upsert error:', upsertError);
+      return NextResponse.json({ error: 'Failed to save filters: ' + upsertError.message }, { status: 500 });
+    }
+
+    // Verify the data was actually saved by fetching it back
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', SETTINGS_KEY)
+      .single();
+
+    if (verifyError || !verifyData) {
+      console.error('Failed to verify save:', verifyError);
+      return NextResponse.json({ error: 'Failed to verify filters were saved' }, { status: 500 });
+    }
+
+    // Verify that categories array has been properly updated
+    const savedFilters = verifyData.value;
+    if (!savedFilters.categories || savedFilters.categories.length !== filters.categories.length) {
+      console.warn('Warning: Saved categories count does not match sent categories count', {
+        sent: filters.categories.length,
+        saved: savedFilters.categories?.length || 0
+      });
+    }
+
+    // Revalidate related paths to clear cache
+    revalidatePath('/browse');
+    revalidatePath('/api/admin/filters');
+    revalidatePath('/api/browse-filters/default');
+
+    return NextResponse.json({ success: true, filters: savedFilters });
   } catch (err) {
     console.error('POST /api/admin/filters error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error: ' + (err instanceof Error ? err.message : 'Unknown'), status: 500 }, { status: 500 });
   }
 }

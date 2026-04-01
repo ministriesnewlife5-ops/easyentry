@@ -133,7 +133,7 @@ export default function BrowseFiltersManager() {
     })();
   }, []);
 
-  const saveFilters = async (updated: BrowseFiltersData) => {
+  const saveFilters = async (updated: BrowseFiltersData): Promise<boolean> => {
     setSaving(true);
     setSaveStatus('idle');
     try {
@@ -142,9 +142,21 @@ export default function BrowseFiltersManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filters: updated }),
       });
-      setSaveStatus(res.ok ? 'success' : 'error');
-    } catch {
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        console.error('Failed to save filters:', data.error);
+        setSaveStatus('error');
+        return false;
+      }
+      
+      setSaveStatus('success');
+      return true;
+    } catch (error) {
+      console.error('Error saving filters:', error);
       setSaveStatus('error');
+      return false;
     } finally {
       setSaving(false);
       setTimeout(() => setSaveStatus('idle'), 3000);
@@ -152,8 +164,14 @@ export default function BrowseFiltersManager() {
   };
 
   const updateFilters = async (updated: BrowseFiltersData) => {
+    const previousFilters = filters;
     setFilters(updated);
-    await saveFilters(updated);
+    const success = await saveFilters(updated);
+    
+    // If save failed, revert to previous state
+    if (!success) {
+      setFilters(previousFilters);
+    }
   };
 
   const handleSaveCategory = async () => {
@@ -174,7 +192,12 @@ export default function BrowseFiltersManager() {
   };
 
   const handleDeleteCategory = async (index: number) => {
-    await updateFilters({ ...filters, categories: filters.categories.filter((_, i) => i !== index) });
+    const categoryName = filters.categories[index]?.name || 'Category';
+    if (!confirm(`Delete "${categoryName}" category? This cannot be undone.`)) {
+      return;
+    }
+    const updated = { ...filters, categories: filters.categories.filter((_, i) => i !== index) };
+    await updateFilters(updated);
   };
 
   const openEditCategory = (index: number) => {
