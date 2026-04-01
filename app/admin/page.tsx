@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, CircleCheckBig, ImageIcon, IndianRupee, Mic2, Settings, Ticket, TrendingUp, Users, Megaphone, FileText } from 'lucide-react';
+import { BarChart3, CalendarDays, CircleCheckBig, ImageIcon, IndianRupee, Mic2, Settings, Ticket, TrendingUp, Users, Megaphone, FileText, Plus, UserPlus } from 'lucide-react';
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth-options';
@@ -7,6 +7,8 @@ import SettingsContent from '@/components/SettingsContent';
 import EventRequestsSection from '@/components/EventRequestsSection';
 import AdsBannerManager from '@/components/AdsBannerManager';
 import BrowseFiltersManager from '@/components/BrowseFiltersManager';
+import AdminEventHostSection from '@/components/AdminEventHostSection';
+import AdminOnboardingSection from '@/components/AdminOnboardingSection';
 import { getAllPublishedEvents, getPublishedEventCards } from '@/lib/public-events-store';
 import { getAllEventRequests } from '@/lib/event-request-store';
 import { getAllUsers } from '@/lib/auth-store';
@@ -134,6 +136,14 @@ export default async function AdminPage({
               <FileText className="h-4 w-4" />
               Event Requests
             </Link>
+            <Link href="/admin?section=host-event" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'host-event' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
+              <Plus className="h-4 w-4" />
+              Host Event
+            </Link>
+            <Link href="/admin?section=onboarding" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'onboarding' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
+              <UserPlus className="h-4 w-4" />
+              Onboard Users
+            </Link>
             <Link href="/admin?section=settings" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'settings' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
               <Settings className="h-4 w-4" />
               Settings
@@ -160,6 +170,8 @@ export default async function AdminPage({
                    activeSection === 'artists' ? 'All Enrolled Artists' :
                    activeSection === 'influencers' ? 'All Influencers' :
                    activeSection === 'requests' ? 'Event Requests' :
+                   activeSection === 'host-event' ? 'Host New Event' :
+                   activeSection === 'onboarding' ? 'Onboard Users' :
                    activeSection === 'settings' ? 'Settings' :
                    'Admin Dashboard'}
                 </h1>
@@ -170,6 +182,8 @@ export default async function AdminPage({
                    activeSection === 'artists' ? `Manage and view all ${allEnrolledArtists.length} artists enrolled on the platform` :
                    activeSection === 'influencers' ? `Manage and view all ${allInfluencers.length} influencers collaborating on the platform` :
                    activeSection === 'requests' ? 'Review and approve event requests from outlet providers' :
+                   activeSection === 'host-event' ? 'Create and publish events directly for outlets and promoters' :
+                   activeSection === 'onboarding' ? 'Create accounts for artists, influencers, and outlet providers' :
                    activeSection === 'settings' ? 'Manage your account settings and security' :
                    `${upcomingEvents.length} upcoming events · ${allUsers.length} total users`}
                 </p>
@@ -285,6 +299,10 @@ export default async function AdminPage({
             <BrowseFiltersManager />
           ) : activeSection === 'requests' ? (
             <EventRequestsSection />
+          ) : activeSection === 'host-event' ? (
+            <AdminEventHostSection />
+          ) : activeSection === 'onboarding' ? (
+            <AdminOnboardingSection />
           ) : activeSection === 'settings' ? (
             <SettingsContent userEmail={session?.user?.email} />
           ) : (

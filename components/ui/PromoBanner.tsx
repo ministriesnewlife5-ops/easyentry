@@ -15,8 +15,6 @@ type PromoSlide = {
   buttonLink: string;
 };
 
-const STORAGE_KEY = 'easyentry.promo-banners';
-
 // Pre-defined particle data to avoid hydration mismatch
 const particles = [
   { left: 15, x: 120, y: 180, size: 28, icon: 'music', delay: 0, duration: 6 },
@@ -37,26 +35,29 @@ export default function PromoBanner() {
 
   useEffect(() => {
     setMounted(true);
-    // Load banners from localStorage
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Convert banner format to promo slide format
-        const slides = parsed.map((banner: any) => ({
-          id: banner.id,
-          tag: banner.tag,
-          title: banner.title,
-          description: banner.description,
-          image: banner.image,
-          buttonLabel: banner.buttonLabel || 'Learn More',
-          buttonLink: banner.buttonLink || '#'
-        }));
-        setPromoSlides(slides);
+    // Load banners from API (Supabase)
+    const loadBanners = async () => {
+      try {
+        const response = await fetch('/api/promo-banners');
+        if (response.ok) {
+          const data = await response.json();
+          // Convert banner format to promo slide format
+          const slides = (data.banners || []).map((banner: any) => ({
+            id: banner.id,
+            tag: banner.title,
+            title: banner.subtitle || banner.title,
+            description: banner.cta_text || '',
+            image: banner.image_url || '',
+            buttonLabel: banner.cta_text || 'Learn More',
+            buttonLink: banner.cta_link || '#'
+          }));
+          setPromoSlides(slides);
+        }
+      } catch (e) {
+        console.error('Error loading promo banners:', e);
       }
-    } catch (e) {
-      console.error('Error loading promo banners:', e);
-    }
+    };
+    loadBanners();
   }, []);
 
   const nextSlide = useCallback(() => {
@@ -77,36 +78,33 @@ export default function PromoBanner() {
     return () => clearInterval(timer);
   }, [nextSlide, promoSlides.length]);
 
-  // Handle storage changes from admin panel
+  // Handle updates from admin panel - poll every 30 seconds
   useEffect(() => {
-    const handleStorageChange = () => {
+    const interval = setInterval(async () => {
       try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const slides = parsed.map((banner: any) => ({
+        const response = await fetch('/api/promo-banners');
+        if (response.ok) {
+          const data = await response.json();
+          const slides = (data.banners || []).map((banner: any) => ({
             id: banner.id,
-            tag: banner.tag,
-            title: banner.title,
-            description: banner.description,
-            image: banner.image,
-            buttonLabel: banner.buttonLabel || 'Learn More',
-            buttonLink: banner.buttonLink || '#'
+            tag: banner.title,
+            title: banner.subtitle || banner.title,
+            description: banner.cta_text || '',
+            image: banner.image_url || '',
+            buttonLabel: banner.cta_text || 'Learn More',
+            buttonLink: banner.cta_link || '#'
           }));
           setPromoSlides(slides);
           if (currentIndex >= slides.length) {
             setCurrentIndex(0);
           }
-        } else {
-          setPromoSlides([]);
         }
       } catch (e) {
         console.error('Error syncing promo banners:', e);
       }
-    };
+    }, 30000); // Poll every 30 seconds
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    return () => clearInterval(interval);
   }, [currentIndex]);
 
   if (!mounted) {

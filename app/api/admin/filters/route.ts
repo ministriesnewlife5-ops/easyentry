@@ -9,6 +9,7 @@ const defaultFiltersData = {
     { name: 'DATE', icon: 'Calendar' },
     { name: 'PRICE', icon: 'Tag' },
     { name: 'ARTIST', icon: 'Mic', href: '/artist' },
+    { name: 'INFLUENCER', icon: 'Star', href: '/promoters' },
     { name: 'VENUES', icon: 'Building2', href: '/venues' },
   ],
   categories: [

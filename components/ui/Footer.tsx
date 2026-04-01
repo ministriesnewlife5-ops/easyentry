@@ -1,13 +1,7 @@
-import Image from 'next/image';
-
 export default function Footer() {
   return (
     <footer className="bg-black text-white border-t border-gray-900 py-16">
       <div className="container mx-auto px-4">
-        <div className="flex items-center gap-3 mb-8">
-          <Image src="/logo.png" alt="Easy Entry" width={40} height={40} className="object-contain" />
-          <span className="text-xl font-bold text-[#E5A823]">Easy Entry</span>
-        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div>
             <h3 className="font-bold text-lg mb-4 text-white">Company</h3>

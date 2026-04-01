@@ -9,6 +9,7 @@ import {
   Ticket, Send, Video, Image as ImageIcon, Plus, Trash2
 } from 'lucide-react';
 import Image from 'next/image';
+import DragDropUpload from '@/components/ui/DragDropUpload';
 
 interface GalleryImage {
   id: string;
@@ -96,24 +97,24 @@ export default function PromoterProfilePage() {
     setPromoForm({ eventId: '', promoCode: '', discountPercent: '' });
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'cover') => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (type === 'profile') {
-          setProfileImage(reader.result as string);
-        } else {
-          setCoverImage(reader.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
+  const handleProfileImageUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfileImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && videos.length < 4) {
+  const handleCoverImageUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCoverImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleVideoUploadFile = (file: File) => {
+    if (videos.length < 4) {
       const reader = new FileReader();
       reader.onloadend = () => {
         const newVideo: VideoThumbnail = {
@@ -128,21 +129,18 @@ export default function PromoterProfilePage() {
     }
   };
 
-  const handleGalleryImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && galleryImages.length < 9) {
-      Array.from(files).slice(0, 9 - galleryImages.length).forEach((file) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const newImage: GalleryImage = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            url: reader.result as string,
-            name: file.name,
-          };
-          setGalleryImages(prev => [...prev, newImage]);
+  const handleGalleryImageUploadFile = (file: File) => {
+    if (galleryImages.length < 9) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const newImage: GalleryImage = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          url: reader.result as string,
+          name: file.name,
         };
-        reader.readAsDataURL(file);
-      });
+        setGalleryImages(prev => [...prev, newImage]);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -235,37 +233,27 @@ export default function PromoterProfilePage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-medium mb-3">Profile Photo</label>
-                      <div 
-                        onClick={() => profileInputRef.current?.click()}
-                        className="relative w-40 h-40 rounded-2xl bg-[#2A2A2A] border-2 border-dashed border-[#E5A823]/30 flex items-center justify-center cursor-pointer hover:border-[#E5A823] transition-colors overflow-hidden"
-                      >
-                        {profileImage ? (
-                          <Image src={profileImage} alt="Profile" fill className="object-cover" />
-                        ) : (
-                          <div className="text-center">
-                            <Upload className="w-8 h-8 text-[#E5A823] mx-auto mb-2" />
-                            <span className="text-sm text-[#F5F5DC]/50">Upload Photo</span>
-                          </div>
-                        )}
-                      </div>
-                      <input ref={profileInputRef} type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'profile')} className="hidden" />
+                      <DragDropUpload
+                        type="image"
+                        maxSize={5}
+                        preview={profileImage}
+                        onClear={() => setProfileImage(null)}
+                        onFileSelect={handleProfileImageUpload}
+                        className="w-40 h-40 rounded-2xl"
+                        label="Drop profile photo"
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-3">Cover Photo</label>
-                      <div 
-                        onClick={() => coverInputRef.current?.click()}
-                        className="relative w-full h-40 rounded-xl bg-[#2A2A2A] border-2 border-dashed border-[#E5A823]/30 flex items-center justify-center cursor-pointer hover:border-[#E5A823] transition-colors overflow-hidden"
-                      >
-                        {coverImage ? (
-                          <Image src={coverImage} alt="Cover" fill className="object-cover" />
-                        ) : (
-                          <div className="text-center">
-                            <Upload className="w-8 h-8 text-[#E5A823] mx-auto mb-2" />
-                            <span className="text-sm text-[#F5F5DC]/50">Upload Cover</span>
-                          </div>
-                        )}
-                      </div>
-                      <input ref={coverInputRef} type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'cover')} className="hidden" />
+                      <DragDropUpload
+                        type="image"
+                        maxSize={10}
+                        preview={coverImage}
+                        onClear={() => setCoverImage(null)}
+                        onFileSelect={handleCoverImageUpload}
+                        className="w-full h-40 rounded-xl"
+                        label="Drop cover photo"
+                      />
                     </div>
                   </div>
                 </div>
@@ -370,7 +358,7 @@ export default function PromoterProfilePage() {
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
                   <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Video className="w-5 h-5 text-[#E5A823]" />
-                    Promotional Videos
+                    Promotional Videos ({videos.length}/4)
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {videos.map((video) => (
@@ -385,20 +373,22 @@ export default function PromoterProfilePage() {
                       </div>
                     ))}
                     {videos.length < 4 && (
-                      <div onClick={() => videoInputRef.current?.click()} className="aspect-video rounded-xl bg-[#2A2A2A] border-2 border-dashed border-[#E5A823]/30 flex flex-col items-center justify-center cursor-pointer hover:border-[#E5A823] transition-colors">
-                        <Plus className="w-8 h-8 text-[#E5A823] mb-2" />
-                        <span className="text-sm text-[#F5F5DC]/50">Add Video</span>
-                      </div>
+                      <DragDropUpload
+                        type="video"
+                        maxSize={50}
+                        onFileSelect={handleVideoUploadFile}
+                        className="aspect-video rounded-xl"
+                        label="Drop video here"
+                      />
                     )}
                   </div>
-                  <input ref={videoInputRef} type="file" accept="video/*" onChange={handleVideoUpload} className="hidden" />
-                  <p className="mt-4 text-sm text-[#F5F5DC]/50">Upload up to 4 promotional videos (max 50MB each)</p>
+                  <p className="mt-4 text-sm text-[#F5F5DC]/50">Upload up to 4 promotional videos (max 50MB each). Drag & drop or click to browse.</p>
                 </div>
 
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
                   <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <ImageIcon className="w-5 h-5 text-[#E5A823]" />
-                    Photo Gallery
+                    Photo Gallery ({galleryImages.length}/9)
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {galleryImages.map((image) => (
@@ -412,15 +402,16 @@ export default function PromoterProfilePage() {
                       </div>
                     ))}
                     {galleryImages.length < 9 && (
-                      <div onClick={() => galleryInputRef.current?.click()} className="aspect-square rounded-xl bg-[#2A2A2A] border-2 border-dashed border-[#E5A823]/30 flex flex-col items-center justify-center cursor-pointer hover:border-[#E5A823] transition-colors">
-                        <Plus className="w-8 h-8 text-[#E5A823] mb-2" />
-                        <span className="text-sm text-[#F5F5DC]/50">Add Photos</span>
-                        <span className="text-xs text-[#F5F5DC]/30 mt-1">{galleryImages.length}/9</span>
-                      </div>
+                      <DragDropUpload
+                        type="image"
+                        maxSize={5}
+                        onFileSelect={handleGalleryImageUploadFile}
+                        className="aspect-square rounded-xl"
+                        label="Drop photo here"
+                      />
                     )}
                   </div>
-                  <input ref={galleryInputRef} type="file" accept="image/*" multiple onChange={handleGalleryImageUpload} className="hidden" />
-                  <p className="mt-4 text-sm text-[#F5F5DC]/50">Upload up to 9 photos showcasing your work (max 5MB each)</p>
+                  <p className="mt-4 text-sm text-[#F5F5DC]/50">Upload up to 9 photos showcasing your work (max 5MB each). Drag & drop or click to browse.</p>
                 </div>
               </div>
 

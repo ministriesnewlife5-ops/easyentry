@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Calendar, Clock3, ImageIcon, IndianRupee, Info, MapPin, Percent, Sparkles, Ticket, Upload, X, Loader2, Users } from 'lucide-react';
+import DragDropUpload from '@/components/ui/DragDropUpload';
 
 type EventTemplate = {
   id: number;
@@ -400,12 +401,14 @@ export default function OutletHostEventPage() {
                   </div>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm mb-2">Event Images</label>
-                  <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-[#2A2A2A] bg-[#1A1A1A] px-4 py-4 text-[#F5F5DC]/70 hover:border-[#E5A823] hover:text-[#F5F5DC] transition-colors">
-                    <Upload className="w-4 h-4" />
-                    Select multiple images
-                    <input type="file" accept="image/*" multiple onChange={handleImagesChange} className="hidden" />
-                  </label>
+                  <label className="block text-sm mb-2">Event Images ({eventImages.length} selected)</label>
+                  <DragDropUpload
+                    type="image"
+                    maxSize={10}
+                    onFileSelect={(file) => setEventImages((prev) => [...prev, file])}
+                    className="w-full h-24 rounded-xl"
+                    label="Drop event images here"
+                  />
                   {eventImages.length > 0 && (
                     <div className="mt-3 space-y-2">
                       {eventImages.map((file, index) => (

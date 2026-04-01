@@ -35,26 +35,35 @@ type VenueInput = Omit<VenueProfile, 'id' | 'createdAt' | 'updatedAt'>;
 // Map database venue to legacy VenueProfile
 function mapDbToLegacy(record: Record<string, unknown>): VenueProfile {
   const images = (record.images as string[]) || [];
+  const amenities = (record.amenities as Record<string, unknown>) || {};
 
   return {
     id: record.id as string,
     userId: (record.owner_id as string) || '',
     venueName: (record.name as string) || '',
-    venueType: '',
-    email: '',
-    phone: '',
+    venueType: (amenities.venueType as string) || '',
+    email: (amenities.email as string) || '',
+    phone: (amenities.phone as string) || '',
     location: (record.location as string) || '',
     bio: (record.description as string) || '',
     capacity: (record.capacity as number)?.toString() || '',
-    website: '',
-    instagram: '',
-    twitter: '',
-    facebook: '',
+    website: (amenities.website as string) || '',
+    instagram: (amenities.instagram as string) || '',
+    twitter: (amenities.twitter as string) || '',
+    facebook: (amenities.facebook as string) || '',
     imageUrl: images[0] || null,
     coverImage: images[1] || null,
     venueImages: images,
     createdAt: (record.created_at as string) || new Date().toISOString(),
     updatedAt: (record.updated_at as string) || new Date().toISOString(),
+    firstPointContact: (amenities.firstPointContact as { name: string; email: string; phone: string }) || { name: '', email: '', phone: '' },
+    fnbManagerContact: (amenities.fnbManagerContact as { name: string; email: string; phone: string }) || { name: '', email: '', phone: '' },
+    financeContact: (amenities.financeContact as { name: string; email: string; phone: string }) || { name: '', email: '', phone: '' },
+    gstNumber: (amenities.gstNumber as string) || '',
+    gstCertificate: (amenities.gstCertificate as string) || '',
+    panCard: (amenities.panCard as string) || '',
+    panCardDocument: (amenities.panCardDocument as string) || '',
+    termsAccepted: (amenities.termsAccepted as string) || '',
   };
 }
 
@@ -65,12 +74,31 @@ function mapLegacyToDb(venue: Partial<VenueProfile>): Record<string, unknown> {
   if (venue.coverImage) images.push(venue.coverImage);
   if (venue.venueImages) images.push(...venue.venueImages);
 
+  // Store extra fields in amenities as JSON
+  const amenities: Record<string, unknown> = {
+    venueType: venue.venueType || '',
+    email: venue.email || '',
+    phone: venue.phone || '',
+    website: venue.website || '',
+    instagram: venue.instagram || '',
+    twitter: venue.twitter || '',
+    facebook: venue.facebook || '',
+    firstPointContact: venue.firstPointContact || { name: '', email: '', phone: '' },
+    fnbManagerContact: venue.fnbManagerContact || { name: '', email: '', phone: '' },
+    financeContact: venue.financeContact || { name: '', email: '', phone: '' },
+    gstNumber: venue.gstNumber || '',
+    gstCertificate: venue.gstCertificate || '',
+    panCard: venue.panCard || '',
+    panCardDocument: venue.panCardDocument || '',
+    termsAccepted: venue.termsAccepted || '',
+  };
+
   return {
     name: venue.venueName || '',
     location: venue.location || null,
     capacity: venue.capacity ? parseInt(venue.capacity) : null,
     description: venue.bio || null,
-    amenities: null,
+    amenities: amenities,
     images: images.length > 0 ? [...new Set(images)] : null,
     owner_id: venue.userId || null,
     is_active: true,

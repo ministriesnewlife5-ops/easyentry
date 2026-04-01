@@ -14,6 +14,7 @@ import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import DragDropUpload from '@/components/ui/DragDropUpload';
 
 type ActiveTab = 'dashboard' | 'details' | 'about' | 'contacts' | 'documents' | 'events';
 
@@ -190,21 +191,28 @@ function OutletProfileContent() {
     }
   }, [status, session, fetchVenueProfile, fetchOutletEvents]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'cover' | 'gallery') => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (type === 'profile') {
-          setProfileImage(reader.result as string);
-        } else if (type === 'cover') {
-          setCoverImage(reader.result as string);
-        } else if (type === 'gallery') {
-          setVenueImages(prev => [...prev, reader.result as string]);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
+  const handleProfileImageUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfileImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCoverImageUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCoverImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleGalleryImageUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setVenueImages(prev => [...prev, reader.result as string]);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleRemoveVenueImage = (index: number) => {
@@ -420,38 +428,28 @@ function OutletProfileContent() {
                   <div>
                     <label className="block text-sm font-medium mb-1">Logo</label>
                     <p className="text-xs text-[#EB4D4B] mb-2">Recommended: 400x400px (1:1 ratio)</p>
-                    <div 
-                      onClick={() => profileInputRef.current?.click()}
-                      className="relative w-40 h-40 rounded-2xl bg-[#2A2A2A] border-2 border-dashed border-[#E5A823]/30 flex items-center justify-center cursor-pointer hover:border-[#E5A823] transition-colors overflow-hidden"
-                    >
-                      {profileImage ? (
-                        <Image src={profileImage} alt="Profile" fill className="object-cover" />
-                      ) : (
-                        <div className="text-center">
-                          <Upload className="w-8 h-8 text-[#E5A823] mx-auto mb-2" />
-                          <span className="text-sm text-[#F5F5DC]/50">Upload Venue</span>
-                        </div>
-                      )}
-                    </div>
-                    <input ref={profileInputRef} type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'profile')} className="hidden" />
+                    <DragDropUpload
+                      type="image"
+                      maxSize={5}
+                      preview={profileImage}
+                      onClear={() => setProfileImage(null)}
+                      onFileSelect={handleProfileImageUpload}
+                      className="w-40 h-40 rounded-2xl"
+                      label="Drop venue logo"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Venue Image</label>
                     <p className="text-xs text-[#EB4D4B] mb-2">Recommended: 1200x400px (3:1 ratio)</p>
-                    <div 
-                      onClick={() => coverInputRef.current?.click()}
-                      className="relative w-full h-40 rounded-xl bg-[#2A2A2A] border-2 border-dashed border-[#E5A823]/30 flex items-center justify-center cursor-pointer hover:border-[#E5A823] transition-colors overflow-hidden"
-                    >
-                      {coverImage ? (
-                        <Image src={coverImage} alt="Cover" fill className="object-cover" />
-                      ) : (
-                        <div className="text-center">
-                          <Upload className="w-8 h-8 text-[#E5A823] mx-auto mb-2" />
-                          <span className="text-sm text-[#F5F5DC]/50">Upload Cover</span>
-                        </div>
-                      )}
-                    </div>
-                    <input ref={coverInputRef} type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'cover')} className="hidden" />
+                    <DragDropUpload
+                      type="image"
+                      maxSize={10}
+                      preview={coverImage}
+                      onClear={() => setCoverImage(null)}
+                      onFileSelect={handleCoverImageUpload}
+                      className="w-full h-40 rounded-xl"
+                      label="Drop venue cover"
+                    />
                   </div>
                 </div>
               </div>
@@ -508,19 +506,12 @@ function OutletProfileContent() {
                     </div>
                   )}
                   
-                  <div
-                    onClick={() => galleryInputRef.current?.click()}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#2A2A2A] border border-dashed border-[#E5A823]/30 rounded-lg cursor-pointer hover:border-[#E5A823] hover:bg-[#2A2A2A]/80 transition-colors"
-                  >
-                    <Upload className="w-4 h-4 text-[#E5A823]" />
-                    <span className="text-sm text-[#F5F5DC]/70">Add Gallery Image</span>
-                  </div>
-                  <input
-                    ref={galleryInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload(e, 'gallery')}
-                    className="hidden"
+                  <DragDropUpload
+                    type="image"
+                    maxSize={10}
+                    onFileSelect={handleGalleryImageUpload}
+                    className="w-40 h-40 rounded-xl"
+                    label="Drop gallery photo"
                   />
                 </div>
               </div>

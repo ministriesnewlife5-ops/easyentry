@@ -1,9 +1,9 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Instagram, Music, ExternalLink, ArrowLeft } from 'lucide-react';
+import { Instagram, Music, ExternalLink, ArrowLeft, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const artists = [
   {
@@ -72,7 +72,7 @@ const artists = [
   }
 ];
 
-function ArtistCard({ artist, index }: { artist: typeof artists[0]; index: number }) {
+function ArtistCard({ artist, index, onImageClick }: { artist: typeof artists[0]; index: number; onImageClick?: () => void }) {
   const [isHovered, setIsHovered] = useState(false);
 
   const shareToWhatsApp = async (e: React.MouseEvent) => {
@@ -106,8 +106,11 @@ function ArtistCard({ artist, index }: { artist: typeof artists[0]; index: numbe
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
         className="relative overflow-hidden rounded-2xl bg-[#0D0D0D] border border-[#2A2A2A] group-hover:border-[#E5A823]/50 transition-all duration-500"
       >
-        {/* Image Container */}
-        <div className="relative aspect-[3/4] overflow-hidden">
+        {/* Image Container - Clickable */}
+        <div 
+          className="relative aspect-[3/4] overflow-hidden cursor-pointer"
+          onClick={onImageClick}
+        >
           <motion.img
             src={artist.image}
             alt={artist.name}
@@ -240,6 +243,42 @@ function ArtistCard({ artist, index }: { artist: typeof artists[0]; index: numbe
 }
 
 export default function ArtistsPage() {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const openModal = (index: number) => {
+    setCurrentIndex(index);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+  };
+
+  const goToPrev = useCallback(() => {
+    setCurrentIndex((prev) => (prev === 0 ? artists.length - 1 : prev - 1));
+  }, []);
+
+  const goToNext = useCallback(() => {
+    setCurrentIndex((prev) => (prev === artists.length - 1 ? 0 : prev + 1));
+  }, []);
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!modalOpen) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+      if (e.key === 'ArrowLeft') goToPrev();
+      if (e.key === 'ArrowRight') goToNext();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalOpen, goToPrev, goToNext]);
+
+  const currentArtist = artists[currentIndex];
+
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC] pt-24 pb-20">
       <div className="container mx-auto px-4">
@@ -272,7 +311,12 @@ export default function ArtistsPage() {
         {/* Artists Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {artists.map((artist, index) => (
-            <ArtistCard key={artist.id} artist={artist} index={index} />
+            <ArtistCard 
+              key={artist.id} 
+              artist={artist} 
+              index={index} 
+              onImageClick={() => openModal(index)}
+            />
           ))}
         </div>
 
@@ -292,6 +336,94 @@ export default function ArtistsPage() {
           </motion.button>
         </motion.div>
       </div>
+
+      {/* Image Modal */}
+      <AnimatePresence>
+        {modalOpen && currentArtist && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+            onClick={closeModal}
+          >
+            {/* Close Button */}
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={closeModal}
+              className="absolute top-6 right-6 z-50 w-12 h-12 rounded-full bg-[#2A2A2A]/80 border border-[#2A2A2A] hover:border-[#E5A823] flex items-center justify-center text-[#F5F5DC] hover:text-[#E5A823] transition-all"
+            >
+              <X className="w-6 h-6" />
+            </motion.button>
+
+            {/* Counter */}
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-[#2A2A2A]/80 border border-[#2A2A2A] text-[#F5F5DC] text-sm font-bold"
+            >
+              {currentIndex + 1} of {artists.length}
+            </motion.div>
+
+            {/* Previous Button */}
+            <motion.button
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={(e) => { e.stopPropagation(); goToPrev(); }}
+              className="absolute left-4 md:left-8 z-50 w-12 h-12 md:w-14 md:h-14 rounded-full bg-[#2A2A2A]/80 border border-[#2A2A2A] hover:border-[#E5A823] flex items-center justify-center text-[#F5F5DC] hover:text-[#E5A823] transition-all"
+            >
+              <ChevronLeft className="w-6 h-6 md:w-8 md:h-8" />
+            </motion.button>
+
+            {/* Next Button */}
+            <motion.button
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={(e) => { e.stopPropagation(); goToNext(); }}
+              className="absolute right-4 md:right-8 z-50 w-12 h-12 md:w-14 md:h-14 rounded-full bg-[#2A2A2A]/80 border border-[#2A2A2A] hover:border-[#E5A823] flex items-center justify-center text-[#F5F5DC] hover:text-[#E5A823] transition-all"
+            >
+              <ChevronRight className="w-6 h-6 md:w-8 md:h-8" />
+            </motion.button>
+
+            {/* Image Container */}
+            <motion.div
+              key={currentIndex}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="relative max-w-4xl max-h-[80vh] w-full aspect-[3/4] md:aspect-[4/5]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={currentArtist.image}
+                alt={currentArtist.name}
+                className="w-full h-full object-cover rounded-2xl"
+              />
+              
+              {/* Artist Info Overlay */}
+              <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/80 to-transparent rounded-b-2xl">
+                <h2 className="text-2xl md:text-3xl font-black text-white mb-1">
+                  {currentArtist.name}
+                </h2>
+                <p className="text-[#E5A823] font-bold mb-1">{currentArtist.genre}</p>
+                <p className="text-white/70 text-sm">{currentArtist.followers} followers</p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

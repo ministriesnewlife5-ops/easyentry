@@ -20,7 +20,7 @@ export default function Navigation() {
   const workItems = [
     { name: 'Artist', href: '/work/register?role=artist', icon: Mic2, desc: 'Perform & grow' },
     { name: 'Outlet Provider', href: '/work/register?role=outlet', icon: Building2, desc: 'Host events' },
-    { name: 'Promoter', href: '/work/register?role=promoter', icon: Megaphone, desc: 'Sell tickets' },
+    { name: 'Influencer', href: '/work/register?role=promoter', icon: Megaphone, desc: 'Sell tickets' },
   ];
 
   // Close mobile menu on route change
@@ -39,12 +39,14 @@ export default function Navigation() {
         <div className="flex items-center justify-between w-full">
           {/* Logo - Left Side */}
           <Link href="/" className="flex items-center gap-2 group mr-8">
-            <div className="w-8 h-8 rounded flex items-center justify-center overflow-hidden">
-               <Image src="/logo.png" alt="Easy Entry" width={32} height={32} className="object-contain" />
-            </div>
-            <span className="text-xl font-bold text-[#E5A823] tracking-tighter group-hover:text-[#E84545] transition-colors hidden md:inline">
-              Easy Entry
-            </span>
+            <Image 
+              src="/logo.png" 
+              alt="Easy Entry" 
+              width={120} 
+              height={40} 
+              className="h-8 w-auto object-contain"
+              priority
+            />
           </Link>
 
           {/* Search - Left-Middle (Hidden on mobile) */}

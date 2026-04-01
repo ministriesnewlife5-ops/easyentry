@@ -8,6 +8,7 @@ import {
   Video, Image as ImageIcon, ChevronRight, Ticket, Send
 } from 'lucide-react';
 import Image from 'next/image';
+import DragDropUpload from '@/components/ui/DragDropUpload';
 
 interface Award {
   id: string;
@@ -67,25 +68,38 @@ export default function ArtistProfilePage() {
   const profileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const [photoGallery, setPhotoGallery] = useState<string[]>([]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'cover') => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (type === 'profile') {
-          setProfileImage(reader.result as string);
-        } else {
-          setCoverImage(reader.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
+  const handlePhotoUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoGallery(prev => [...prev, reader.result as string]);
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && videos.length < 4) {
+  const removePhoto = (index: number) => {
+    setPhotoGallery(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleProfileImageUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfileImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCoverImageUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCoverImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleVideoUploadFile = (file: File) => {
+    if (videos.length < 4) {
       const reader = new FileReader();
       reader.onloadend = () => {
         const newVideo: VideoThumbnail = {
@@ -273,74 +287,28 @@ export default function ArtistProfilePage() {
                     {/* Profile Photo */}
                     <div>
                       <label className="block text-sm font-medium mb-3">Profile Photo</label>
-                      <div 
-                        onClick={() => profileInputRef.current?.click()}
-                        className="relative w-40 h-40 rounded-full bg-[#2A2A2A] border-2 border-dashed border-[#E5A823]/30 flex items-center justify-center cursor-pointer hover:border-[#E5A823] transition-colors overflow-hidden"
-                      >
-                        {profileImage ? (
-                          <Image src={profileImage} alt="Profile" fill className="object-cover" />
-                        ) : (
-                          <div className="text-center">
-                            <Upload className="w-8 h-8 text-[#E5A823] mx-auto mb-2" />
-                            <span className="text-sm text-[#F5F5DC]/50">Upload Photo</span>
-                          </div>
-                        )}
-                        {profileImage && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setProfileImage(null);
-                            }}
-                            className="absolute top-0 right-0 p-1 bg-[#EB4D4B] rounded-full"
-                          >
-                            <X className="w-4 h-4 text-white" />
-                          </button>
-                        )}
-                      </div>
-                      <input
-                        ref={profileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleImageUpload(e, 'profile')}
-                        className="hidden"
+                      <DragDropUpload
+                        type="image"
+                        maxSize={5}
+                        preview={profileImage}
+                        onClear={() => setProfileImage(null)}
+                        onFileSelect={handleProfileImageUpload}
+                        className="w-40 h-40 rounded-full"
+                        label="Drop profile photo"
                       />
                     </div>
 
                     {/* Cover Photo */}
                     <div>
                       <label className="block text-sm font-medium mb-3">Cover Photo</label>
-                      <div 
-                        onClick={() => coverInputRef.current?.click()}
-                        className="relative w-full h-40 rounded-xl bg-[#2A2A2A] border-2 border-dashed border-[#E5A823]/30 flex items-center justify-center cursor-pointer hover:border-[#E5A823] transition-colors overflow-hidden"
-                      >
-                        {coverImage ? (
-                          <Image src={coverImage} alt="Cover" fill className="object-cover" />
-                        ) : (
-                          <div className="text-center">
-                            <Upload className="w-8 h-8 text-[#E5A823] mx-auto mb-2" />
-                            <span className="text-sm text-[#F5F5DC]/50">Upload Cover</span>
-                          </div>
-                        )}
-                        {coverImage && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCoverImage(null);
-                            }}
-                            className="absolute top-2 right-2 p-1 bg-[#EB4D4B] rounded-full"
-                          >
-                            <X className="w-4 h-4 text-white" />
-                          </button>
-                        )}
-                      </div>
-                      <input
-                        ref={coverInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleImageUpload(e, 'cover')}
-                        className="hidden"
+                      <DragDropUpload
+                        type="image"
+                        maxSize={10}
+                        preview={coverImage}
+                        onClear={() => setCoverImage(null)}
+                        onFileSelect={handleCoverImageUpload}
+                        className="w-full h-40 rounded-xl"
+                        label="Drop cover photo"
                       />
                     </div>
                   </div>
@@ -566,7 +534,7 @@ export default function ArtistProfilePage() {
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
                   <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Video className="w-5 h-5 text-[#E5A823]" />
-                    Performance Videos
+                    Performance Videos ({videos.length}/4)
                   </h3>
                   
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -589,46 +557,57 @@ export default function ArtistProfilePage() {
                     ))}
                     
                     {videos.length < 4 && (
-                      <div
-                        onClick={() => videoInputRef.current?.click()}
-                        className="aspect-video rounded-xl bg-[#2A2A2A] border-2 border-dashed border-[#E5A823]/30 flex flex-col items-center justify-center cursor-pointer hover:border-[#E5A823] transition-colors"
-                      >
-                        <Plus className="w-8 h-8 text-[#E5A823] mb-2" />
-                        <span className="text-sm text-[#F5F5DC]/50">Add Video</span>
-                      </div>
+                      <DragDropUpload
+                        type="video"
+                        maxSize={50}
+                        onFileSelect={handleVideoUploadFile}
+                        className="aspect-video rounded-xl"
+                        label="Drop video here"
+                      />
                     )}
                   </div>
                   
-                  <input
-                    ref={videoInputRef}
-                    type="file"
-                    accept="video/*"
-                    onChange={handleVideoUpload}
-                    className="hidden"
-                  />
-                  
                   <p className="mt-4 text-sm text-[#F5F5DC]/50">
-                    Upload up to 4 performance videos (max 50MB each)
+                    Upload up to 4 performance videos (max 50MB each). Drag & drop or click to browse.
                   </p>
                 </div>
 
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
                   <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <ImageIcon className="w-5 h-5 text-[#E5A823]" />
-                    Photo Gallery
+                    Photo Gallery ({photoGallery.length}/6)
                   </h3>
                   
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {[1, 2, 3, 4, 5, 6].map((i) => (
-                      <div
-                        key={i}
-                        className="aspect-square rounded-xl bg-[#2A2A2A] border-2 border-dashed border-[#E5A823]/30 flex flex-col items-center justify-center cursor-pointer hover:border-[#E5A823] transition-colors"
-                      >
-                        <Upload className="w-6 h-6 text-[#E5A823] mb-2" />
-                        <span className="text-xs text-[#F5F5DC]/50">Photo {i}</span>
+                    {photoGallery.map((photo, index) => (
+                      <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-[#2A2A2A] group">
+                        <Image src={photo} alt={`Photo ${index + 1}`} fill className="object-cover" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => removePhoto(index)}
+                            className="p-2 bg-[#EB4D4B] rounded-full"
+                          >
+                            <Trash2 className="w-4 h-4 text-white" />
+                          </button>
+                        </div>
                       </div>
                     ))}
+                    
+                    {photoGallery.length < 6 && (
+                      <DragDropUpload
+                        type="image"
+                        maxSize={10}
+                        onFileSelect={handlePhotoUpload}
+                        className="aspect-square rounded-xl"
+                        label="Drop photo here"
+                      />
+                    )}
                   </div>
+                  
+                  <p className="mt-4 text-sm text-[#F5F5DC]/50">
+                    Upload up to 6 gallery photos (max 10MB each). Drag & drop or click to browse.
+                  </p>
                 </div>
               </motion.div>
             )}

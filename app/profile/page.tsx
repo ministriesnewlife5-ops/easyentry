@@ -19,9 +19,10 @@ function ProfileContent() {
   const [activeTab, setActiveTab] = useState<'profile' | 'wishlist' | 'history'>('profile');
   const [wishlist, setWishlist] = useState<WishlistEvent[]>([]);
   
-  // Load wishlist from localStorage
-  const loadWishlist = () => {
-    setWishlist(getWishlist());
+  // Load wishlist from API
+  const loadWishlist = async () => {
+    const wishlistData = await getWishlist();
+    setWishlist(wishlistData);
   };
   
   // Get tab from URL query parameter
@@ -64,9 +65,10 @@ function ProfileContent() {
 
   const isRegularUser = session.user.role === 'user';
 
-  const handleRemoveFromWishlist = (eventId: string) => {
-    removeFromWishlist(eventId);
-    setWishlist(getWishlist());
+  const handleRemoveFromWishlist = async (eventId: string) => {
+    await removeFromWishlist(eventId);
+    const updatedWishlist = await getWishlist();
+    setWishlist(updatedWishlist);
   };
 
   const handleLogout = () => {

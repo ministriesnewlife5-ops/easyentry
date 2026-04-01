@@ -25,15 +25,20 @@ export default function EventCard({ id, title, date, venue, price, imageColor, i
   const [showShareMenu, setShowShareMenu] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Check wishlist status on mount and when localStorage changes
+  // Check wishlist status on mount and when it changes
   useEffect(() => {
-    setIsLiked(isInWishlist(String(id)));
+    const checkWishlist = async () => {
+      const inWishlist = await isInWishlist(String(id));
+      setIsLiked(inWishlist);
+    };
+    checkWishlist();
   }, [id]);
 
   // Listen for wishlist updates from other components
   useEffect(() => {
-    const handleWishlistUpdate = () => {
-      setIsLiked(isInWishlist(String(id)));
+    const handleWishlistUpdate = async () => {
+      const inWishlist = await isInWishlist(String(id));
+      setIsLiked(inWishlist);
     };
     window.addEventListener('wishlist-updated', handleWishlistUpdate);
     return () => window.removeEventListener('wishlist-updated', handleWishlistUpdate);
@@ -75,7 +80,7 @@ export default function EventCard({ id, title, date, venue, price, imageColor, i
   const weekday = dateObj.toLocaleString('en-US', { weekday: 'short' }).toUpperCase();
   const fullDate = dateObj.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
-  const handleLike = (e: MouseEvent) => {
+  const handleLike = async (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const event: Omit<WishlistEvent, 'addedAt'> = {
@@ -87,7 +92,7 @@ export default function EventCard({ id, title, date, venue, price, imageColor, i
       imageUrl,
       category
     };
-    const newLikedState = toggleWishlist(event);
+    const newLikedState = await toggleWishlist(event);
     setIsLiked(newLikedState);
   };
 

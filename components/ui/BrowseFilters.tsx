@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   MapPin, Calendar, Tag, Mic, PartyPopper, Disc, Smile, Drama,
   Palette, Building2, LucideIcon, ChevronLeft, ChevronRight,
-  X, Check, ChevronDown, Loader2, Search
+  X, Check, ChevronDown, Loader2, Search, Star
 } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -25,7 +25,7 @@ type BrowseFiltersData = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const iconMap: Record<string, LucideIcon> = {
-  MapPin, Calendar, Tag, Mic, PartyPopper, Disc, Smile, Drama, Palette, Building2
+  MapPin, Calendar, Tag, Mic, PartyPopper, Disc, Smile, Drama, Palette, Building2, Star
 };
 
 const defaultFilters: BrowseFiltersData = {
@@ -33,6 +33,7 @@ const defaultFilters: BrowseFiltersData = {
     { name: 'DATE', icon: 'Calendar' },
     { name: 'PRICE', icon: 'Tag' },
     { name: 'ARTIST', icon: 'Mic', href: '/artist' },
+    { name: 'INFLUENCER', icon: 'Star', href: '/promoters' },
     { name: 'VENUES', icon: 'Building2', href: '/venues' },
   ],
   categories: [
@@ -435,26 +436,55 @@ export default function BrowseFilters({
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden mb-4"
             >
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-                <span className="text-xs text-[#F5F5DC]/30 self-center whitespace-nowrap pr-1 flex-shrink-0">Areas in {selectedCity.name}:</span>
-                {selectedCity.areas.map(area => {
-                  const isActive = selectedAreas.includes(area);
-                  return (
-                    <motion.button
-                      key={area}
-                      whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                      onClick={() => toggleArea(area)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-all ${
-                        isActive
-                          ? 'bg-[#E5A823] text-[#0D0D0D] border-[#E5A823]'
-                          : 'bg-[#1A1A1A] text-[#F5F5DC]/60 border-[#2A2A2A] hover:border-[#E5A823]/50 hover:text-[#F5F5DC]'
-                      }`}
-                    >
-                      {isActive && <Check className="w-2.5 h-2.5 inline mr-1" />}
-                      {area}
-                    </motion.button>
-                  );
-                })}
+              <div className="flex items-center gap-2">
+                {/* Left Arrow */}
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => {
+                    const container = document.getElementById('areas-scroll-container');
+                    if (container) container.scrollBy({ left: -200, behavior: 'smooth' });
+                  }}
+                  className="flex-shrink-0 w-8 h-8 rounded-full bg-[#2A2A2A] border border-[#2A2A2A] hover:border-[#E5A823] flex items-center justify-center text-[#F5F5DC] hover:text-[#E5A823] transition-all"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </motion.button>
+
+                {/* Scrollable Areas */}
+                <div id="areas-scroll-container" className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 flex-1">
+                  <span className="text-xs text-[#F5F5DC]/30 self-center whitespace-nowrap pr-1 flex-shrink-0">Areas in {selectedCity.name}:</span>
+                  {selectedCity.areas.map(area => {
+                    const isActive = selectedAreas.includes(area);
+                    return (
+                      <motion.button
+                        key={area}
+                        whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                        onClick={() => toggleArea(area)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-all ${
+                          isActive
+                            ? 'bg-[#E5A823] text-[#0D0D0D] border-[#E5A823]'
+                            : 'bg-[#1A1A1A] text-[#F5F5DC]/60 border-[#2A2A2A] hover:border-[#E5A823]/50 hover:text-[#F5F5DC]'
+                        }`}
+                      >
+                        {isActive && <Check className="w-2.5 h-2.5 inline mr-1" />}
+                        {area}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+
+                {/* Right Arrow */}
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => {
+                    const container = document.getElementById('areas-scroll-container');
+                    if (container) container.scrollBy({ left: 200, behavior: 'smooth' });
+                  }}
+                  className="flex-shrink-0 w-8 h-8 rounded-full bg-[#2A2A2A] border border-[#2A2A2A] hover:border-[#E5A823] flex items-center justify-center text-[#F5F5DC] hover:text-[#E5A823] transition-all"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </motion.button>
               </div>
             </motion.div>
           )}
@@ -665,12 +695,26 @@ export default function BrowseFilters({
               exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3 }} className="overflow-hidden">
               <div className="mt-4 pt-4 border-t border-[#F5F5DC]/10">
                 <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+                  {/* ALL Button - First and default */}
+                  <motion.button
+                    initial={{ opacity: 0, x: -20, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ delay: 0, type: 'spring', stiffness: 300 }}
+                    whileHover={{ scale: 1.1, y: -2 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setActiveSubFilters([])}
+                    className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap border ${
+                      activeSubFilters.length === 0
+                        ? 'bg-gradient-to-r from-[#E5A823] to-[#EB4D4B] text-[#0D0D0D] border-transparent shadow-[0_0_15px_rgba(229,168,35,0.5)]'
+                        : 'bg-[#2A2A2A] border-[#2A2A2A] text-[#F5F5DC]/70 hover:border-[#E5A823]/50'
+                    }`}>ALL</motion.button>
+
                   {allCategories.find(c => c.name === activeCategory)?.subFilters.map((sub, i) => {
                     const isSubActive = activeSubFilters.includes(sub);
                     return (
                       <motion.button key={sub}
                         initial={{ opacity: 0, x: -20, scale: 0.8 }} animate={{ opacity: 1, x: 0, scale: 1 }}
-                        transition={{ delay: i * 0.03, type: 'spring', stiffness: 300 }}
+                        transition={{ delay: (i + 1) * 0.03, type: 'spring', stiffness: 300 }}
                         whileHover={{ scale: 1.1, y: -2 }} whileTap={{ scale: 0.9 }}
                         onClick={() => toggleSubFilter(sub)}
                         className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap border ${

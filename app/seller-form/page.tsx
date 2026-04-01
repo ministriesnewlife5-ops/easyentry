@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
@@ -24,10 +24,12 @@ import {
   Trash2,
   Video,
   X,
-  Clock
+  Clock,
+  Mic
 } from 'lucide-react';
 import Navigation from '@/components/ui/Navigation';
 import Footer from '@/components/ui/Footer';
+import DragDropUpload from '@/components/ui/DragDropUpload';
 
 // Converts a File to a base64 data URL so images persist after page reload
 function fileToBase64(file: File): Promise<string> {
@@ -59,6 +61,12 @@ export default function SellerFormPage() {
   const [images, setImages] = useState<File[]>([]);
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  
+  // Uploaded URLs state - files are uploaded immediately when selected
+  const [coverImageUrl, setCoverImageUrl] = useState<string>('');
+  const [mediaFileUrls, setMediaFileUrls] = useState<Array<{ url: string; type: string; name: string }>>([]);
+  const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
   const [activeTab, setActiveTab] = useState<'details' | 'tickets' | 'media' | 'promo'>('details');
   const [events, setEvents] = useState<Array<{ id: number; title: string; venue: string; date: string }>>([]);
@@ -71,36 +79,58 @@ export default function SellerFormPage() {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [ticketCategories, setTicketCategories] = useState<Array<{ id: string; name: string; price: number; quantity: number; availableFromDate?: string; availableFromTime?: string; availableUntilDate?: string; availableUntilTime?: string }>>([]);
-  const [previewCategoryId, setPreviewCategoryId] = useState<string>('female');
+  const [ticketCategories, setTicketCategories] = useState<Array<{ 
+    id: string; 
+    name: string; 
+    price: number; 
+    originalPrice?: number; 
+    quantity: number; 
+    availableFromDate?: string; 
+    availableFromTime?: string; 
+    availableUntilDate?: string; 
+    availableUntilTime?: string;
+    discount: number;
+    platformFee: number;
+    artistShare: number;
+    influencerShare: number;
+  }>>([]);
   const [customCategory, setCustomCategory] = useState('');
   const [customSubcategory, setCustomSubcategory] = useState('');
   const [categories, setCategories] = useState<Array<{ name: string; icon: string; subFilters: string[] }>>([]);
   const [rules, setRules] = useState<Array<{ id: string; text: string }>>([{ id: '1', text: '' }]);
-  const [pricing, setPricing] = useState({
-    ticket: 0,
-    platformFee: 5,
-    artistShare: 0,
-    discount: 0
-  });
+  
+  // Artists state
+  const [artists, setArtists] = useState<Array<{ id: string; email: string; name: string | null; role: string }>>([]);
+  const [selectedArtists, setSelectedArtists] = useState<Array<{ id: string; email: string; name: string | null }>>([]);
+  const [artistSearchQuery, setArtistSearchQuery] = useState('');
+  const [showArtistDropdown, setShowArtistDropdown] = useState(false);
+  const artistDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const { getHostedEvents } = require('@/lib/hosted-events');
-      const hostedEvents = getHostedEvents();
-      setEvents(hostedEvents);
+      // Load hosted events from API
+      const loadHostedEvents = async () => {
+        const { getHostedEvents } = await import('@/lib/hosted-events');
+        const hostedEvents = await getHostedEvents();
+        setEvents(hostedEvents);
+      };
+      loadHostedEvents();
       
-      // Load categories from BrowseFiltersManager storage
-      const stored = localStorage.getItem('easyentry.browse-filters');
-      if (stored) {
+      // Load categories from API
+      const loadCategories = async () => {
         try {
-          const filters = JSON.parse(stored);
-          setCategories(filters.categories || []);
+          const response = await fetch('/api/browse-filters/default');
+          if (response.ok) {
+            const data = await response.json();
+            const filters = data.filters;
+            setCategories(filters?.categories || []);
+          }
         } catch (e) {
           console.error('Error loading categories:', e);
           setCategories([]);
         }
-      }
+      };
+      loadCategories();
 
       // Fetch venue profile and pre-populate location
       const fetchVenueProfile = async () => {
@@ -118,7 +148,32 @@ export default function SellerFormPage() {
         }
       };
       fetchVenueProfile();
+
+      // Fetch artists
+      const fetchArtists = async () => {
+        try {
+          const response = await fetch('/api/artists');
+          const data = await response.json();
+          if (data.artists) {
+            setArtists(data.artists);
+          }
+        } catch (error) {
+          console.error('Error fetching artists:', error);
+        }
+      };
+      fetchArtists();
     }
+  }, []);
+
+  // Close artist dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (artistDropdownRef.current && !artistDropdownRef.current.contains(event.target as Node)) {
+        setShowArtistDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handlePromoInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -152,32 +207,26 @@ export default function SellerFormPage() {
         ? Math.min(...ticketCategories.map(c => c.price))
         : Number(formData.price) || 0;
 
-      // Convert cover image to base64
-      const coverImageBase64 = coverImage 
-        ? await fileToBase64(coverImage) 
-        : (mediaFiles.length > 0 && mediaFiles[0].type.startsWith('image/') 
-            ? await fileToBase64(mediaFiles[0]) 
+        // Use pre-uploaded URLs - no conversion needed
+        const coverImageUrlToUse = coverImageUrl || (mediaFileUrls.length > 0 && mediaFileUrls[0].type.startsWith('image/') 
+            ? mediaFileUrls[0].url 
             : '');
 
-      // Convert all media files (images and videos) to base64
-      const mediaFilesBase64: string[] = [];
-      for (const file of mediaFiles) {
-        const base64 = await fileToBase64(file);
-        mediaFilesBase64.push(base64);
-      }
+        // Get all media URLs (already uploaded)
+        const mediaFilesBase64: string[] = mediaFileUrls.map(m => m.url);
       
       const eventData = {
         title: formData.title,
         subtitle: formData.description,
         date: formData.date,
-        time: formData.startTime, // Changed from startTime to time for compatibility
+        time: formData.startTime,
         startTime: formData.startTime,
         endTime: formData.endTime,
         venue: formData.location,
         category: formData.category === 'Other' ? customCategory : (formData.category || 'General'),
         subcategory: formData.subcategory === 'Other' ? customSubcategory : (formData.subcategory || undefined),
         price: `₹${minPrice}`,
-        image: coverImageBase64,
+        image: coverImageUrlToUse,
         numberOfTickets: ticketCategories.reduce((sum, cat) => sum + (cat.quantity || 0), 0),
         mediaFiles: mediaFilesBase64,
         description: formData.about,
@@ -187,8 +236,10 @@ export default function SellerFormPage() {
         layout: 'Standing',
         seating: 'General Admission',
         rules: rules.filter(r => r.text.trim()).map(r => r.text),
+        taggedArtists: selectedArtists.map(a => ({ id: a.id, name: a.name, email: a.email })),
         ticketCategories: ticketCategories.map(cat => ({
           ...cat,
+          originalPrice: cat.originalPrice || cat.price,
           availableFrom: cat.availableFromDate && cat.availableFromTime 
             ? `${cat.availableFromDate}T${cat.availableFromTime}` 
             : (cat.availableFromDate || undefined),
@@ -216,9 +267,9 @@ export default function SellerFormPage() {
           setShowNotification(false);
         }, 5000);
         
-        // Also save to localStorage for immediate display
-        const { saveHostedEvent } = require('@/lib/hosted-events');
-        saveHostedEvent({
+        // Also save to hosted events via API for immediate display
+        const { saveHostedEvent } = await import('@/lib/hosted-events');
+        await saveHostedEvent({
           id: Date.now(),
           title: formData.title,
           date: formData.date,
@@ -226,7 +277,7 @@ export default function SellerFormPage() {
           price: `₹${minPrice}`,
           imageColor: 'bg-blue-900',
           category: 'General',
-          imageUrl: coverImageBase64,
+          imageUrl: coverImageUrlToUse,
           createdAt: Date.now()
         });
         
@@ -245,13 +296,18 @@ export default function SellerFormPage() {
           category: '',
           subcategory: '',
         });
+        // Reset form and uploaded files
         setImages([]);
         setCoverImage(null);
         setMediaFiles([]);
+        setCoverImageUrl('');
+        setMediaFileUrls([]);
         setTicketCategories([]);
         setCustomCategory('');
         setCustomSubcategory('');
         setRules([{ id: '1', text: '' }]);
+        setSelectedArtists([]);
+        setArtistSearchQuery('');
         
         // Also handle promo code if entered
         if (promoForm.promoCode) {
@@ -288,21 +344,72 @@ export default function SellerFormPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setCoverImage(e.target.files[0]);
+  // Upload file immediately and return URL
+  const uploadFileImmediately = async (file: File, type: string): Promise<string | null> => {
+    const fileId = `${file.name}-${Date.now()}`;
+    
+    try {
+      setUploadingFiles(prev => new Set(prev).add(fileId));
+      setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', type);
+      
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+      
+      const data = await response.json();
+      
+      setUploadProgress(prev => ({ ...prev, [fileId]: 100 }));
+      setTimeout(() => {
+        setUploadingFiles(prev => {
+          const next = new Set(prev);
+          next.delete(fileId);
+          return next;
+        });
+      }, 500);
+      
+      return data.url;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setNotificationMessage(`Failed to upload ${file.name}. Please try again.`);
+      setShowNotification(true);
+      setUploadingFiles(prev => {
+        const next = new Set(prev);
+        next.delete(fileId);
+        return next;
+      });
+      return null;
     }
   };
 
-  const handleMediaFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
-      setMediaFiles((prev) => [...prev, ...selectedFiles]);
+  const handleCoverImageUpload = async (file: File) => {
+    setCoverImage(file);
+    const url = await uploadFileImmediately(file, 'cover');
+    if (url) {
+      setCoverImageUrl(url);
     }
   };
 
-  const removeMediaFile = (index: number) => {
-    setMediaFiles((prev) => prev.filter((_, i) => i !== index));
+  const handleMediaFileUpload = async (file: File) => {
+    setMediaFiles(prev => [...prev, file]);
+    const url = await uploadFileImmediately(file, 'media');
+    if (url) {
+      setMediaFileUrls(prev => [...prev, { url, type: file.type, name: file.name }]);
+    }
+  };
+
+  const removeMediaFile = async (index: number) => {
+    const file = mediaFiles[index];
+    setMediaFiles(prev => prev.filter((_, i) => i !== index));
+    setMediaFileUrls(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -519,6 +626,107 @@ export default function SellerFormPage() {
                       </div>
                     </div>
 
+                    {/* Artist Selection */}
+                    <div className="md:col-span-2" ref={artistDropdownRef}>
+                      <label className="block text-sm font-medium mb-3 flex items-center gap-2">
+                        <Mic className="w-4 h-4 text-[#E5A823]" />
+                        Tag Performing Artists
+                      </label>
+                      <div className="relative">
+                        {/* Selected Artists Display */}
+                        <div 
+                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] min-h-[50px] cursor-pointer flex flex-wrap gap-2 items-center"
+                          onClick={() => setShowArtistDropdown(!showArtistDropdown)}
+                        >
+                          {selectedArtists.length === 0 ? (
+                            <span className="text-[#F5F5DC]/50">Search and select artists...</span>
+                          ) : (
+                            selectedArtists.map((artist) => (
+                              <span 
+                                key={artist.id} 
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-[#E5A823]/20 text-[#E5A823] rounded-full text-sm"
+                              >
+                                {artist.name || artist.email}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedArtists(prev => prev.filter(a => a.id !== artist.id));
+                                  }}
+                                  className="hover:text-[#EB4D4B]"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </span>
+                            ))
+                          )}
+                          <div className="ml-auto">
+                            <span className="text-[#E5A823]">{showArtistDropdown ? '▲' : '▼'}</span>
+                          </div>
+                        </div>
+
+                        {/* Dropdown */}
+                        {showArtistDropdown && (
+                          <div className="absolute z-50 w-full mt-1 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg shadow-xl max-h-64 overflow-hidden">
+                            {/* Search Input */}
+                            <div className="p-2 border-b border-[#2A2A2A]">
+                              <input
+                                type="text"
+                                value={artistSearchQuery}
+                                onChange={(e) => setArtistSearchQuery(e.target.value)}
+                                placeholder="Search artists..."
+                                className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                autoFocus
+                              />
+                            </div>
+                            
+                            {/* Artists List */}
+                            <div className="overflow-y-auto max-h-48">
+                              {artists
+                                .filter(artist => 
+                                  (artist.name?.toLowerCase().includes(artistSearchQuery.toLowerCase()) || 
+                                   artist.email.toLowerCase().includes(artistSearchQuery.toLowerCase())) &&
+                                  !selectedArtists.find(a => a.id === artist.id)
+                                )
+                                .map((artist) => (
+                                  <button
+                                    key={artist.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedArtists(prev => [...prev, artist]);
+                                      setArtistSearchQuery('');
+                                    }}
+                                    className="w-full px-4 py-3 text-left hover:bg-[#2A2A2A] flex items-center gap-3 transition-colors"
+                                  >
+                                    <div className="w-8 h-8 rounded-full bg-[#E5A823]/20 flex items-center justify-center">
+                                      <User className="w-4 h-4 text-[#E5A823]" />
+                                    </div>
+                                    <div>
+                                      <div className="text-sm font-medium text-[#F5F5DC]">
+                                        {artist.name || 'Unnamed Artist'}
+                                      </div>
+                                      <div className="text-xs text-[#F5F5DC]/50">{artist.email}</div>
+                                    </div>
+                                  </button>
+                                ))}
+                              {artists.filter(artist => 
+                                (artist.name?.toLowerCase().includes(artistSearchQuery.toLowerCase()) || 
+                                 artist.email.toLowerCase().includes(artistSearchQuery.toLowerCase())) &&
+                                !selectedArtists.find(a => a.id === artist.id)
+                              ).length === 0 && (
+                                <div className="px-4 py-3 text-sm text-[#F5F5DC]/50 text-center">
+                                  No artists found
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-[#F5F5DC]/50 mt-2">
+                        Select artists who will be performing at this event. Multiple artists can be selected.
+                      </p>
+                    </div>
+
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium mb-3">Short Description *</label>
                       <input
@@ -699,20 +907,23 @@ export default function SellerFormPage() {
                           <div key={cat.id} className="bg-[#0F0F0F] rounded-xl p-4 border border-[#2A2A2A]">
                             {/* Labels Row */}
                             <div className="grid grid-cols-12 gap-3 mb-2">
-                              <div className="col-span-5">
-                                <label className="text-xs text-[#F5F5DC]/50">Category Name</label>
+                              <div className="col-span-3">
+                                <label className="text-xs text-[#F5F5DC]/50">Category</label>
+                              </div>
+                              <div className="col-span-2">
+                                <label className="text-xs text-[#F5F5DC]/50">Quantity</label>
                               </div>
                               <div className="col-span-3">
-                                <label className="text-xs text-[#F5F5DC]/50">Tickets</label>
+                                <label className="text-xs text-[#F5F5DC]/50">Sale Price (₹)</label>
                               </div>
                               <div className="col-span-3">
-                                <label className="text-xs text-[#F5F5DC]/50">Price</label>
+                                <label className="text-xs text-[#F5F5DC]/50">Original Price (₹)</label>
                               </div>
                               <div className="col-span-1"></div>
                             </div>
                             {/* Inputs Row */}
                             <div className="grid grid-cols-12 gap-3 mb-3">
-                              <div className="col-span-5">
+                              <div className="col-span-3">
                                 <input
                                   type="text"
                                   value={cat.name}
@@ -722,14 +933,13 @@ export default function SellerFormPage() {
                                       prev.map((c) => (c.id === cat.id ? { ...c, name: v } : c))
                                     );
                                   }}
-                                  className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                                  placeholder="Category name"
+                                  className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                  placeholder="e.g. EARLYBIRD"
                                   required
                                 />
                               </div>
-                              <div className="col-span-3">
+                              <div className="col-span-2">
                                 <div className="relative">
-                                  <Ticket className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/50" />
                                   <input
                                     type="number"
                                     value={cat.quantity}
@@ -739,7 +949,7 @@ export default function SellerFormPage() {
                                         prev.map((c) => (c.id === cat.id ? { ...c, quantity } : c))
                                       );
                                     }}
-                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-9 pr-3 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-3 pr-3 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                                     placeholder="0"
                                     min={0}
                                     step={1}
@@ -758,9 +968,6 @@ export default function SellerFormPage() {
                                       setTicketCategories((prev) =>
                                         prev.map((c) => (c.id === cat.id ? { ...c, price } : c))
                                       );
-                                      if (cat.id === previewCategoryId) {
-                                        setPricing((p) => ({ ...p, ticket: price }));
-                                      }
                                     }}
                                     className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-9 pr-3 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                                     placeholder="0"
@@ -770,18 +977,30 @@ export default function SellerFormPage() {
                                   />
                                 </div>
                               </div>
+                              <div className="col-span-3">
+                                <div className="relative">
+                                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/50" />
+                                  <input
+                                    type="number"
+                                    value={cat.originalPrice || ''}
+                                    onChange={(e) => {
+                                      const originalPrice = e.target.value === '' ? undefined : Math.max(0, Number(e.target.value));
+                                      setTicketCategories((prev) =>
+                                        prev.map((c) => (c.id === cat.id ? { ...c, originalPrice } : c))
+                                      );
+                                    }}
+                                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-9 pr-3 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                    placeholder="Original"
+                                    min={0}
+                                    step={0.01}
+                                  />
+                                </div>
+                              </div>
                               <div className="col-span-1 flex items-center justify-center">
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setTicketCategories((prev) => prev.filter((c) => c.id !== cat.id));
-                                    if (previewCategoryId === cat.id && ticketCategories.length > 1) {
-                                      const next = ticketCategories.find((c) => c.id !== cat.id);
-                                      if (next) {
-                                        setPreviewCategoryId(next.id);
-                                        setPricing((p) => ({ ...p, ticket: next.price }));
-                                      }
-                                    }
                                   }}
                                   disabled={ticketCategories.length <= 1}
                                   className="p-2 rounded-lg border border-[#2A2A2A] hover:border-[#EB4D4B] hover:bg-[#EB4D4B]/10 disabled:opacity-40"
@@ -790,6 +1009,17 @@ export default function SellerFormPage() {
                                 </button>
                               </div>
                             </div>
+                            {/* Savings Display */}
+                            {cat.originalPrice && cat.originalPrice > cat.price && (
+                              <div className="mb-3 px-3 py-2 bg-[#E5A823]/10 border border-[#E5A823]/30 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-[#E5A823]">Savings</span>
+                                  <span className="text-sm font-bold text-[#E5A823]">
+                                    ₹{(cat.originalPrice - cat.price).toFixed(2)} ({((1 - cat.price / cat.originalPrice) * 100).toFixed(0)}% off)
+                                  </span>
+                                </div>
+                              </div>
+                            )}
                             <div className="space-y-3">
                               {/* Available from */}
                               <div className="flex items-center gap-3">
@@ -858,7 +1088,16 @@ export default function SellerFormPage() {
                           type="button"
                           onClick={() => {
                             const id = Math.random().toString(36).slice(2);
-                            setTicketCategories((prev) => [...prev, { id, name: 'NEW', price: 0, quantity: 0 }]);
+                            setTicketCategories((prev) => [...prev, { 
+                              id, 
+                              name: 'NEW', 
+                              price: 0, 
+                              quantity: 0,
+                              discount: 0,
+                              platformFee: 5,
+                              artistShare: 0,
+                              influencerShare: 0
+                            }]);
                           }}
                           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#2A2A2A] text-sm hover:border-[#E5A823]"
                         >
@@ -868,183 +1107,269 @@ export default function SellerFormPage() {
                       </div>
                     </div>
 
-                    <div className="bg-[#0F0F0F] rounded-2xl p-6 border border-[#2A2A2A]">
-                      <h4 className="text-base font-bold text-[#F5F5DC] mb-1">Per-ticket Money Flow</h4>
-                      <p className="text-xs text-[#F5F5DC]/50 mb-6">Preview the split for one ticket</p>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-5">
-                          <div>
-                            <label className="block text-xs font-medium mb-2 text-[#F5F5DC]/70">Preview category</label>
-                            <select
-                              value={previewCategoryId}
-                              onChange={(e) => {
-                                const id = e.target.value;
-                                setPreviewCategoryId(id);
-                                const cat = ticketCategories.find((c) => c.id === id);
-                                if (cat) setPricing((p) => ({ ...p, ticket: cat.price }));
-                              }}
-                              className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                            >
-                              {ticketCategories.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium mb-2 text-[#F5F5DC]/70">Ticket price (₹)</label>
-                            <div className="relative">
-                              <IndianRupee className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
-                              <input
-                                type="number"
-                                value={pricing.ticket}
-                                onChange={(e) => {
-                                  const v = Math.max(0, Number(e.target.value));
-                                  setPricing((p) => ({ ...p, ticket: v }));
-                                  setTicketCategories((prev) =>
-                                    prev.map((c) => (c.id === previewCategoryId ? { ...c, price: v } : c))
-                                  );
-                                }}
-                                className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                                placeholder="0"
-                                min={0}
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="flex items-center justify-between text-xs font-medium mb-2 text-[#F5F5DC]/70">
-                              <span>Platform fee (%)</span>
-                              <span className="text-[#E5A823] font-bold">{pricing.platformFee.toFixed(1)}%</span>
-                            </label>
-                            <input
-                              type="range"
-                              min={0}
-                              max={15}
-                              step={0.5}
-                              value={pricing.platformFee}
-                              onChange={(e) => setPricing((p) => ({ ...p, platformFee: Number(e.target.value) }))}
-                              className="w-full accent-[#E5A823]"
-                            />
-                          </div>
-                          <div>
-                            <label className="flex items-center justify-between text-xs font-medium mb-2 text-[#F5F5DC]/70">
-                              <span>Artist revenue share (%)</span>
-                              <span className="text-[#E5A823] font-bold">{pricing.artistShare.toFixed(1)}%</span>
-                            </label>
-                            <input
-                              type="range"
-                              min={0}
-                              max={50}
-                              step={0.5}
-                              value={pricing.artistShare}
-                              onChange={(e) => setPricing((p) => ({ ...p, artistShare: Number(e.target.value) }))}
-                              className="w-full accent-[#E5A823]"
-                            />
-                          </div>
-                          <div>
-                            <label className="flex items-center justify-between text-xs font-medium mb-2 text-[#F5F5DC]/70">
-                              <span>Customer discount (%)</span>
-                              <span className="text-[#E5A823] font-bold">{pricing.discount.toFixed(1)}%</span>
-                            </label>
-                            <input
-                              type="range"
-                              min={0}
-                              max={50}
-                              step={0.5}
-                              value={pricing.discount}
-                              onChange={(e) => setPricing((p) => ({ ...p, discount: Number(e.target.value) }))}
-                              className="w-full accent-[#E5A823]"
-                            />
-                          </div>
+                    {/* Money Flow Cards for Each Category */}
+                    {ticketCategories.length > 0 && (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 mb-4">
+                          <IndianRupee className="w-5 h-5 text-[#E5A823]" />
+                          <h4 className="text-base font-bold text-[#F5F5DC]">Per-Ticket Money Flow</h4>
                         </div>
-
-                        <div className="space-y-4">
-                          {(() => {
-                            const gross = pricing.ticket || 0;
-                            const discountAmt = gross * (pricing.discount / 100);
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {ticketCategories.map((category) => {
+                            const gross = category.price || 0;
+                            const discountAmt = gross * (category.discount / 100);
                             const customerPays = Math.max(gross - discountAmt, 0);
                             const pgFee = customerPays * 0.05;
-                            const platformFeeAmt = customerPays * (pricing.platformFee / 100);
-                            const artistAmt = gross * (pricing.artistShare / 100);
-                            const outletNet = Math.max(customerPays - pgFee - platformFeeAmt - artistAmt, 0);
+                            const platformFeeAmt = customerPays * (category.platformFee / 100);
+                            const artistAmt = gross * (category.artistShare / 100);
+                            const influencerAmt = gross * (category.influencerShare / 100);
+                            const outletNet = Math.max(customerPays - pgFee - platformFeeAmt - artistAmt - influencerAmt, 0);
                             const fmt = (n: number) => `₹${n.toFixed(0)}`;
-                            const totalBar = Math.max(customerPays, 1);
-                            const w = (n: number) => `${Math.max(0, Math.min(100, (n / totalBar) * 100))}%`;
+
                             return (
-                              <>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
-                                    <div className="text-xs text-[#F5F5DC]/50">Customer</div>
-                                    <div className="text-2xl font-black text-[#F5F5DC] mt-1">{fmt(customerPays)}</div>
-                                    <div className="text-[10px] text-[#F5F5DC]/40 mt-1">full price</div>
+                              <motion.div
+                                key={category.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="bg-gradient-to-br from-[#1A1A1A] to-[#0F0F0F] rounded-2xl p-6 border border-[#2A2A2A] hover:border-[#E5A823]/50 transition-all"
+                              >
+                                {/* Category Header */}
+                                <div className="pb-4 mb-4 border-b border-[#2A2A2A]">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h5 className="text-lg font-bold text-[#E5A823]">{category.name}</h5>
+                                    <span className="text-xs px-2 py-1 bg-[#E5A823]/10 text-[#E5A823] rounded-full font-medium">
+                                      {category.quantity} tickets
+                                    </span>
                                   </div>
-                                  <div className="rounded-xl border border-[#3E83B6]/50 bg-[#3E83B6]/10 p-4">
-                                    <div className="text-xs text-[#3E83B6]">Outlet</div>
-                                    <div className="text-2xl font-black text-[#3E83B6] mt-1">{fmt(outletNet)}</div>
-                                    <div className="text-[10px] text-[#3E83B6]/70 mt-1">bears artist share</div>
-                                  </div>
-                                  <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
-                                    <div className="text-xs text-[#F5F5DC]/50">Artist</div>
-                                    <div className="text-xl font-black text-[#F5F5DC] mt-1">{fmt(artistAmt)}</div>
-                                    <div className="text-[10px] text-[#F5F5DC]/40 mt-1">no code used</div>
-                                  </div>
-                                  <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
-                                    <div className="text-xs text-[#F5F5DC]/50">Razorpay</div>
-                                    <div className="text-xl font-black text-[#F5F5DC] mt-1">{fmt(pgFee)}</div>
-                                    <div className="text-[10px] text-[#F5F5DC]/40 mt-1">5%</div>
-                                  </div>
-                                  <div className="col-span-2 rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
-                                    <div className="flex items-center justify-between text-xs text-[#F5F5DC]/50">
-                                      <span>Platform</span>
-                                      <span className="text-[#F5F5DC] font-semibold">{fmt(platformFeeAmt)}</span>
+                                  <p className="text-xs text-[#F5F5DC]/50">Configure revenue split</p>
+                                </div>
+
+                                <div className="space-y-3">
+                                  {/* Customer Pays */}
+                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div>
+                                        <div className="text-xs text-[#F5F5DC]/50">Customer Pays</div>
+                                        <div className="text-lg font-black text-[#F5F5DC]">{fmt(customerPays)}</div>
+                                      </div>
+                                      {category.originalPrice && category.originalPrice > category.price && (
+                                        <div className="text-right">
+                                          <div className="text-xs text-[#F5F5DC]/50">Original</div>
+                                          <div className="text-sm text-[#F5F5DC]/70 line-through">{fmt(gross)}</div>
+                                        </div>
+                                      )}
                                     </div>
-                                    <div className="mt-2 h-1.5 rounded bg-[#2A2A2A] overflow-hidden">
-                                      <div className="h-full bg-gradient-to-r from-[#E5A823] to-[#EB4D4B]" style={{ width: w(platformFeeAmt) }} />
+
+                                    {/* Discount Control */}
+                                    <div className="space-y-2 mt-3 pt-3 border-t border-[#2A2A2A]">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <label className="text-xs font-medium text-[#F5F5DC]/70 flex-1">Discount %</label>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          max={100}
+                                          step={0.5}
+                                          value={category.discount || ''}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === '') {
+                                              setTicketCategories((prev) =>
+                                                prev.map((c) => (c.id === category.id ? { ...c, discount: 0 } : c))
+                                              );
+                                              return;
+                                            }
+                                            const num = parseFloat(val);
+                                            if (!isNaN(num)) {
+                                              setTicketCategories((prev) =>
+                                                prev.map((c) => (c.id === category.id ? { ...c, discount: num } : c))
+                                              );
+                                            }
+                                          }}
+                                          onBlur={(e) => {
+                                            const num = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                            setTicketCategories((prev) =>
+                                              prev.map((c) => (c.id === category.id ? { ...c, discount: num } : c))
+                                            );
+                                          }}
+                                          className="w-16 bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1 text-xs text-[#F5F5DC] text-center focus:outline-none focus:border-[#E5A823]"
+                                        />
+                                        <span className="text-[#E5A823] font-bold text-xs">%</span>
+                                      </div>
+                                      <input
+                                        type="range"
+                                        min={0}
+                                        max={100}
+                                        step={0.5}
+                                        value={category.discount}
+                                        onChange={(e) => {
+                                          const num = parseFloat(e.target.value);
+                                          setTicketCategories((prev) =>
+                                            prev.map((c) => (c.id === category.id ? { ...c, discount: num } : c))
+                                          );
+                                        }}
+                                        className="w-full h-1 accent-[#E5A823]"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Artist Share */}
+                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div>
+                                        <div className="text-xs text-[#F5F5DC]/50">Artist Share</div>
+                                        <div className="text-lg font-black text-[#F5F5DC]">{fmt(artistAmt)}</div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2 mt-2">
+                                      <label className="text-xs font-medium text-[#F5F5DC]/70 flex-1">Share %</label>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        step={0.5}
+                                        value={category.artistShare || ''}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          if (val === '') {
+                                            setTicketCategories((prev) =>
+                                              prev.map((c) => (c.id === category.id ? { ...c, artistShare: 0 } : c))
+                                            );
+                                            return;
+                                          }
+                                          const num = parseFloat(val);
+                                          if (!isNaN(num)) {
+                                            setTicketCategories((prev) =>
+                                              prev.map((c) => (c.id === category.id ? { ...c, artistShare: num } : c))
+                                            );
+                                          }
+                                        }}
+                                        onBlur={(e) => {
+                                          const num = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                          setTicketCategories((prev) =>
+                                            prev.map((c) => (c.id === category.id ? { ...c, artistShare: num } : c))
+                                          );
+                                        }}
+                                        className="w-16 bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1 text-xs text-[#F5F5DC] text-center focus:outline-none focus:border-[#E5A823]"
+                                      />
+                                      <span className="text-[#E5A823] font-bold text-xs">%</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Influencer Share */}
+                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div>
+                                        <div className="text-xs text-[#F5F5DC]/50">Influencer Share</div>
+                                        <div className="text-lg font-black text-[#F5F5DC]">{fmt(influencerAmt)}</div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2 mt-2">
+                                      <label className="text-xs font-medium text-[#F5F5DC]/70 flex-1">Share %</label>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        step={0.5}
+                                        value={category.influencerShare || ''}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          if (val === '') {
+                                            setTicketCategories((prev) =>
+                                              prev.map((c) => (c.id === category.id ? { ...c, influencerShare: 0 } : c))
+                                            );
+                                            return;
+                                          }
+                                          const num = parseFloat(val);
+                                          if (!isNaN(num)) {
+                                            setTicketCategories((prev) =>
+                                              prev.map((c) => (c.id === category.id ? { ...c, influencerShare: num } : c))
+                                            );
+                                          }
+                                        }}
+                                        onBlur={(e) => {
+                                          const num = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                          setTicketCategories((prev) =>
+                                            prev.map((c) => (c.id === category.id ? { ...c, influencerShare: num } : c))
+                                          );
+                                        }}
+                                        className="w-16 bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1 text-xs text-[#F5F5DC] text-center focus:outline-none focus:border-[#E5A823]"
+                                      />
+                                      <span className="text-[#E5A823] font-bold text-xs">%</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Platform Fee */}
+                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div>
+                                        <div className="text-xs text-[#F5F5DC]/50">Platform Fee</div>
+                                        <div className="text-lg font-black text-[#F5F5DC]">{fmt(platformFeeAmt)}</div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2 mt-2">
+                                      <label className="text-xs font-medium text-[#F5F5DC]/70 flex-1">Fee %</label>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        step={0.5}
+                                        value={category.platformFee || ''}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          if (val === '') {
+                                            setTicketCategories((prev) =>
+                                              prev.map((c) => (c.id === category.id ? { ...c, platformFee: 0 } : c))
+                                            );
+                                            return;
+                                          }
+                                          const num = parseFloat(val);
+                                          if (!isNaN(num)) {
+                                            setTicketCategories((prev) =>
+                                              prev.map((c) => (c.id === category.id ? { ...c, platformFee: num } : c))
+                                            );
+                                          }
+                                        }}
+                                        onBlur={(e) => {
+                                          const num = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                          setTicketCategories((prev) =>
+                                            prev.map((c) => (c.id === category.id ? { ...c, platformFee: num } : c))
+                                          );
+                                        }}
+                                        className="w-16 bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1 text-xs text-[#F5F5DC] text-center focus:outline-none focus:border-[#E5A823]"
+                                      />
+                                      <span className="text-[#E5A823] font-bold text-xs">%</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Payment Gateway Fee */}
+                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-3">
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <div className="text-xs text-[#F5F5DC]/50">Payment Gateway (5% Fixed)</div>
+                                        <div className="text-lg font-black text-[#F5F5DC]">{fmt(pgFee)}</div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Outlet Net */}
+                                  <div className="rounded-lg border border-[#3E83B6]/50 bg-gradient-to-r from-[#3E83B6]/10 to-[#3E83B6]/5 p-3">
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <div className="text-xs text-[#3E83B6]">Outlet Net Revenue</div>
+                                        <div className="text-xl font-black text-[#3E83B6]">{fmt(outletNet)}</div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="text-xs text-[#3E83B6]/70">After all deductions</div>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-
-                                <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4 space-y-2">
-                                  <div className="flex items-center justify-between text-xs">
-                                    <span className="text-[#F5F5DC]/60">Customer pays</span>
-                                    <span className="text-[#F5F5DC] font-semibold">{fmt(customerPays)}</span>
-                                  </div>
-                                  <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
-                                    <div className="h-full bg-[#E5A823]" style={{ width: w(customerPays) }} />
-                                  </div>
-
-                                  <div className="flex items-center justify-between text-xs pt-2">
-                                    <span className="text-[#F5F5DC]/60">Razorpay</span>
-                                    <span className="text-[#F5F5DC] font-semibold">-{fmt(pgFee)}</span>
-                                  </div>
-                                  <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
-                                    <div className="h-full bg-[#EB4D4B]" style={{ width: w(pgFee) }} />
-                                  </div>
-
-                                  <div className="flex items-center justify-between text-xs pt-2">
-                                    <span className="text-[#F5F5DC]/60">Platform fee</span>
-                                    <span className="text-[#F5F5DC] font-semibold">-{fmt(platformFeeAmt)}</span>
-                                  </div>
-                                  <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
-                                    <div className="h-full bg-[#7C6F3E]" style={{ width: w(platformFeeAmt) }} />
-                                  </div>
-
-                                  <div className="flex items-center justify-between text-xs pt-2">
-                                    <span className="text-[#F5F5DC]/60">Outlet net</span>
-                                    <span className="text-[#F5F5DC] font-semibold">{fmt(outletNet)}</span>
-                                  </div>
-                                  <div className="h-2 rounded bg-[#2A2A2A] overflow-hidden">
-                                    <div className="h-full bg-[#3E83B6]" style={{ width: w(outletNet) }} />
-                                  </div>
-                                </div>
-                              </>
+                              </motion.div>
                             );
-                          })()}
+                          })}
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -1068,40 +1393,28 @@ export default function SellerFormPage() {
                   </p>
                   
                   <div>
-                    <div 
-                      onClick={() => document.getElementById('cover-image-upload')?.click()}
-                      className="mt-2 flex justify-center px-6 pt-10 pb-10 border-2 border-dashed border-[#E5A823]/50 rounded-2xl hover:border-[#E5A823] hover:bg-[#E5A823]/5 transition-all cursor-pointer"
-                    >
-                      <div className="space-y-3 text-center">
-                        <div className="w-16 h-16 mx-auto rounded-full bg-[#E5A823]/10 flex items-center justify-center">
-                          <ImageIcon className="h-8 w-8 text-[#E5A823]" />
-                        </div>
-                        <div className="flex flex-col text-sm text-[#F5F5DC]/50 justify-center gap-1">
-                          <span className="font-medium text-[#E5A823] hover:text-[#F5C542]">Click to upload cover image</span>
-                          <span>or drag and drop</span>
-                        </div>
-                        <p className="text-xs text-[#F5F5DC]/30">High-res PNG, JPG up to 10MB</p>
-                      </div>
-                      <input 
-                        id="cover-image-upload"
-                        type="file" 
-                        accept="image/*"
-                        onChange={handleCoverImageChange}
-                        className="hidden" 
-                      />
-                    </div>
+                    <DragDropUpload
+                      type="image"
+                      maxSize={10}
+                      onFileSelect={handleCoverImageUpload}
+                      className="w-full h-48 rounded-2xl"
+                      label="Drop cover image here"
+                    />
                     
                     {coverImage && (
                       <div className="mt-6">
                         <div className="relative aspect-video rounded-xl overflow-hidden border border-[#E5A823]/30">
                           <img 
-                            src={URL.createObjectURL(coverImage)} 
+                            src={coverImageUrl || URL.createObjectURL(coverImage)} 
                             alt="Cover Preview" 
                             className="object-cover w-full h-full"
                           />
                           <button
                             type="button"
-                            onClick={() => setCoverImage(null)}
+                            onClick={() => {
+                              setCoverImage(null);
+                              setCoverImageUrl('');
+                            }}
                             className="absolute top-2 right-2 p-2 bg-[#0D0D0D]/80 rounded-full hover:bg-[#EB4D4B]/80 transition-colors"
                           >
                             <X className="w-4 h-4 text-white" />
@@ -1119,41 +1432,20 @@ export default function SellerFormPage() {
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
                   <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
                     <Camera className="w-5 h-5 text-[#E5A823]" />
-                    Event Images & Videos
+                    Event Images & Videos ({mediaFiles.length} selected)
                   </h3>
                   <p className="text-sm text-[#F5F5DC]/60 mb-6">
-                    Upload additional images and videos to showcase your event
+                    Upload additional images and videos to showcase your event. Drag & drop or click to browse.
                   </p>
                   
                   <div>
-                    <div 
-                      onClick={() => document.getElementById('media-files-upload')?.click()}
-                      className="mt-2 flex justify-center px-6 pt-10 pb-10 border-2 border-dashed border-[#2A2A2A] rounded-2xl hover:border-[#E5A823]/50 hover:bg-[#2A2A2A]/50 transition-all cursor-pointer"
-                    >
-                      <div className="space-y-3 text-center">
-                        <div className="flex items-center justify-center gap-4">
-                          <div className="w-12 h-12 rounded-full bg-[#2A2A2A] flex items-center justify-center">
-                            <ImageIcon className="h-5 w-5 text-[#E5A823]" />
-                          </div>
-                          <div className="w-12 h-12 rounded-full bg-[#2A2A2A] flex items-center justify-center">
-                            <Video className="h-5 w-5 text-[#E5A823]" />
-                          </div>
-                        </div>
-                        <div className="flex flex-col text-sm text-[#F5F5DC]/50 justify-center gap-1">
-                          <span className="font-medium text-[#E5A823] hover:text-[#F5C542]">Click to upload images or videos</span>
-                          <span>or drag and drop</span>
-                        </div>
-                        <p className="text-xs text-[#F5F5DC]/30">PNG, JPG, MP4, MOV up to 50MB each</p>
-                      </div>
-                      <input 
-                        id="media-files-upload"
-                        type="file" 
-                        multiple 
-                        accept="image/*,video/*"
-                        onChange={handleMediaFilesChange}
-                        className="hidden" 
-                      />
-                    </div>
+                    <DragDropUpload
+                      type="both"
+                      maxSize={50}
+                      onFileSelect={handleMediaFileUpload}
+                      className="w-full h-32 rounded-2xl"
+                      label="Drop images or videos here"
+                    />
                     
                     {mediaFiles.length > 0 && (
                       <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -1167,7 +1459,7 @@ export default function SellerFormPage() {
                             {file.type.startsWith('video/') ? (
                               <div className="w-full h-full bg-[#0D0D0D] flex items-center justify-center">
                                 <video className="w-full h-full object-cover">
-                                  <source src={URL.createObjectURL(file)} type={file.type} />
+                                  <source src={mediaFileUrls[index]?.url || URL.createObjectURL(file)} type={file.type} />
                                 </video>
                                 <div className="absolute inset-0 flex items-center justify-center bg-[#0D0D0D]/50">
                                   <Video className="w-8 h-8 text-[#E5A823]" />
@@ -1175,7 +1467,7 @@ export default function SellerFormPage() {
                               </div>
                             ) : (
                               <img 
-                                src={URL.createObjectURL(file)} 
+                                src={mediaFileUrls[index]?.url || URL.createObjectURL(file)} 
                                 alt={`Media ${index}`} 
                                 className="object-cover w-full h-full hover:scale-105 transition-transform duration-500"
                               />
@@ -1322,7 +1614,19 @@ export default function SellerFormPage() {
                 
                 <div className="space-y-4">
                   <div className="aspect-video rounded-xl bg-[#2A2A2A] flex items-center justify-center">
-                    {coverImage ? (
+                    {coverImageUrl ? (
+                      <img 
+                        src={coverImageUrl} 
+                        alt="Event Cover" 
+                        className="w-full h-full object-cover rounded-xl"
+                      />
+                    ) : mediaFileUrls.length > 0 && mediaFileUrls[0].type.startsWith('image/') ? (
+                      <img 
+                        src={mediaFileUrls[0].url} 
+                        alt="Event" 
+                        className="w-full h-full object-cover rounded-xl"
+                      />
+                    ) : coverImage ? (
                       <img 
                         src={URL.createObjectURL(coverImage)} 
                         alt="Event Cover" 

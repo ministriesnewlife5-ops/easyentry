@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ImageIcon, Pencil, Trash2, X, Plus } from 'lucide-react';
+import { ImageIcon, Pencil, Trash2, X, Plus, Loader2 } from 'lucide-react';
 
 type Banner = {
   id: number;
@@ -13,30 +13,9 @@ type Banner = {
   buttonLink: string;
 };
 
-const STORAGE_KEY = 'easyentry.promo-banners';
-
-function getStoredBanners(): Banner[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch (e) {
-    console.error('Error reading banners:', e);
-    return [];
-  }
-}
-
-function saveBanners(banners: Banner[]) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(banners));
-  } catch (e) {
-    console.error('Error saving banners:', e);
-  }
-}
-
 export default function AdsBannerManager() {
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState<Partial<Banner>>({
@@ -48,15 +27,47 @@ export default function AdsBannerManager() {
     buttonLink: '',
   });
   const [previewImage, setPreviewImage] = useState<string>('');
+  const [saving, setSaving] = useState(false);
 
+  // Load banners from API
   useEffect(() => {
-    setBanners(getStoredBanners());
+    const loadBanners = async () => {
+      try {
+        const response = await fetch('/api/promo-banners');
+        if (response.ok) {
+          const data = await response.json();
+          const mapped = (data.banners || []).map((b: any) => ({
+            id: parseInt(b.id) || Date.now(),
+            tag: b.title,
+            title: b.subtitle || b.title,
+            description: b.cta_text || '',
+            image: b.image_url || '',
+            buttonLabel: b.cta_text || 'Learn More',
+            buttonLink: b.cta_link || '#',
+          }));
+          setBanners(mapped);
+        }
+      } catch (e) {
+        console.error('Error loading banners:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadBanners();
   }, []);
 
-  const handleDelete = (id: number) => {
-    const updated = banners.filter(b => b.id !== id);
-    setBanners(updated);
-    saveBanners(updated);
+  const handleDelete = async (id: number) => {
+    try {
+      const response = await fetch(`/api/promo-banners?id=${id}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        const updated = banners.filter(b => b.id !== id);
+        setBanners(updated);
+      }
+    } catch (e) {
+      console.error('Error deleting banner:', e);
+    }
   };
 
   const handleEdit = (banner: Banner) => {
@@ -94,31 +105,64 @@ export default function AdsBannerManager() {
     });
   };
 
-  const handleSave = () => {
-    if (editingBanner) {
-      const updated = banners.map(b => b.id === editingBanner.id ? { ...formData, id: editingBanner.id } as Banner : b);
-      setBanners(updated);
-      saveBanners(updated);
-      setEditingBanner(null);
-    } else if (isCreating) {
-      const newBanner: Banner = {
-        ...formData as Banner,
-        id: Date.now(),
-      };
-      const updated = [...banners, newBanner];
-      setBanners(updated);
-      saveBanners(updated);
-      setIsCreating(false);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      if (editingBanner) {
+        const response = await fetch('/api/promo-banners', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingBanner.id,
+            title: formData.tag,
+            subtitle: formData.title,
+            cta_text: formData.buttonLabel,
+            cta_link: formData.buttonLink,
+            image_url: formData.image,
+          }),
+        });
+        if (response.ok) {
+          const updated = banners.map(b => b.id === editingBanner.id ? { ...formData, id: editingBanner.id } as Banner : b);
+          setBanners(updated);
+          setEditingBanner(null);
+        }
+      } else if (isCreating) {
+        const response = await fetch('/api/promo-banners', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: formData.tag,
+            subtitle: formData.title,
+            cta_text: formData.buttonLabel,
+            cta_link: formData.buttonLink,
+            image_url: formData.image,
+          }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const newBanner: Banner = {
+            ...formData as Banner,
+            id: parseInt(data.banner.id) || Date.now(),
+          };
+          const updated = [...banners, newBanner];
+          setBanners(updated);
+          setIsCreating(false);
+        }
+      }
+      setFormData({
+        tag: '',
+        title: '',
+        description: '',
+        image: '',
+        buttonLabel: '',
+        buttonLink: '',
+      });
+      setPreviewImage('');
+    } catch (e) {
+      console.error('Error saving banner:', e);
+    } finally {
+      setSaving(false);
     }
-    setFormData({
-      tag: '',
-      title: '',
-      description: '',
-      image: '',
-      buttonLabel: '',
-      buttonLink: '',
-    });
-    setPreviewImage('');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

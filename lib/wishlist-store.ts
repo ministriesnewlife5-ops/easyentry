@@ -1,6 +1,4 @@
-// Wishlist storage utility - stores liked events in localStorage
-
-const WISHLIST_KEY = 'easyentry.wishlist';
+// Wishlist storage utility - now uses Supabase instead of localStorage
 
 export interface WishlistEvent {
   id: string;
@@ -13,51 +11,88 @@ export interface WishlistEvent {
   addedAt: number;
 }
 
-export function getWishlist(): WishlistEvent[] {
-  if (typeof window === 'undefined') return [];
+// Get wishlist from API
+export async function getWishlist(): Promise<WishlistEvent[]> {
   try {
-    const stored = localStorage.getItem(WISHLIST_KEY);
-    return stored ? JSON.parse(stored) : [];
+    const response = await fetch('/api/wishlist');
+    if (!response.ok) {
+      return [];
+    }
+    const data = await response.json();
+    return (data.wishlist || []).map((item: any) => ({
+      id: item.event_id,
+      title: item.event_title,
+      date: item.event_date,
+      venue: item.event_venue,
+      price: item.event_price,
+      imageUrl: item.event_image,
+      category: 'General',
+      addedAt: new Date(item.added_at).getTime(),
+    }));
   } catch {
     return [];
   }
 }
 
-export function addToWishlist(event: Omit<WishlistEvent, 'addedAt'>): void {
-  if (typeof window === 'undefined') return;
-  const wishlist = getWishlist();
-  const exists = wishlist.find(item => item.id === event.id);
-  
-  if (!exists) {
-    const newItem: WishlistEvent = { ...event, addedAt: Date.now() };
-    localStorage.setItem(WISHLIST_KEY, JSON.stringify([...wishlist, newItem]));
-    // Dispatch custom event to notify other components
-    window.dispatchEvent(new CustomEvent('wishlist-updated', { detail: { count: wishlist.length + 1 } }));
+// Check if event is in wishlist
+export async function isInWishlist(eventId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/wishlist/check?event_id=${eventId}`);
+    if (!response.ok) {
+      return false;
+    }
+    const data = await response.json();
+    return data.isInWishlist;
+  } catch {
+    return false;
   }
 }
 
-export function removeFromWishlist(eventId: string): void {
-  if (typeof window === 'undefined') return;
-  const wishlist = getWishlist();
-  const filtered = wishlist.filter(item => item.id !== eventId);
-  localStorage.setItem(WISHLIST_KEY, JSON.stringify(filtered));
-  // Dispatch custom event to notify other components
-  window.dispatchEvent(new CustomEvent('wishlist-updated', { detail: { count: filtered.length } }));
+// Add event to wishlist
+export async function addToWishlist(event: Omit<WishlistEvent, 'addedAt'>): Promise<void> {
+  try {
+    await fetch('/api/wishlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event_id: event.id,
+        event_title: event.title,
+        event_date: event.date,
+        event_venue: event.venue,
+        event_price: event.price,
+        event_image: event.imageUrl,
+      }),
+    });
+    // Dispatch custom event to notify other components
+    const wishlist = await getWishlist();
+    window.dispatchEvent(new CustomEvent('wishlist-updated', { detail: { count: wishlist.length + 1 } }));
+  } catch {
+    // Silently fail
+  }
 }
 
-export function isInWishlist(eventId: string): boolean {
-  if (typeof window === 'undefined') return false;
-  const wishlist = getWishlist();
-  return wishlist.some(item => item.id === eventId);
+// Remove event from wishlist
+export async function removeFromWishlist(eventId: string): Promise<void> {
+  try {
+    await fetch(`/api/wishlist?event_id=${eventId}`, {
+      method: 'DELETE',
+    });
+    // Dispatch custom event to notify other components
+    const wishlist = await getWishlist();
+    window.dispatchEvent(new CustomEvent('wishlist-updated', { detail: { count: wishlist.length } }));
+  } catch {
+    // Silently fail
+  }
 }
 
-export function toggleWishlist(event: Omit<WishlistEvent, 'addedAt'>): boolean {
-  const isLiked = isInWishlist(event.id);
+// Toggle wishlist status
+export async function toggleWishlist(event: Omit<WishlistEvent, 'addedAt'>): Promise<boolean> {
+  const isLiked = await isInWishlist(event.id);
   if (isLiked) {
-    removeFromWishlist(event.id);
+    await removeFromWishlist(event.id);
     return false;
   } else {
-    addToWishlist(event);
+    await addToWishlist(event);
     return true;
   }
 }
