@@ -327,9 +327,11 @@ VALUES ('event-files', 'event-files', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage policies (allow authenticated uploads)
+DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
 CREATE POLICY "Allow authenticated uploads" ON storage.objects
   FOR INSERT TO authenticated WITH CHECK (bucket_id = 'event-files');
 
+DROP POLICY IF EXISTS "Allow public read" ON storage.objects;
 CREATE POLICY "Allow public read" ON storage.objects
   FOR SELECT TO anon USING (bucket_id = 'event-files');
 
