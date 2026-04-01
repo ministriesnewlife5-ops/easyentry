@@ -42,7 +42,21 @@ CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_records(email);
 CREATE INDEX IF NOT EXISTS idx_otp_expires ON otp_records(expires_at);
 
 -- ============================================
--- 3. VENUE_PROFILES TABLE
+-- 3. APP_SETTINGS TABLE (for browse filters and other settings)
+-- ============================================
+CREATE TABLE IF NOT EXISTS app_settings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  key VARCHAR(255) UNIQUE NOT NULL,
+  value JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index for faster settings lookups
+CREATE INDEX IF NOT EXISTS idx_app_settings_key ON app_settings(key);
+
+-- ============================================
+-- 4. VENUE_PROFILES TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS venue_profiles (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
