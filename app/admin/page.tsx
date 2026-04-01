@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, CircleCheckBig, ImageIcon, IndianRupee, Mic2, Settings, Ticket, TrendingUp, Users, Megaphone, FileText, Plus, UserPlus } from 'lucide-react';
+import { BarChart3, CalendarDays, CircleCheckBig, ImageIcon, IndianRupee, Mic2, Settings, Ticket, TrendingUp, Users, Megaphone, FileText, Plus, UserPlus, Store } from 'lucide-react';
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth-options';
@@ -9,6 +9,10 @@ import AdsBannerManager from '@/components/AdsBannerManager';
 import BrowseFiltersManager from '@/components/BrowseFiltersManager';
 import AdminEventHostSection from '@/components/AdminEventHostSection';
 import AdminOnboardingSection from '@/components/AdminOnboardingSection';
+import OutletProvidersTable from '@/components/OutletProvidersTable';
+import ArtistsTable from '@/components/ArtistsTable';
+import InfluencersTable from '@/components/InfluencersTable';
+import EventsTable from '@/components/EventsTable';
 import { getAllPublishedEvents, getPublishedEventCards } from '@/lib/public-events-store';
 import { getAllEventRequests } from '@/lib/event-request-store';
 import { getAllUsers } from '@/lib/auth-store';
@@ -44,6 +48,9 @@ export default async function AdminPage({
   
   // Get real influencers/promoters (users with promoter role)
   const enrolledInfluencers = allUsers.filter((user: { role: string }) => user.role === 'promoter');
+  
+  // Get outlet providers (users with outlet or outlet_provider role)
+  const outletProviders = allUsers.filter((user: { role: string }) => user.role === 'outlet' || user.role === 'outlet_provider');
 
   // Map published events to the format used in the admin dashboard
   const allWebsiteEvents = publishedEvents.map(event => ({
@@ -74,6 +81,20 @@ export default async function AdminPage({
     ticketsSoldByCode: 0,
   }));
 
+  // Map outlet providers to the format used in the admin dashboard
+  const allOutletProviders = outletProviders.map(provider => ({
+    id: provider.id,
+    name: provider.name || 'Unnamed',
+    image: `https://ui-avatars.com/api/?name=${encodeURIComponent(provider.name || 'Unknown')}&background=random&color=fff&size=200`,
+    email: provider.email,
+    joinedDate: new Date(provider.created_at).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }),
+    isVerified: provider.is_verified,
+  }));
+
   // Get upcoming events for the overview section (limit to 6)
   const upcomingEvents = publishedEvents
     .slice(0, 6)
@@ -92,6 +113,7 @@ export default async function AdminPage({
     { label: 'Total Events', value: publishedEvents.length.toString(), delta: 'Published events', icon: CalendarDays },
     { label: 'Artists Enrolled', value: enrolledArtists.length.toString(), delta: 'Active artists', icon: Mic2 },
     { label: 'Promoters', value: enrolledInfluencers.length.toString(), delta: 'Active promoters', icon: Megaphone },
+    { label: 'Outlet Providers', value: outletProviders.length.toString(), delta: 'Active outlets', icon: Store },
     { label: 'Total Users', value: allUsers.length.toString(), delta: 'Registered users', icon: Users },
   ];
 
@@ -128,10 +150,10 @@ export default async function AdminPage({
               <Megaphone className="h-4 w-4" />
               Influencers
             </Link>
-            <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]">
-              <Users className="h-4 w-4" />
-              Customers
-            </button>
+            <Link href="/admin?section=outlet-providers" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'outlet-providers' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
+              <Store className="h-4 w-4" />
+              Outlet Providers
+            </Link>
             <Link href="/admin?section=requests" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'requests' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
               <FileText className="h-4 w-4" />
               Event Requests
@@ -169,6 +191,7 @@ export default async function AdminPage({
                    activeSection === 'events' ? 'All Platform Events' : 
                    activeSection === 'artists' ? 'All Enrolled Artists' :
                    activeSection === 'influencers' ? 'All Influencers' :
+                   activeSection === 'outlet-providers' ? 'All Outlet Providers' :
                    activeSection === 'requests' ? 'Event Requests' :
                    activeSection === 'host-event' ? 'Host New Event' :
                    activeSection === 'onboarding' ? 'Onboard Users' :
@@ -181,6 +204,7 @@ export default async function AdminPage({
                    activeSection === 'events' ? `Manage and view all ${allWebsiteEvents.length} events across the platform` : 
                    activeSection === 'artists' ? `Manage and view all ${allEnrolledArtists.length} artists enrolled on the platform` :
                    activeSection === 'influencers' ? `Manage and view all ${allInfluencers.length} influencers collaborating on the platform` :
+                   activeSection === 'outlet-providers' ? `Manage and view all outlet providers on the platform` :
                    activeSection === 'requests' ? 'Review and approve event requests from outlet providers' :
                    activeSection === 'host-event' ? 'Create and publish events directly for outlets and promoters' :
                    activeSection === 'onboarding' ? 'Create accounts for artists, influencers, and outlet providers' :
@@ -195,104 +219,13 @@ export default async function AdminPage({
           </header>
 
           {activeSection === 'events' ? (
-            <article className="mt-4 rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5 overflow-x-auto">
-              <table className="w-full text-left text-sm text-[#F5F5DC]">
-                <thead className="border-b border-[#2A2A2A] text-xs uppercase text-[#F5F5DC]/60">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Event Name</th>
-                    <th className="px-4 py-3 font-semibold">Outlet Provider</th>
-                    <th className="px-4 py-3 font-semibold">Location</th>
-                    <th className="px-4 py-3 font-semibold">Date</th>
-                    <th className="px-4 py-3 font-semibold">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#2A2A2A]">
-                  {allWebsiteEvents.map((event) => (
-                    <tr key={event.id} className="hover:bg-[#2A2A2A]/40 transition-colors">
-                      <td className="px-4 py-4 font-medium text-[#E5A823]">{event.name}</td>
-                      <td className="px-4 py-4">{event.provider}</td>
-                      <td className="px-4 py-4 text-[#F5F5DC]/80">{event.location}</td>
-                      <td className="px-4 py-4">{event.date}</td>
-                      <td className="px-4 py-4">
-                        <Link href={`/events/${event.id}`} className="text-xs font-semibold px-3 py-1.5 bg-[#2A2A2A] rounded-lg hover:bg-[#E5A823] hover:text-[#0D0D0D] transition-colors">
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </article>
+            <EventsTable events={allWebsiteEvents} />
           ) : activeSection === 'artists' ? (
-            <article className="mt-4 rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5 overflow-x-auto">
-              <table className="w-full text-left text-sm text-[#F5F5DC]">
-                <thead className="border-b border-[#2A2A2A] text-xs uppercase text-[#F5F5DC]/60">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Artist</th>
-                    <th className="px-4 py-3 font-semibold">Name</th>
-                    <th className="px-4 py-3 font-semibold">Location</th>
-                    <th className="px-4 py-3 font-semibold">Events Completed</th>
-                    <th className="px-4 py-3 font-semibold">Upcoming Events</th>
-                    <th className="px-4 py-3 font-semibold">Tickets Sold (Coupon)</th>
-                    <th className="px-4 py-3 font-semibold">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#2A2A2A]">
-                  {allEnrolledArtists.map((artist) => (
-                    <tr key={artist.id} className="hover:bg-[#2A2A2A]/40 transition-colors">
-                      <td className="px-4 py-4">
-                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-[#2A2A2A]">
-                          <img src={artist.image} alt={artist.name} className="w-full h-full object-cover" />
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 font-medium text-[#E5A823]">{artist.name}</td>
-                      <td className="px-4 py-4 text-[#F5F5DC]/80">{artist.location}</td>
-                      <td className="px-4 py-4">{artist.completedEvents}</td>
-                      <td className="px-4 py-4">{artist.upcomingEvents}</td>
-                      <td className="px-4 py-4">{artist.ticketsSoldByCode}</td>
-                      <td className="px-4 py-4">
-                        <Link href={`/artist/${artist.id}`} className="text-xs font-semibold px-3 py-1.5 bg-[#2A2A2A] rounded-lg hover:bg-[#E5A823] hover:text-[#0D0D0D] transition-colors">
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </article>
+            <ArtistsTable artists={allEnrolledArtists} />
           ) : activeSection === 'influencers' ? (
-            <article className="mt-4 rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5 overflow-x-auto">
-              <table className="w-full text-left text-sm text-[#F5F5DC]">
-                <thead className="border-b border-[#2A2A2A] text-xs uppercase text-[#F5F5DC]/60">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Influencer</th>
-                    <th className="px-4 py-3 font-semibold">Name</th>
-                    <th className="px-4 py-3 font-semibold">Location</th>
-                    <th className="px-4 py-3 font-semibold">Tickets Sold (Coupon)</th>
-                    <th className="px-4 py-3 font-semibold">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#2A2A2A]">
-                  {allInfluencers.map((inf) => (
-                    <tr key={inf.id} className="hover:bg-[#2A2A2A]/40 transition-colors">
-                      <td className="px-4 py-4">
-                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-[#2A2A2A]">
-                          <img src={inf.image} alt={inf.name} className="w-full h-full object-cover" />
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 font-medium text-[#E5A823]">{inf.name}</td>
-                      <td className="px-4 py-4 text-[#F5F5DC]/80">{inf.location}</td>
-                      <td className="px-4 py-4">{inf.ticketsSoldByCode}</td>
-                      <td className="px-4 py-4">
-                        <Link href="/promoter/profile" className="text-xs font-semibold px-3 py-1.5 bg-[#2A2A2A] rounded-lg hover:bg-[#E5A823] hover:text-[#0D0D0D] transition-colors">
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </article>
+            <InfluencersTable influencers={allInfluencers} />
+          ) : activeSection === 'outlet-providers' ? (
+            <OutletProvidersTable outletProviders={allOutletProviders} />
           ) : activeSection === 'ads' ? (
             <AdsBannerManager />
           ) : activeSection === 'browse-filters' ? (
@@ -307,7 +240,7 @@ export default async function AdminPage({
             <SettingsContent userEmail={session?.user?.email} />
           ) : (
             <>
-              <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                 {stats.map((item) => (
                   <article key={item.label} className="rounded-2xl border border-[#2A2A2A] bg-[#101018] p-4">
                     <div className="mb-2 flex items-center justify-between">

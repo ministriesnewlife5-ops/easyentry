@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS app_users (
   role VARCHAR(50) NOT NULL DEFAULT 'user',
   name VARCHAR(255),
   is_verified BOOLEAN DEFAULT FALSE,
+  is_archived BOOLEAN DEFAULT FALSE,
+  archived_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -29,6 +31,11 @@ CREATE TABLE IF NOT EXISTS otp_records (
   is_used BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add archive columns to app_users if they don't exist
+ALTER TABLE app_users 
+  ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
 
 -- Index for faster OTP lookups
 CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_records(email);
@@ -117,6 +124,11 @@ CREATE INDEX IF NOT EXISTS idx_published_events_date ON published_events(date);
 CREATE INDEX IF NOT EXISTS idx_published_events_status ON published_events(status);
 CREATE INDEX IF NOT EXISTS idx_published_events_venue ON published_events(venue_id);
 CREATE INDEX IF NOT EXISTS idx_published_events_featured ON published_events(is_featured) WHERE is_featured = TRUE;
+
+-- Add archive columns to published_events if they don't exist
+ALTER TABLE published_events 
+  ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
 
 -- ============================================
 -- ENABLE ROW LEVEL SECURITY (RLS)
