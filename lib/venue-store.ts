@@ -96,10 +96,10 @@ function mapLegacyToDb(venue: Partial<VenueProfile>): Record<string, unknown> {
   return {
     name: venue.venueName || '',
     location: venue.location || null,
-    capacity: venue.capacity ? parseInt(venue.capacity) : null,
+    capacity: (venue.capacity && !isNaN(parseInt(venue.capacity, 10))) ? parseInt(venue.capacity, 10) : null,
     description: venue.bio || null,
     amenities: amenities,
-    images: images.length > 0 ? [...new Set(images)] : null,
+    images: [...new Set(images)], // always an array, never null — Supabase expects JSON array
     owner_id: venue.userId || null,
     is_active: true,
   };
@@ -248,6 +248,14 @@ export async function updateVenueByUserId(
       imageUrl: updates.imageUrl || null,
       coverImage: updates.coverImage || null,
       venueImages: updates.venueImages || [],
+      firstPointContact: updates.firstPointContact || { name: '', email: '', phone: '' },
+      fnbManagerContact: updates.fnbManagerContact || { name: '', email: '', phone: '' },
+      financeContact: updates.financeContact || { name: '', email: '', phone: '' },
+      gstNumber: updates.gstNumber || '',
+      gstCertificate: updates.gstCertificate || '',
+      panCard: updates.panCard || '',
+      panCardDocument: updates.panCardDocument || '',
+      termsAccepted: updates.termsAccepted || '',
     };
     return createVenue(newVenue as VenueInput);
   }

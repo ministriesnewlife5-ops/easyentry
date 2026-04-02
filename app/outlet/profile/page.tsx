@@ -191,28 +191,71 @@ function OutletProfileContent() {
     }
   }, [status, session, fetchVenueProfile, fetchOutletEvents]);
 
-  const handleProfileImageUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProfileImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+  // Compress image to a max width/height and quality before storing as base64
+  // This keeps images well under 300KB so Supabase doesn't reject the payload
+  const compressImage = (file: File, maxWidth: number, maxHeight: number, quality = 0.75): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let { width, height } = img;
+
+          // Scale down proportionally
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error('Canvas not supported'));
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = reject;
+        img.src = reader.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
-  const handleCoverImageUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setCoverImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+  const handleProfileImageUpload = async (file: File) => {
+    try {
+      const compressed = await compressImage(file, 400, 400, 0.8);
+      setProfileImage(compressed);
+    } catch {
+      // Fallback to uncompressed if canvas fails
+      const reader = new FileReader();
+      reader.onloadend = () => setProfileImage(reader.result as string);
+      reader.readAsDataURL(file);
+    }
   };
 
-  const handleGalleryImageUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setVenueImages(prev => [...prev, reader.result as string]);
-    };
-    reader.readAsDataURL(file);
+  const handleCoverImageUpload = async (file: File) => {
+    try {
+      const compressed = await compressImage(file, 1200, 400, 0.8);
+      setCoverImage(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onloadend = () => setCoverImage(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleGalleryImageUpload = async (file: File) => {
+    try {
+      const compressed = await compressImage(file, 800, 600, 0.75);
+      setVenueImages(prev => [...prev, compressed]);
+    } catch {
+      const reader = new FileReader();
+      reader.onloadend = () => setVenueImages(prev => [...prev, reader.result as string]);
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleRemoveVenueImage = (index: number) => {
