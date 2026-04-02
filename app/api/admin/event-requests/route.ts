@@ -17,6 +17,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
     }
 
+    if (!token.sub) {
+      return NextResponse.json({ error: 'Admin user ID is missing from the session' }, { status: 400 });
+    }
+
     const requests = await getAllEventRequests();
     return NextResponse.json({ requests });
   } catch (error) {
@@ -101,7 +105,7 @@ export async function PUT(request: NextRequest) {
     const updated = await updateEventRequestStatus(
       requestId,
       status,
-      token.name || 'Admin',
+      token.sub,
       rejectionReason
     );
 
