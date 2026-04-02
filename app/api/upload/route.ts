@@ -4,6 +4,25 @@ import { getSupabaseServerClient } from '@/lib/supabase';
 
 const STORAGE_BUCKET = 'event-files';
 
+function normalizeToHttps(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const isLocalHost =
+      parsed.hostname === 'localhost' ||
+      parsed.hostname === '127.0.0.1' ||
+      parsed.hostname.endsWith('.local');
+
+    if (parsed.protocol === 'http:' && !isLocalHost) {
+      parsed.protocol = 'https:';
+      return parsed.toString();
+    }
+
+    return url;
+  } catch {
+    return url;
+  }
+}
+
 // Allow larger request bodies for file uploads
 export const config = {
   api: {
@@ -65,9 +84,11 @@ export async function POST(request: NextRequest) {
       .from(STORAGE_BUCKET)
       .getPublicUrl(filePath);
 
+    const secureUrl = normalizeToHttps(urlData.publicUrl);
+
     return NextResponse.json({
       success: true,
-      url: urlData.publicUrl,
+      url: secureUrl,
       fileName: fileName,
       type: file.type,
       size: file.size,

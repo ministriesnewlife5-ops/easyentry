@@ -40,7 +40,7 @@ export default function Navigation() {
           {/* Logo - Left Side */}
           <Link href="/" className="flex items-center gap-2 group mr-8">
             <Image 
-              src="/logo.png" 
+              src="/Easy Entry Logo.png" 
               alt="Easy Entry" 
               width={120} 
               height={40} 

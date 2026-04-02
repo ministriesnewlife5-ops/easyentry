@@ -41,6 +41,53 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+async function compressImageForUpload(file: File): Promise<File> {
+  if (!file.type.startsWith('image/')) {
+    return file;
+  }
+
+  const maxDimension = 1920;
+  let quality = 0.85;
+  const targetBytes = 900 * 1024; // stay below common 1MB proxy limits
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Failed to load image for compression'));
+    img.src = URL.createObjectURL(file);
+  });
+
+  const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return file;
+  }
+
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  let blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, 'image/jpeg', quality);
+  });
+
+  while (blob && blob.size > targetBytes && quality > 0.45) {
+    quality -= 0.08;
+    blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', quality);
+    });
+  }
+
+  if (!blob) {
+    return file;
+  }
+
+  const compressedName = file.name.replace(/\.[^.]+$/, '.jpg');
+  return new File([blob], compressedName, { type: 'image/jpeg' });
+}
+
 export default function SellerFormPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -349,11 +396,21 @@ export default function SellerFormPage() {
     const fileId = `${file.name}-${Date.now()}`;
     
     try {
+      const uploadFile = await compressImageForUpload(file);
+
+      // Guard against upstream reverse-proxy limits (common 1MB cap)
+      const hardLimitBytes = 950 * 1024;
+      if (uploadFile.size > hardLimitBytes) {
+        setNotificationMessage(`File is too large after optimization (${Math.round(uploadFile.size / 1024)}KB). Please upload a smaller image.`);
+        setShowNotification(true);
+        return null;
+      }
+
       setUploadingFiles(prev => new Set(prev).add(fileId));
       setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
       
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', uploadFile);
       formData.append('type', type);
       
       const response = await fetch('/api/upload', {
