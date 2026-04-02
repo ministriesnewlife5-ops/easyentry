@@ -3,11 +3,22 @@ import Razorpay from 'razorpay';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 
-// Initialize Razorpay
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || '',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || '',
-});
+function getRazorpayClient() {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (!keyId || !keySecret) {
+    throw new Error('Missing Razorpay credentials in environment');
+  }
+
+  return {
+    client: new Razorpay({
+      key_id: keyId,
+      key_secret: keySecret,
+    }),
+    keyId,
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,6 +47,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+      return NextResponse.json(
+        { error: 'Invalid amount' },
+        { status: 400 }
+      );
+    }
+
+    const { client: razorpay, keyId } = getRazorpayClient();
+
     // Create Razorpay order
     const orderOptions: {
       amount: number;
@@ -63,11 +83,30 @@ export async function POST(request: NextRequest) {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: process.env.RAZORPAY_KEY_ID,
+      keyId,
     });
 
   } catch (error) {
-    console.error('Razorpay order creation failed:', error);
+    console.error('Razorpay order creation failed:', {
+      message: error?.message,
+      statusCode: error?.statusCode,
+      error: error?.error,
+    });
+
+    if (error?.message === 'Missing Razorpay credentials in environment') {
+      return NextResponse.json(
+        { error: 'Payment gateway is not configured on server' },
+        { status: 500 }
+      );
+    }
+
+    if (error?.statusCode === 401) {
+      return NextResponse.json(
+        { error: 'Payment gateway authentication failed. Please contact support.' },
+        { status: 502 }
+      );
+    }
+
     return NextResponse.json(
       { error: 'Failed to create payment order' },
       { status: 500 }
