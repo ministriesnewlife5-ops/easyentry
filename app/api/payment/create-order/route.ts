@@ -3,9 +3,13 @@ import Razorpay from 'razorpay';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 
+function normalizeEnvValue(value?: string) {
+  return value?.trim().replace(/^['\"]|['\"]$/g, '');
+}
+
 function getRazorpayClient() {
-  const keyId = process.env.RAZORPAY_KEY_ID;
-  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  const keyId = normalizeEnvValue(process.env.RAZORPAY_KEY_ID);
+  const keySecret = normalizeEnvValue(process.env.RAZORPAY_KEY_SECRET);
 
   if (!keyId || !keySecret) {
     throw new Error('Missing Razorpay credentials in environment');
@@ -97,6 +101,7 @@ export async function POST(request: NextRequest) {
       message: err.message,
       statusCode: err.statusCode,
       error: err.error,
+      razorpayKeyIdPrefix: normalizeEnvValue(process.env.RAZORPAY_KEY_ID)?.slice(0, 10),
     });
 
     if (err.message === 'Missing Razorpay credentials in environment') {
@@ -108,7 +113,10 @@ export async function POST(request: NextRequest) {
 
     if (err.statusCode === 401) {
       return NextResponse.json(
-        { error: 'Payment gateway authentication failed. Please contact support.' },
+        {
+          error: 'Payment gateway authentication failed. Please contact support.',
+          errorCode: 'RAZORPAY_AUTH_FAILED',
+        },
         { status: 502 }
       );
     }

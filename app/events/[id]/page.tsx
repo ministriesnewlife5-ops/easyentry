@@ -8,7 +8,6 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import type { PublicEvent } from '@/lib/public-events-store';
 import { useSession } from 'next-auth/react';
 import QRCode from 'qrcode';
-import html2canvas from 'html2canvas';
 
 // Razorpay types
 declare global {
@@ -151,14 +150,108 @@ export default function EventDetailsPage() {
 
   // Download ticket as image
   const downloadTicket = useCallback(async () => {
-    if (!ticketRef.current) return;
+    if (!bookingDetails) return;
     
     try {
-      const canvas = await html2canvas(ticketRef.current, {
-        backgroundColor: '#1A1A1A',
-        scale: 2,
-        logging: false,
-      });
+      const canvas = document.createElement('canvas');
+      canvas.width = 1200;
+      canvas.height = 1700;
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        throw new Error('Could not initialize canvas context');
+      }
+
+      // Background
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Header gradient
+      const headerGradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+      headerGradient.addColorStop(0, '#E5A823');
+      headerGradient.addColorStop(1, '#EB4D4B');
+      ctx.fillStyle = headerGradient;
+      ctx.fillRect(0, 0, canvas.width, 210);
+
+      // Header text
+      ctx.fillStyle = '#0D0D0D';
+      ctx.font = 'bold 56px Arial';
+      ctx.fillText('Payment Successful!', 60, 92);
+      ctx.font = '32px Arial';
+      ctx.fillText('Your tickets are confirmed', 60, 145);
+
+      // QR box
+      ctx.fillStyle = '#0D0D0D';
+      ctx.fillRect(60, 250, 1080, 390);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(420, 300, 360, 280);
+
+      const qrCanvas = ticketRef.current?.querySelector('canvas');
+      if (qrCanvas) {
+        ctx.drawImage(qrCanvas, 470, 340, 260, 200);
+      }
+
+      ctx.fillStyle = '#F5F5DC';
+      ctx.font = '24px Arial';
+      ctx.fillText('Scan at venue entry', 500, 290);
+      ctx.font = '20px monospace';
+      ctx.fillText(bookingDetails.bookingId, 430, 610);
+
+      // Event section
+      ctx.fillStyle = '#F5F5DC';
+      ctx.font = 'bold 44px Arial';
+      ctx.fillText(bookingDetails.eventTitle.slice(0, 42), 60, 725);
+
+      ctx.font = '28px Arial';
+      ctx.fillStyle = '#BDBDAF';
+      ctx.fillText(`${bookingDetails.eventDate} • ${bookingDetails.eventTime}`, 60, 775);
+      ctx.fillText(bookingDetails.venue, 60, 820);
+
+      // Ticket details card
+      ctx.fillStyle = '#2A2A2A';
+      ctx.fillRect(60, 860, 1080, 460);
+      ctx.fillStyle = '#F5F5DC';
+      ctx.font = 'bold 34px Arial';
+      ctx.fillText('Ticket Details', 95, 925);
+
+      let y = 980;
+      ctx.font = '28px Arial';
+      for (const ticket of bookingDetails.tickets) {
+        const line = `${ticket.name} x ${ticket.quantity}`;
+        const amount = `₹${(ticket.price * ticket.quantity).toFixed(2)}`;
+        ctx.fillStyle = '#D5D5CA';
+        ctx.fillText(line.slice(0, 45), 95, y);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#F5F5DC';
+        ctx.fillText(amount, 1105, y);
+        ctx.textAlign = 'left';
+        y += 55;
+      }
+
+      // Total
+      ctx.strokeStyle = '#3A3A3A';
+      ctx.beginPath();
+      ctx.moveTo(95, 1235);
+      ctx.lineTo(1105, 1235);
+      ctx.stroke();
+
+      ctx.fillStyle = '#BDBDAF';
+      ctx.font = '28px Arial';
+      ctx.fillText('Total Paid', 95, 1285);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#E5A823';
+      ctx.font = 'bold 40px Arial';
+      ctx.fillText(`₹${bookingDetails.totalAmount.toFixed(2)}`, 1105, 1288);
+      ctx.textAlign = 'left';
+
+      // Footer metadata
+      ctx.fillStyle = '#A5A598';
+      ctx.font = '22px Arial';
+      ctx.fillText(`Booked by: ${bookingDetails.userName}`, 60, 1400);
+      ctx.fillText(`Email: ${bookingDetails.userEmail}`, 60, 1440);
+      ctx.fillText(`Booking ID: ${bookingDetails.bookingId}`, 60, 1480);
+      ctx.fillText(`Payment ID: ${bookingDetails.paymentId}`, 60, 1520);
+      ctx.fillText(`Booked on: ${new Date(bookingDetails.bookedAt).toLocaleString('en-IN')}`, 60, 1560);
       
       const link = document.createElement('a');
       link.download = `ticket-${bookingDetails?.bookingId || 'download'}.png`;

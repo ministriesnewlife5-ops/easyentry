@@ -4,6 +4,10 @@ import { authOptions } from '@/lib/auth-options';
 import crypto from 'crypto';
 import { getSupabaseServerClient } from '@/lib/supabase';
 
+function normalizeEnvValue(value?: string) {
+  return value?.trim().replace(/^['\"]|['\"]$/g, '');
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -35,8 +39,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify signature
+    const razorpaySecret = normalizeEnvValue(process.env.RAZORPAY_KEY_SECRET) || '';
+
     const expectedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
+      .createHmac('sha256', razorpaySecret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex');
 
