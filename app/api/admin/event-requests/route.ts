@@ -97,6 +97,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
     }
 
+    const reviewerId = token.sub;
+
+    if (!reviewerId) {
+      return NextResponse.json({ error: 'Admin user ID is missing from the session' }, { status: 400 });
+    }
+
     const body = await request.json();
     const { requestId, status, rejectionReason } = body;
 
