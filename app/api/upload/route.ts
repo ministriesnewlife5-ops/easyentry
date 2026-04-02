@@ -23,15 +23,6 @@ function normalizeToHttps(url: string): string {
   }
 }
 
-// Allow larger request bodies for file uploads
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '50mb',
-    },
-  },
-};
-
 export async function POST(request: NextRequest) {
   try {
     const supabase = getSupabaseServerClient();

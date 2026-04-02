@@ -28,6 +28,7 @@ import {
   Users
 } from 'lucide-react';
 import DragDropUpload from '@/components/ui/DragDropUpload';
+import { uploadFileDirectToSupabase } from '@/lib/browser-storage';
 
 type Company = {
   id: string;
@@ -154,26 +155,20 @@ export default function AdminEventHostSection() {
     try {
       const uploadFile = await compressImageForUpload(file);
 
-      const hardLimitBytes = 950 * 1024;
-      if (uploadFile.size > hardLimitBytes) {
-        setMessage({ type: 'error', text: `File is too large after optimization (${Math.round(uploadFile.size / 1024)}KB). Please upload a smaller image.` });
+      const maxFileBytes = uploadFile.type.startsWith('video/')
+        ? 50 * 1024 * 1024
+        : uploadFile.type.startsWith('image/')
+          ? 10 * 1024 * 1024
+          : 25 * 1024 * 1024;
+
+      if (uploadFile.size > maxFileBytes) {
+        const sizeLabel = Math.round(maxFileBytes / (1024 * 1024));
+        const unit = uploadFile.type.startsWith('video/') ? 'video' : 'file';
+        setMessage({ type: 'error', text: `This ${unit} is too large. Please upload a file under ${sizeLabel}MB.` });
         return null;
       }
 
-      const formData = new FormData();
-      formData.append('file', uploadFile);
-      formData.append('type', type);
-      
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-      
-      const data = await response.json();
+      const data = await uploadFileDirectToSupabase(uploadFile, type);
       return data.url;
     } catch (error) {
       console.error('Error uploading file:', error);

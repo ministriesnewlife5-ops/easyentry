@@ -30,6 +30,7 @@ import {
 import Navigation from '@/components/ui/Navigation';
 import Footer from '@/components/ui/Footer';
 import DragDropUpload from '@/components/ui/DragDropUpload';
+import { uploadFileDirectToSupabase } from '@/lib/browser-storage';
 
 // Converts a File to a base64 data URL so images persist after page reload
 function fileToBase64(file: File): Promise<string> {
@@ -398,31 +399,24 @@ export default function SellerFormPage() {
     try {
       const uploadFile = await compressImageForUpload(file);
 
-      // Guard against upstream reverse-proxy limits (common 1MB cap)
-      const hardLimitBytes = 950 * 1024;
-      if (uploadFile.size > hardLimitBytes) {
-        setNotificationMessage(`File is too large after optimization (${Math.round(uploadFile.size / 1024)}KB). Please upload a smaller image.`);
+      const maxFileBytes = uploadFile.type.startsWith('video/')
+        ? 50 * 1024 * 1024
+        : uploadFile.type.startsWith('image/')
+          ? 10 * 1024 * 1024
+          : 25 * 1024 * 1024;
+
+      if (uploadFile.size > maxFileBytes) {
+        const sizeLabel = Math.round(maxFileBytes / (1024 * 1024));
+        const unit = uploadFile.type.startsWith('video/') ? 'video' : 'file';
+        setNotificationMessage(`This ${unit} is too large. Please upload a file under ${sizeLabel}MB.`);
         setShowNotification(true);
         return null;
       }
 
       setUploadingFiles(prev => new Set(prev).add(fileId));
       setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
-      
-      const formData = new FormData();
-      formData.append('file', uploadFile);
-      formData.append('type', type);
-      
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-      
-      const data = await response.json();
+
+      const data = await uploadFileDirectToSupabase(uploadFile, type);
       
       setUploadProgress(prev => ({ ...prev, [fileId]: 100 }));
       setTimeout(() => {
