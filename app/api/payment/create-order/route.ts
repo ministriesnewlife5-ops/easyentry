@@ -86,21 +86,27 @@ export async function POST(request: NextRequest) {
       keyId,
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
+    const err = error as {
+      message?: string;
+      statusCode?: number;
+      error?: unknown;
+    };
+
     console.error('Razorpay order creation failed:', {
-      message: error?.message,
-      statusCode: error?.statusCode,
-      error: error?.error,
+      message: err.message,
+      statusCode: err.statusCode,
+      error: err.error,
     });
 
-    if (error?.message === 'Missing Razorpay credentials in environment') {
+    if (err.message === 'Missing Razorpay credentials in environment') {
       return NextResponse.json(
         { error: 'Payment gateway is not configured on server' },
         { status: 500 }
       );
     }
 
-    if (error?.statusCode === 401) {
+    if (err.statusCode === 401) {
       return NextResponse.json(
         { error: 'Payment gateway authentication failed. Please contact support.' },
         { status: 502 }
