@@ -59,7 +59,7 @@ export type VenueProfile = {
   location: string | null;
   capacity: number | null;
   description: string | null;
-  amenities: string[] | null;
+  amenities: Record<string, unknown> | null;
   images: string[] | null;
   owner_id: string | null;
   is_active: boolean;

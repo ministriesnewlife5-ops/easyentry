@@ -64,13 +64,32 @@ CREATE TABLE IF NOT EXISTS venue_profiles (
   location TEXT,
   capacity INTEGER,
   description TEXT,
-  amenities TEXT[],
+  amenities JSONB,
   images TEXT[],
   owner_id UUID REFERENCES app_users(id) ON DELETE SET NULL,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure amenities supports object JSON payloads used by venue API/store
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'venue_profiles'
+      AND column_name = 'amenities'
+      AND data_type = 'ARRAY'
+  ) THEN
+    ALTER TABLE venue_profiles
+      ALTER COLUMN amenities TYPE JSONB
+      USING CASE
+        WHEN amenities IS NULL THEN '{}'::jsonb
+        ELSE to_jsonb(amenities)
+      END;
+  END IF;
+END $$;
 
 -- ============================================
 -- 4. EVENT_REQUESTS TABLE
