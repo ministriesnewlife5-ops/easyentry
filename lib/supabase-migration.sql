@@ -12,6 +12,9 @@ ALTER TABLE event_requests
   ADD COLUMN IF NOT EXISTS estimated_total_revenue    NUMERIC(12,2),
   ADD COLUMN IF NOT EXISTS estimated_total_commission NUMERIC(12,2);
 
+-- Refresh PostgREST schema cache so the API sees the new columns immediately
+NOTIFY pgrst, 'reload schema';
+
 -- Optional: index for faster outlet lookups
 CREATE INDEX IF NOT EXISTS idx_event_requests_user_id
   ON event_requests (user_id);

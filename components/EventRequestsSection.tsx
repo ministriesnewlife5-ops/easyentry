@@ -97,10 +97,10 @@ export default function EventRequestsSection() {
   const handleApprove = async (id: string) => {
     setActionLoading(id);
     try {
-      const res = await fetch(`/api/admin/event-requests/${id}`, {
-        method: 'PATCH',
+      const res = await fetch('/api/admin/event-requests', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve' }),
+        body: JSON.stringify({ requestId: id, status: 'approved' }),
       });
       if (res.ok) {
         setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'approved' } : r));
@@ -113,10 +113,10 @@ export default function EventRequestsSection() {
   const handleReject = async (id: string) => {
     setActionLoading(id);
     try {
-      const res = await fetch(`/api/admin/event-requests/${id}`, {
-        method: 'PATCH',
+      const res = await fetch('/api/admin/event-requests', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reject', rejectionReason }),
+        body: JSON.stringify({ requestId: id, status: 'rejected', rejectionReason }),
       });
       if (res.ok) {
         setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'rejected' } : r));

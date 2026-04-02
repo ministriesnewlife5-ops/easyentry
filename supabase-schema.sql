@@ -117,6 +117,19 @@ CREATE TABLE IF NOT EXISTS event_requests (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Additional fields used by the current app payloads
+ALTER TABLE event_requests
+  ADD COLUMN IF NOT EXISTS outlet_name TEXT,
+  ADD COLUMN IF NOT EXISTS outlet_email TEXT,
+  ADD COLUMN IF NOT EXISTS event_data JSONB,
+  ADD COLUMN IF NOT EXISTS ticket_categories JSONB,
+  ADD COLUMN IF NOT EXISTS commission_percent NUMERIC(5,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS estimated_total_revenue NUMERIC(12,2),
+  ADD COLUMN IF NOT EXISTS estimated_total_commission NUMERIC(12,2);
+
+-- Refresh PostgREST schema cache so new columns are immediately visible
+NOTIFY pgrst, 'reload schema';
+
 -- Index for event request lookups
 CREATE INDEX IF NOT EXISTS idx_event_requests_user ON event_requests(user_id);
 CREATE INDEX IF NOT EXISTS idx_event_requests_status ON event_requests(status);
