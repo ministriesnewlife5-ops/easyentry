@@ -2,6 +2,15 @@
 import { supabase, type PublishedEvent } from './supabase';
 import type { EventRequest } from './event-request-store';
 
+type PublicEventTicketCategory = {
+  id: string;
+  name: string;
+  price: number;
+  quantity?: number;
+  availableFrom?: string;
+  availableUntil?: string;
+};
+
 export type PublicEventHighlight = {
   iconKey: 'star' | 'zap';
   title: string;
@@ -63,7 +72,7 @@ export type PublicEvent = {
   artists: PublicEventArtist[];
   publishedAt: number;
   sourceRequestId?: string;
-  ticketCategories?: Array<{ id: string; name: string; price: number; availableFrom?: string; availableUntil?: string }>;
+  ticketCategories?: PublicEventTicketCategory[];
 };
 
 export type PublicEventCard = {
@@ -104,9 +113,13 @@ function mapLegacyToDb(event: Partial<PublicEvent> & { sourceRequestId?: string 
 }
 
 // Map database record to legacy PublicEvent
-function mapDbToLegacy(record: Record<string, unknown>): PublicEvent {
+function mapDbToLegacy(record: Record<string, unknown>, ticketCategoriesOverride?: PublicEventTicketCategory[]): PublicEvent {
   const gallery = (record.gallery_images as string[]) || [];
   const imageUrl = (record.image_url as string) || gallery[0] || '';
+  const ticketCategoriesFromRecord = Array.isArray(record.ticket_categories)
+    ? (record.ticket_categories as PublicEventTicketCategory[])
+    : [];
+  const ticketCategories = ticketCategoriesOverride ?? ticketCategoriesFromRecord;
 
   return {
     id: record.id as string,
@@ -135,8 +148,63 @@ function mapDbToLegacy(record: Record<string, unknown>): PublicEvent {
     artists: [],
     publishedAt: new Date(record.published_at as string).getTime(),
     sourceRequestId: (record.request_id as string) || undefined,
-    ticketCategories: [],
+    ticketCategories,
   };
+}
+
+async function getTicketCategoriesByEventId(eventId: string): Promise<PublicEventTicketCategory[]> {
+  const { data, error } = await supabase
+    .from('ticket_categories')
+    .select('id, name, price, quantity, available_from, available_until')
+    .eq('event_id', eventId)
+    .order('created_at', { ascending: true });
+
+  if (error || !data) {
+    if (error) {
+      console.error(`Failed to fetch ticket categories for event ${eventId}:`, error.message);
+    }
+    return [];
+  }
+
+  return (data as Array<Record<string, unknown>>).map((row) => ({
+    id: String(row.id || ''),
+    name: String(row.name || 'General Admission'),
+    price: Number(row.price || 0),
+    quantity: row.quantity == null ? undefined : Number(row.quantity),
+    availableFrom: typeof row.available_from === 'string' ? row.available_from : undefined,
+    availableUntil: typeof row.available_until === 'string' ? row.available_until : undefined,
+  }));
+}
+
+async function getTicketCategoriesFromSourceRequest(requestId: string): Promise<PublicEventTicketCategory[]> {
+  const { data, error } = await supabase
+    .from('event_requests')
+    .select('event_data, ticket_categories')
+    .eq('id', requestId)
+    .single();
+
+  if (error || !data) {
+    return [];
+  }
+
+  const row = data as Record<string, unknown>;
+  const eventData = row.event_data as Record<string, unknown> | null;
+  const fromEventData = Array.isArray(eventData?.ticketCategories)
+    ? (eventData?.ticketCategories as PublicEventTicketCategory[])
+    : [];
+  const fromColumn = Array.isArray(row.ticket_categories)
+    ? (row.ticket_categories as PublicEventTicketCategory[])
+    : [];
+
+  const raw = fromEventData.length > 0 ? fromEventData : fromColumn;
+  return raw.map((cat) => ({
+    id: String(cat.id || ''),
+    name: String(cat.name || 'General Admission'),
+    price: Number(cat.price || 0),
+    quantity: cat.quantity == null ? undefined : Number(cat.quantity),
+    availableFrom: cat.availableFrom,
+    availableUntil: cat.availableUntil,
+  }));
 }
 
 function getImageColor(category: string): string {
@@ -241,7 +309,14 @@ export async function getPublishedEventById(id: string): Promise<PublicEvent | u
     throw new Error(`Failed to get published event: ${error.message}`);
   }
 
-  return mapDbToLegacy(data as Record<string, unknown>);
+  let ticketCategories = await getTicketCategoriesByEventId(id);
+  if (ticketCategories.length === 0) {
+    const requestId = (data as Record<string, unknown>).request_id as string | null;
+    if (requestId) {
+      ticketCategories = await getTicketCategoriesFromSourceRequest(requestId);
+    }
+  }
+  return mapDbToLegacy(data as Record<string, unknown>, ticketCategories);
 }
 
 /**
@@ -298,7 +373,40 @@ export async function publishEventFromRequest(request: EventRequest): Promise<Pu
     result = data;
   }
 
-  return mapDbToLegacy(result as Record<string, unknown>);
+  const publishedEventId = (result as Record<string, unknown>).id as string;
+
+  const { error: deleteTicketsError } = await supabase
+    .from('ticket_categories')
+    .delete()
+    .eq('event_id', publishedEventId);
+
+  if (deleteTicketsError) {
+    throw new Error(`Failed to refresh ticket categories: ${deleteTicketsError.message}`);
+  }
+
+  const categories = request.eventData.ticketCategories || [];
+  if (categories.length > 0) {
+    const { error: insertTicketsError } = await supabase
+      .from('ticket_categories')
+      .insert(
+        categories.map((cat) => ({
+          event_id: publishedEventId,
+          name: cat.name,
+          price: cat.price,
+          quantity: cat.quantity ?? null,
+          available_from: cat.availableFrom ?? null,
+          available_until: cat.availableUntil ?? null,
+          created_at: new Date().toISOString(),
+        }))
+      );
+
+    if (insertTicketsError) {
+      throw new Error(`Failed to store ticket categories: ${insertTicketsError.message}`);
+    }
+  }
+
+  const ticketCategories = await getTicketCategoriesByEventId(publishedEventId);
+  return mapDbToLegacy(result as Record<string, unknown>, ticketCategories);
 }
 
 /**

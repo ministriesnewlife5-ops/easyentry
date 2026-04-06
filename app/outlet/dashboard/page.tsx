@@ -127,7 +127,7 @@ function EventCard({ event }: { event: RecentEvent }) {
     <div className="flex items-center gap-4 rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-4">
       <div className="relative w-16 h-16 rounded-lg bg-[#2A2A2A] overflow-hidden flex-shrink-0">
         {event.image ? (
-          <Image src={event.image} alt={event.title} fill className="object-cover" />
+          <img src={event.image} alt={event.title} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <CalendarDays className="w-6 h-6 text-[#F5F5DC]/30" />

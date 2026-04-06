@@ -290,7 +290,7 @@ export default function PromoterProfilePage() {
                     <h3 className="text-sm font-medium text-[#F5F5DC]/60 mb-4">Profile Preview</h3>
                     <div className="relative h-32 rounded-xl overflow-hidden bg-[#2A2A2A] mb-4">
                       {coverImage ? (
-                        <Image src={coverImage} alt="Cover" fill className="object-cover" />
+                        <img src={coverImage} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-[#F5F5DC]/30">
                           <Camera className="w-8 h-8" />
@@ -300,7 +300,7 @@ export default function PromoterProfilePage() {
                     <div className="flex items-center gap-3 mb-4">
                       <div className="relative w-16 h-16 rounded-full overflow-hidden bg-[#2A2A2A] border-2 border-[#E5A823]">
                         {profileImage ? (
-                          <Image src={profileImage} alt="Profile" fill className="object-cover" />
+                          <img src={profileImage} alt="Profile" className="absolute inset-0 w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-[#F5F5DC]/30">
                             <Camera className="w-6 h-6" />
@@ -363,7 +363,7 @@ export default function PromoterProfilePage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {videos.map((video) => (
                       <div key={video.id} className="relative aspect-video rounded-xl overflow-hidden bg-[#2A2A2A] group">
-                        <Image src={video.thumbnail} alt={video.title} fill className="object-cover" />
+                        <img src={video.thumbnail} alt={video.title} className="absolute inset-0 w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <button type="button" onClick={() => removeVideo(video.id)} className="p-2 bg-[#EB4D4B] rounded-full">
                             <Trash2 className="w-4 h-4 text-white" />
@@ -393,7 +393,7 @@ export default function PromoterProfilePage() {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {galleryImages.map((image) => (
                       <div key={image.id} className="relative aspect-square rounded-xl overflow-hidden bg-[#2A2A2A] group">
-                        <Image src={image.url} alt={image.name} fill className="object-cover" />
+                        <img src={image.url} alt={image.name} className="absolute inset-0 w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <button type="button" onClick={() => removeGalleryImage(image.id)} className="p-2 bg-[#EB4D4B] rounded-full">
                             <Trash2 className="w-4 h-4 text-white" />

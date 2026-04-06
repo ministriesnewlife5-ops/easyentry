@@ -32,6 +32,18 @@ import Footer from '@/components/ui/Footer';
 import DragDropUpload from '@/components/ui/DragDropUpload';
 import { uploadFileDirectToSupabase } from '@/lib/browser-storage';
 
+type BrowseCategory = { name: string; icon: string; subFilters: string[] };
+
+const CUSTOM_CATEGORIES_STORAGE_KEY = 'seller_form_custom_categories';
+const FALLBACK_BROWSE_CATEGORIES: BrowseCategory[] = [
+  { name: 'Gigs', icon: 'Mic', subFilters: ['Alternative', 'Afropop', 'Alt-rock', 'Britpop', 'Celtic', 'Chiptune'] },
+  { name: 'Party', icon: 'PartyPopper', subFilters: ['House', 'Techno', 'Trance', 'Drum & Bass', 'Dubstep', 'EDM'] },
+  { name: 'DJ', icon: 'Disc', subFilters: ['Hip Hop', 'R&B', 'Reggaeton', 'Latin', 'Jazz', 'Blues'] },
+  { name: 'Comedy', icon: 'Smile', subFilters: ['Stand-up', 'Improv', 'Sketch', 'Dark Comedy', 'Satire'] },
+  { name: 'Theatre', icon: 'Drama', subFilters: ['Drama', 'Musical', 'Opera', 'Ballet', 'Contemporary'] },
+  { name: 'Art', icon: 'Palette', subFilters: ['Painting', 'Sculpture', 'Photography', 'Digital Art'] },
+];
+
 // Converts a File to a base64 data URL so images persist after page reload
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -144,7 +156,7 @@ export default function SellerFormPage() {
   }>>([]);
   const [customCategory, setCustomCategory] = useState('');
   const [customSubcategory, setCustomSubcategory] = useState('');
-  const [categories, setCategories] = useState<Array<{ name: string; icon: string; subFilters: string[] }>>([]);
+  const [categories, setCategories] = useState<BrowseCategory[]>([]);
   const [rules, setRules] = useState<Array<{ id: string; text: string }>>([{ id: '1', text: '' }]);
   
   // Artists state
@@ -153,6 +165,97 @@ export default function SellerFormPage() {
   const [artistSearchQuery, setArtistSearchQuery] = useState('');
   const [showArtistDropdown, setShowArtistDropdown] = useState(false);
   const artistDropdownRef = useRef<HTMLDivElement>(null);
+
+  const normalizeCategoryName = (value: string) => value.trim().replace(/\s+/g, ' ');
+
+  const normalizeCategories = (raw: unknown): BrowseCategory[] => {
+    if (!Array.isArray(raw)) return [];
+
+    return raw
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const record = item as Record<string, unknown>;
+        const name = typeof record.name === 'string' ? normalizeCategoryName(record.name) : '';
+        if (!name) return null;
+        const icon = typeof record.icon === 'string' && record.icon.trim() ? record.icon : 'Tag';
+        const subFilters = Array.isArray(record.subFilters)
+          ? record.subFilters.filter((sub): sub is string => typeof sub === 'string').map((sub) => normalizeCategoryName(sub)).filter(Boolean)
+          : [];
+        return { name, icon, subFilters };
+      })
+      .filter((item): item is BrowseCategory => item !== null);
+  };
+
+  const dedupeCategories = (items: BrowseCategory[]): BrowseCategory[] => {
+    const categoryMap = new Map<string, BrowseCategory>();
+
+    items.forEach((item) => {
+      const key = item.name.toLowerCase();
+      const existing = categoryMap.get(key);
+
+      if (!existing) {
+        categoryMap.set(key, {
+          name: item.name,
+          icon: item.icon || 'Tag',
+          subFilters: Array.from(new Set(item.subFilters.map((sub) => normalizeCategoryName(sub)).filter(Boolean))),
+        });
+        return;
+      }
+
+      const mergedSubFilters = Array.from(
+        new Set([...existing.subFilters, ...item.subFilters].map((sub) => normalizeCategoryName(sub)).filter(Boolean))
+      );
+
+      categoryMap.set(key, {
+        name: existing.name,
+        icon: existing.icon || item.icon || 'Tag',
+        subFilters: mergedSubFilters,
+      });
+    });
+
+    return Array.from(categoryMap.values());
+  };
+
+  const getStoredCustomCategories = (): BrowseCategory[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(CUSTOM_CATEGORIES_STORAGE_KEY);
+      if (!raw) return [];
+      return normalizeCategories(JSON.parse(raw));
+    } catch {
+      return [];
+    }
+  };
+
+  const saveCustomCategories = (nextCategories: BrowseCategory[]) => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(CUSTOM_CATEGORIES_STORAGE_KEY, JSON.stringify(nextCategories));
+    } catch {
+      // Ignore storage write failures
+    }
+  };
+
+  const addOrUpdateCustomCategory = (categoryName: string, subcategoryName?: string) => {
+    const normalizedCategory = normalizeCategoryName(categoryName);
+    const normalizedSubcategory = normalizeCategoryName(subcategoryName || '');
+
+    if (!normalizedCategory) return;
+
+    setCategories((prev) => {
+      const merged = dedupeCategories([
+        ...prev,
+        {
+          name: normalizedCategory,
+          icon: 'Tag',
+          subFilters: normalizedSubcategory ? [normalizedSubcategory] : [],
+        },
+      ]);
+
+      saveCustomCategories(merged.filter((cat) => cat.icon === 'Tag' || !FALLBACK_BROWSE_CATEGORIES.some((f) => f.name.toLowerCase() === cat.name.toLowerCase())));
+      return merged;
+    });
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -167,15 +270,27 @@ export default function SellerFormPage() {
       // Load categories from API
       const loadCategories = async () => {
         try {
-          const response = await fetch('/api/browse-filters/default');
-          if (response.ok) {
-            const data = await response.json();
-            const filters = data.filters;
-            setCategories(filters?.categories || []);
+          let loadedCategories: BrowseCategory[] = [];
+
+          const adminFiltersResponse = await fetch('/api/admin/filters');
+          if (adminFiltersResponse.ok) {
+            const data = await adminFiltersResponse.json();
+            loadedCategories = normalizeCategories(data?.filters?.categories);
           }
+
+          if (loadedCategories.length === 0) {
+            const fallbackResponse = await fetch('/api/browse-filters/default');
+            if (fallbackResponse.ok) {
+              const data = await fallbackResponse.json();
+              loadedCategories = normalizeCategories(data?.filters?.categories || data?.filters?.value?.categories);
+            }
+          }
+
+          const storedCustomCategories = getStoredCustomCategories();
+          setCategories(dedupeCategories([...FALLBACK_BROWSE_CATEGORIES, ...loadedCategories, ...storedCustomCategories]));
         } catch (e) {
           console.error('Error loading categories:', e);
-          setCategories([]);
+          setCategories(dedupeCategories([...FALLBACK_BROWSE_CATEGORIES, ...getStoredCustomCategories()]));
         }
       };
       loadCategories();
@@ -238,6 +353,27 @@ export default function SellerFormPage() {
 
   const handleSendEventRequest = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const resolvedCategory = normalizeCategoryName(formData.category === 'Other' ? customCategory : formData.category);
+    const resolvedSubcategory = normalizeCategoryName(formData.subcategory === 'Other' ? customSubcategory : formData.subcategory);
+
+    if (!resolvedCategory) {
+      setNotificationMessage('Please select or enter a valid category.');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 5000);
+      return;
+    }
+
+    if (!resolvedSubcategory) {
+      setNotificationMessage('Please select or enter a valid subcategory.');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 5000);
+      return;
+    }
+
+    if (formData.category === 'Other' || formData.subcategory === 'Other') {
+      addOrUpdateCustomCategory(resolvedCategory, resolvedSubcategory);
+    }
     
     // Validate required fields
     if (!formData.title || !formData.date || !formData.startTime || !formData.location) {
@@ -271,8 +407,8 @@ export default function SellerFormPage() {
         startTime: formData.startTime,
         endTime: formData.endTime,
         venue: formData.location,
-        category: formData.category === 'Other' ? customCategory : (formData.category || 'General'),
-        subcategory: formData.subcategory === 'Other' ? customSubcategory : (formData.subcategory || undefined),
+        category: resolvedCategory || 'General',
+        subcategory: resolvedSubcategory || undefined,
         price: `₹${minPrice}`,
         image: coverImageUrlToUse,
         numberOfTickets: ticketCategories.reduce((sum, cat) => sum + (cat.quantity || 0), 0),
@@ -611,6 +747,13 @@ export default function SellerFormPage() {
                             type="text"
                             value={customCategory}
                             onChange={(e) => setCustomCategory(e.target.value)}
+                            onBlur={() => {
+                              const normalized = normalizeCategoryName(customCategory);
+                              if (!normalized) return;
+                              addOrUpdateCustomCategory(normalized);
+                              setCustomCategory(normalized);
+                              setFormData((prev) => ({ ...prev, category: normalized }));
+                            }}
                             className="w-full bg-[#2A2A2A] border border-[#E5A823]/50 rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                             placeholder="Enter custom category"
                             required
@@ -639,7 +782,7 @@ export default function SellerFormPage() {
                           {!formData.category ? 'Select category first' : 'Select subcategory'}
                         </option>
                         {formData.category && formData.category !== 'Other' && categories
-                          .find((cat) => cat.name === formData.category)
+                          .find((cat) => cat.name.toLowerCase() === formData.category.toLowerCase())
                           ?.subFilters?.map((sub) => (
                             <option key={sub} value={sub}>{sub}</option>
                           ))}
@@ -653,6 +796,13 @@ export default function SellerFormPage() {
                             type="text"
                             value={customSubcategory}
                             onChange={(e) => setCustomSubcategory(e.target.value)}
+                            onBlur={() => {
+                              const normalizedSub = normalizeCategoryName(customSubcategory);
+                              if (!normalizedSub || !formData.category || formData.category === 'Other') return;
+                              addOrUpdateCustomCategory(formData.category, normalizedSub);
+                              setCustomSubcategory(normalizedSub);
+                              setFormData((prev) => ({ ...prev, subcategory: normalizedSub }));
+                            }}
                             className="w-full bg-[#2A2A2A] border border-[#E5A823]/50 rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                             placeholder="Enter custom subcategory"
                             required

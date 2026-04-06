@@ -536,7 +536,7 @@ function OutletProfileContent() {
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-4">
                       {venueImages.map((img, index) => (
                         <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-[#2A2A2A] group">
-                          <Image src={img} alt={`Venue image ${index + 1}`} fill className="object-cover" />
+                          <img src={img} alt={`Venue image ${index + 1}`} className="absolute inset-0 w-full h-full object-cover" />
                           <button
                             type="button"
                             onClick={() => handleRemoveVenueImage(index)}
