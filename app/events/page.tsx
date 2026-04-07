@@ -144,6 +144,23 @@ export default function EventsPage() {
 
   const handleCategorySelect = (category: string | null) => {
     setSelectedCategory(category);
+    setActiveFilters((prev) => {
+      const base: BrowseFilterSelection = prev || {
+        category: null,
+        subFilters: [],
+        selectedAreas: [],
+        hasDateFilter: false,
+        hasPriceFilter: false,
+        priceMin: 0,
+        priceMax: 10000,
+      };
+
+      return {
+        ...base,
+        category,
+        subFilters: category ? base.subFilters : [],
+      };
+    });
   };
 
   useEffect(() => {
