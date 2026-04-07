@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import {
   Plus, Trash2, X, MapPin, Calendar, Tag, Mic, PartyPopper,
   Disc, Smile, Drama, Palette, Building2, LucideIcon,
-  ChevronRight, ChevronDown, Loader2, CheckCircle2, AlertCircle
+  ChevronRight, ChevronDown, Loader2, CheckCircle2, AlertCircle, GripVertical
 } from 'lucide-react';
 
 type Category = {
@@ -106,6 +106,7 @@ export default function BrowseFiltersManager() {
   const [newSubFilter, setNewSubFilter] = useState('');
   const [categoryIconFile, setCategoryIconFile] = useState<string>('');
 
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [expandedState, setExpandedState] = useState<number | null>(null);
   const [expandedCity, setExpandedCity] = useState<string | null>(null);
 
@@ -198,6 +199,35 @@ export default function BrowseFiltersManager() {
     }
     const updated = { ...filters, categories: filters.categories.filter((_, i) => i !== index) };
     await updateFilters(updated);
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggingIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggingIndex === null || draggingIndex === index) return;
+  };
+
+  const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggingIndex === null || draggingIndex === dropIndex) {
+      setDraggingIndex(null);
+      return;
+    }
+
+    const newCategories = [...filters.categories];
+    const draggedItem = newCategories[draggingIndex];
+    newCategories.splice(draggingIndex, 1);
+    newCategories.splice(dropIndex, 0, draggedItem);
+
+    await updateFilters({ ...filters, categories: newCategories });
+    setDraggingIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingIndex(null);
   };
 
   const openEditCategory = (index: number) => {
@@ -399,10 +429,22 @@ export default function BrowseFiltersManager() {
         <ul className="space-y-2 max-h-80 overflow-y-auto">
           {filters.categories.map((cat, index) => {
             const IconComp = getIconComponent(cat.icon);
+            const isDragging = draggingIndex === index;
             return (
-              <li key={index} onClick={() => openEditCategory(index)}
-                className="cursor-pointer flex items-center justify-between rounded-lg border border-[#2A2A2A] bg-[#121212] p-3 hover:bg-[#2A2A2A]/40 transition-colors">
+              <li key={index}
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+                onClick={() => openEditCategory(index)}
+                className={`cursor-pointer flex items-center justify-between rounded-lg border p-3 transition-all ${
+                  isDragging
+                    ? 'border-[#E5A823] bg-[#E5A823]/10 opacity-50'
+                    : 'border-[#2A2A2A] bg-[#121212] hover:bg-[#2A2A2A]/40'
+                }`}>
                 <div className="flex items-center gap-2">
+                  <GripVertical className="w-4 h-4 text-[#F5F5DC]/30 cursor-grab active:cursor-grabbing" />
                   {cat.icon === 'CUSTOM' && cat.iconImage ? <img src={cat.iconImage} alt="" className="w-4 h-4 object-contain" /> : <IconComp className="w-4 h-4 text-[#E5A823]" />}
                   <span className="text-sm font-medium">{cat.name}</span>
                   <span className="text-xs text-[#F5F5DC]/40">({cat.subFilters.length} sub-filters)</span>
