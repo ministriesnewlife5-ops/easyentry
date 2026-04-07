@@ -550,51 +550,47 @@ export default function OutletHostEventPage() {
 
                   {/* Added categories */}
                   {ticketCategories.length > 0 && (
-                    <div className="bg-[#1A1A1A] rounded-lg border border-[#2A2A2A] overflow-hidden">
-                      <div className="px-3 py-2 border-b border-[#2A2A2A] text-xs text-[#F5F5DC]/50 uppercase tracking-wider grid grid-cols-5 gap-2">
-                        <span className="col-span-2">Category</span>
-                        <span className="text-right">Qty</span>
-                        <span className="text-right">Commission</span>
-                        <span className="text-right">Rev (est.)</span>
-                      </div>
-                      <div className="divide-y divide-[#2A2A2A]">
-                        {ticketCategories.map((category) => {
-                          const commAmt = (category.price * category.commissionPercent / 100);
-                          const totalRev = category.price * category.quantity;
-                          const totalComm = commAmt * category.quantity;
-                          return (
-                            <div key={category.id} className="p-3 grid grid-cols-5 gap-2 items-center hover:bg-[#2A2A2A]/50 transition-colors">
-                              <div className="col-span-2">
+                    <div className="space-y-3">
+                      {ticketCategories.map((category) => {
+                        const commAmt = category.price * category.commissionPercent / 100;
+                        const totalRev = category.price * category.quantity;
+                        const totalComm = commAmt * category.quantity;
+
+                        return (
+                          <div key={category.id} className="rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
                                 <p className="text-sm font-medium text-[#E5A823]">{category.name}</p>
-                                <p className="text-xs text-[#F5F5DC]/60">₹{category.price} / ticket</p>
+                                <p className="text-xs text-[#F5F5DC]/60">₹{category.price.toLocaleString('en-IN')} / ticket</p>
                               </div>
-                              <p className="text-sm text-right text-[#F5F5DC]/80">{category.quantity}</p>
-                              <div className="text-right">
-                                <p className="text-sm text-emerald-400 font-medium">{category.commissionPercent}%</p>
-                                <p className="text-xs text-[#F5F5DC]/50">₹{commAmt.toFixed(2)}/ticket</p>
-                                <p className="text-xs text-emerald-400/70">Total: ₹{totalComm.toFixed(2)}</p>
+                              <button
+                                type="button"
+                                onClick={() => removeTicketCategory(category.id)}
+                                className="text-[#EB4D4B] hover:bg-[#EB4D4B]/10 rounded-lg p-1.5 transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                              <div className="rounded-md bg-[#0D0D0D] border border-[#2A2A2A] px-3 py-2">
+                                <p className="text-xs text-[#F5F5DC]/50">Quantity</p>
+                                <p className="font-medium text-[#F5F5DC]">{category.quantity}</p>
                               </div>
-                              <div className="flex items-center justify-end gap-2">
-                                <p className="text-sm text-[#F5F5DC]/70">₹{totalRev.toLocaleString('en-IN')}</p>
-                                <button
-                                  type="button"
-                                  onClick={() => removeTicketCategory(category.id)}
-                                  className="text-[#EB4D4B] hover:bg-[#EB4D4B]/10 rounded-lg p-1.5 transition-colors"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
+                              <div className="rounded-md bg-[#0D0D0D] border border-[#2A2A2A] px-3 py-2">
+                                <p className="text-xs text-[#F5F5DC]/50">Commission</p>
+                                <p className="font-medium text-emerald-400">{category.commissionPercent}%</p>
+                                <p className="text-xs text-[#F5F5DC]/50">₹{commAmt.toFixed(2)} / ticket</p>
+                              </div>
+                              <div className="rounded-md bg-[#0D0D0D] border border-[#2A2A2A] px-3 py-2">
+                                <p className="text-xs text-[#F5F5DC]/50">Money Flow</p>
+                                <p className="font-medium text-[#F5F5DC]">Revenue: ₹{totalRev.toLocaleString('en-IN')}</p>
+                                <p className="text-xs text-emerald-400">Commission: ₹{totalComm.toFixed(2)}</p>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                      {/* Totals row */}
-                      <div className="px-3 py-2.5 border-t border-[#2A2A2A] bg-[#0D0D0D]/60 grid grid-cols-5 gap-2 text-sm font-semibold">
-                        <span className="col-span-2 text-[#F5F5DC]/70">Totals</span>
-                        <span className="text-right text-[#F5F5DC]/70">{totalTicketsFromCategories}</span>
-                        <span className="text-right text-emerald-400">₹{estimatedTotalCommission.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                        <span className="text-right text-[#F5F5DC]/70">₹{estimatedTotalRevenue.toLocaleString('en-IN')}</span>
-                      </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
