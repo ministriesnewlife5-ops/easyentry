@@ -6,7 +6,7 @@ import type { BrowseFilterSelection } from '@/components/ui/BrowseFilters';
 import PromoBanner from '@/components/ui/PromoBanner';
 import EventCard from '@/components/ui/EventCard';
 import { ArrowRight } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { PublicEventCard } from '@/lib/public-events-store';
 
@@ -122,7 +122,6 @@ export default function EventsPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showPromoBanner, setShowPromoBanner] = useState(true);
   const [allEvents, setAllEvents] = useState<PublicEventCard[]>([]);
-  const [filteredEvents, setFilteredEvents] = useState<PublicEventCard[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<BrowseFilterSelection | null>(null);
@@ -174,7 +173,6 @@ export default function EventsPage() {
         const data = await response.json();
         const events = data.events || [];
         setAllEvents(events);
-        setFilteredEvents(events);
       } catch (error) {
         console.error('Failed to load events:', error);
       } finally {
@@ -185,13 +183,13 @@ export default function EventsPage() {
     fetchEvents();
   }, []);
 
-  useEffect(() => {
+  const filteredEvents = useMemo(() => {
     const categoryFilter = activeFilters?.category ?? selectedCategory;
     const subFilters = activeFilters?.subFilters || [];
     const selectedAreas = activeFilters?.selectedAreas || [];
     const normalize = (value: string | null | undefined) => (value || '').trim().toLowerCase();
 
-    const filtered = allEvents.filter((event) => {
+    return allEvents.filter((event) => {
       // Category (always apply when selected)
       if (categoryFilter) {
         if (normalize(event.category) !== normalize(categoryFilter)) {
@@ -236,8 +234,6 @@ export default function EventsPage() {
 
       return true;
     });
-
-    setFilteredEvents(filtered);
   }, [allEvents, activeFilters, selectedCategory]);
 
   return (
