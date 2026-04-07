@@ -60,6 +60,7 @@ export type PublicEvent = {
   date: string;
   time: string;
   venue: string;
+  googleMapsLink?: string;
   distance: string;
   gatesOpen: string;
   price: string;
@@ -103,6 +104,19 @@ function mapLegacyToDb(event: Partial<PublicEvent> & { sourceRequestId?: string 
   const allMedia = Array.from(
     new Set([...(event.images || []), ...(event.mediaFiles || [])].filter(Boolean))
   );
+  const parsedTicketPrice = Number(String(event.price || '').replace(/[^\d.]/g, ''));
+  const socialLinks: Record<string, string> = {};
+
+  if (event.googleMapsLink) socialLinks.googleMapsLink = event.googleMapsLink;
+  if (event.venue) socialLinks.venue = event.venue;
+  if (event.distance) socialLinks.distance = event.distance;
+  if (event.gatesOpen) socialLinks.gatesOpen = event.gatesOpen;
+  if (event.entryAge) socialLinks.entryAge = event.entryAge;
+  if (event.layout) socialLinks.layout = event.layout;
+  if (event.seating) socialLinks.seating = event.seating;
+  if (event.promoterName) socialLinks.promoterName = event.promoterName;
+  if (event.promoterLabel) socialLinks.promoterLabel = event.promoterLabel;
+  if (event.subtitle) socialLinks.subtitle = event.subtitle;
 
   return {
     title: event.title || 'Untitled Event',
@@ -115,14 +129,14 @@ function mapLegacyToDb(event: Partial<PublicEvent> & { sourceRequestId?: string 
     category: event.category || null,
     image_url: event.image || allMedia[0] || null,
     gallery_images: allMedia,
-    ticket_price: event.price ? parseFloat(event.price) : null,
+    ticket_price: Number.isFinite(parsedTicketPrice) ? parsedTicketPrice : null,
     ticket_url: null,
     max_attendance: null,
     tags: event.subcategory ? [event.subcategory] : null,
     is_featured: false,
     is_public: true,
     status: 'upcoming',
-    social_links: null,
+    social_links: Object.keys(socialLinks).length > 0 ? socialLinks : null,
     request_id: event.sourceRequestId || null,
   };
 }
@@ -166,16 +180,34 @@ function mapDbToLegacy(
     ? (record.tags as unknown[]).filter((tag): tag is string => typeof tag === 'string')
     : [];
   const subcategory = tags[0] || undefined;
+  const socialLinks = (record.social_links as Record<string, unknown> | null) || null;
+  const googleMapsLink =
+    socialLinks && typeof socialLinks.googleMapsLink === 'string'
+      ? socialLinks.googleMapsLink
+      : undefined;
+  const venue = socialLinks && typeof socialLinks.venue === 'string' ? socialLinks.venue : '';
+  const distance = socialLinks && typeof socialLinks.distance === 'string' ? socialLinks.distance : 'Newly published event';
+  const gatesOpen = socialLinks && typeof socialLinks.gatesOpen === 'string' ? socialLinks.gatesOpen : '';
+  const entryAge = socialLinks && typeof socialLinks.entryAge === 'string' ? socialLinks.entryAge : '';
+  const layout = socialLinks && typeof socialLinks.layout === 'string' ? socialLinks.layout : '';
+  const seating = socialLinks && typeof socialLinks.seating === 'string' ? socialLinks.seating : '';
+  const promoterName = socialLinks && typeof socialLinks.promoterName === 'string' ? socialLinks.promoterName : '';
+  const promoterLabel =
+    socialLinks && typeof socialLinks.promoterLabel === 'string' ? socialLinks.promoterLabel : 'Published Event';
+  const subtitle = socialLinks && typeof socialLinks.subtitle === 'string'
+    ? socialLinks.subtitle
+    : (record.description as string)?.substring(0, 100) || '';
 
   return {
     id: record.id as string,
     title: (record.title as string) || '',
-    subtitle: (record.description as string)?.substring(0, 100) || '',
+    subtitle,
     date: (record.date as string) || '',
     time: (record.time as string) || '',
-    venue: '',
-    distance: 'Newly published event',
-    gatesOpen: '',
+    venue,
+    googleMapsLink,
+    distance,
+    gatesOpen,
     price: (record.ticket_price as number)?.toString() || '0',
     priceSubtext: 'onwards',
     image: imageUrl,
@@ -185,11 +217,11 @@ function mapDbToLegacy(
     fullDescription: (record.description as string) || '',
     category: (record.category as string) || (record.event_type as string) || '',
     subcategory,
-    entryAge: '',
-    layout: '',
-    seating: '',
-    promoterName: '',
-    promoterLabel: 'Published Event',
+    entryAge,
+    layout,
+    seating,
+    promoterName,
+    promoterLabel,
     highlights: [],
     thingsToKnow: [],
     artists: [],
@@ -375,6 +407,7 @@ function createApprovedEvent(request: EventRequest): Partial<PublicEvent> {
     date: request.eventData.date,
     time: request.eventData.time,
     venue: request.eventData.venue,
+    googleMapsLink: request.eventData.googleMapsLink,
     distance: 'Newly approved event',
     gatesOpen: request.eventData.gatesOpen,
     price: request.eventData.price,

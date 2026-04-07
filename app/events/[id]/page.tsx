@@ -126,6 +126,26 @@ export default function EventDetailsPage() {
     ];
   }, [event]);
 
+  const directionsUrl = useMemo(() => {
+    if (!event) return '';
+    if (event.googleMapsLink && /^https?:\/\//i.test(event.googleMapsLink)) {
+      return event.googleMapsLink;
+    }
+    if (!event.venue) return '';
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue)}`;
+  }, [event]);
+
+  const mapEmbedUrl = useMemo(() => {
+    if (!event) return '';
+    if (event.venue) {
+      return `https://www.google.com/maps?q=${encodeURIComponent(event.venue)}&output=embed`;
+    }
+    if (directionsUrl) {
+      return `https://www.google.com/maps?q=${encodeURIComponent(directionsUrl)}&output=embed`;
+    }
+    return '';
+  }, [event, directionsUrl]);
+
   const shareToWhatsApp = () => {
     if (!event) {
       return;
@@ -658,9 +678,16 @@ export default function EventDetailsPage() {
                 <div className="space-y-1">
                   <p className="text-sm font-bold text-[#F5F5DC]">{event.venue}</p>
                   <p className="text-xs text-[#F5F5DC]/50">{event.distance}</p>
-                  <button className="mt-2 px-3 py-1 bg-gradient-to-r from-[#E5A823] to-[#EB4D4B] text-[#0D0D0D] text-xs font-bold rounded hover:from-[#F5C542] hover:to-[#FF6B6B] transition-colors">
-                    DIRECTIONS
-                  </button>
+                  {directionsUrl && (
+                    <a
+                      href={directionsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex px-3 py-1 bg-gradient-to-r from-[#E5A823] to-[#EB4D4B] text-[#0D0D0D] text-xs font-bold rounded hover:from-[#F5C542] hover:to-[#FF6B6B] transition-colors"
+                    >
+                      DIRECTIONS
+                    </a>
+                  )}
                 </div>
               </motion.div>
             </div>
@@ -676,15 +703,23 @@ export default function EventDetailsPage() {
                 <MapPinned className="w-4 h-4 text-[#E5A823]" />
                 <span className="text-sm font-bold text-[#F5F5DC]">Map Location</span>
               </div>
-              <div className="aspect-video bg-[#0D0D0D] rounded-lg flex items-center justify-center border border-[#2A2A2A]">
-                <div className="text-center">
-                  <MapPin className="w-8 h-8 text-[#E5A823] mx-auto mb-2" />
-                  <p className="text-xs text-[#F5F5DC]/50">Interactive map coming soon</p>
-                </div>
-              </div>
-              <div className="flex gap-2 mt-3">
-                <button className="px-3 py-1 border border-[#2A2A2A] text-xs font-bold rounded hover:bg-[#2A2A2A] text-[#F5F5DC]">Map</button>
-                <button className="px-3 py-1 border border-[#2A2A2A] text-xs font-bold rounded hover:bg-[#2A2A2A] text-[#F5F5DC]">Satellite</button>
+              <div className="aspect-video bg-[#0D0D0D] rounded-lg overflow-hidden border border-[#2A2A2A]">
+                {mapEmbedUrl ? (
+                  <iframe
+                    title="Event location map"
+                    src={mapEmbedUrl}
+                    className="w-full h-full"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <MapPin className="w-8 h-8 text-[#E5A823] mx-auto mb-2" />
+                      <p className="text-xs text-[#F5F5DC]/50">Location unavailable</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
 

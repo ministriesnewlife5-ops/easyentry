@@ -36,6 +36,13 @@ type Company = {
   type: 'outlet' | 'promoter';
   location?: string;
   email?: string;
+  ownerId?: string;
+};
+
+type BrowseCategory = {
+  name: string;
+  icon: string;
+  subFilters: string[];
 };
 
 type TicketCategory = {
@@ -115,14 +122,22 @@ export default function AdminEventHostSection() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [formData, setFormData] = useState({
     title: '',
+    subtitle: '',
     description: '',
     date: '',
     startTime: '',
     endTime: '',
     location: '',
+    googleMapsLink: '',
     about: '',
     category: '',
+    subcategory: '',
+    gatesOpen: '',
+    entryAge: '18+',
+    layout: 'Standing',
+    seating: 'General Admission',
   });
+  const [categories, setCategories] = useState<BrowseCategory[]>([]);
   
   const [ticketCategories, setTicketCategories] = useState<TicketCategory[]>([]);
   const [rules, setRules] = useState<Array<{ id: string; text: string }>>([{ id: '1', text: '' }]);
@@ -134,7 +149,55 @@ export default function AdminEventHostSection() {
   // Fetch companies on mount
   useEffect(() => {
     fetchCompanies();
+    fetchBrowseFilters();
   }, []);
+
+  const normalizeCategories = (raw: unknown): BrowseCategory[] => {
+    if (!Array.isArray(raw)) return [];
+
+    return raw
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const record = item as Record<string, unknown>;
+        const name = typeof record.name === 'string' ? record.name.trim() : '';
+        if (!name) return null;
+        const icon = typeof record.icon === 'string' && record.icon.trim() ? record.icon : 'Tag';
+        const subFilters = Array.isArray(record.subFilters)
+          ? record.subFilters
+              .filter((sub): sub is string => typeof sub === 'string')
+              .map((sub) => sub.trim())
+              .filter(Boolean)
+          : [];
+
+        return { name, icon, subFilters };
+      })
+      .filter((item): item is BrowseCategory => item !== null);
+  };
+
+  const fetchBrowseFilters = async () => {
+    try {
+      let loadedCategories: BrowseCategory[] = [];
+
+      const adminFiltersResponse = await fetch('/api/admin/filters', { cache: 'no-store' });
+      if (adminFiltersResponse.ok) {
+        const data = await adminFiltersResponse.json();
+        loadedCategories = normalizeCategories(data?.filters?.categories);
+      }
+
+      if (loadedCategories.length === 0) {
+        const fallbackResponse = await fetch('/api/browse-filters/default', { cache: 'no-store' });
+        if (fallbackResponse.ok) {
+          const data = await fallbackResponse.json();
+          loadedCategories = normalizeCategories(data?.filters?.categories || data?.filters?.value?.categories);
+        }
+      }
+
+      setCategories(loadedCategories);
+    } catch (error) {
+      console.error('Error loading browse categories:', error);
+      setCategories([]);
+    }
+  };
   
   const fetchCompanies = async () => {
     try {
@@ -201,6 +264,13 @@ export default function AdminEventHostSection() {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
+
+  const handleGenerateGoogleMapsLink = () => {
+    const location = formData.location.trim();
+    if (!location) return;
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+    setFormData((prev) => ({ ...prev, googleMapsLink: mapsUrl }));
+  };
   
   const addTicketCategory = () => {
     const newCategory: TicketCategory = {
@@ -234,6 +304,17 @@ export default function AdminEventHostSection() {
       setMessage({ type: 'error', text: 'Please add at least one ticket category' });
       return;
     }
+
+    const hasInvalidTicketCategory = ticketCategories.some(
+      (cat) => !cat.name.trim() || (cat.price || 0) < 0 || (cat.quantity || 0) <= 0
+    );
+    if (hasInvalidTicketCategory) {
+      setMessage({
+        type: 'error',
+        text: 'Each ticket category must have a name, non-negative price, and quantity greater than 0.',
+      });
+      return;
+    }
     
     setSubmitting(true);
     
@@ -242,25 +323,27 @@ export default function AdminEventHostSection() {
       
       const eventData = {
         title: formData.title,
-        subtitle: formData.description,
+        subtitle: formData.subtitle || formData.description,
         date: formData.date,
-        time: formData.startTime,
+        time: formData.endTime ? `${formData.startTime} - ${formData.endTime}` : formData.startTime,
         startTime: formData.startTime,
         endTime: formData.endTime,
         venue: formData.location,
+        googleMapsLink: formData.googleMapsLink || undefined,
         category: formData.category || 'General',
+        subcategory: formData.subcategory || undefined,
         price: `₹${minPrice}`,
         image: coverImageUrl || (mediaFileUrls.length > 0 && mediaFileUrls[0].type.startsWith('image/') 
           ? mediaFileUrls[0].url 
           : ''),
         numberOfTickets: ticketCategories.reduce((sum, cat) => sum + (cat.quantity || 0), 0),
         mediaFiles: mediaFileUrls.map(m => m.url),
-        description: formData.about,
+        description: formData.description,
         fullDescription: formData.about,
-        gatesOpen: formData.startTime,
-        entryAge: '18+',
-        layout: 'Standing',
-        seating: 'General Admission',
+        gatesOpen: formData.gatesOpen || formData.startTime,
+        entryAge: formData.entryAge,
+        layout: formData.layout,
+        seating: formData.seating,
         rules: rules.filter(r => r.text.trim()).map(r => r.text),
         ticketCategories: ticketCategories.map(cat => ({
           ...cat,
@@ -274,9 +357,9 @@ export default function AdminEventHostSection() {
         // Admin specific fields
         isAdminHosted: true,
         hostCompanyId: selectedCompany.id,
+        hostCompanyOwnerId: selectedCompany.ownerId,
         hostCompanyType: selectedCompany.type,
         hostCompanyName: selectedCompany.name,
-        status: 'approved', // Auto-approved since admin is creating
       };
       
       const response = await fetch('/api/admin/host-event', {
@@ -291,13 +374,20 @@ export default function AdminEventHostSection() {
         setSelectedCompany(null);
         setFormData({
           title: '',
+          subtitle: '',
           description: '',
           date: '',
           startTime: '',
           endTime: '',
           location: '',
+          googleMapsLink: '',
           about: '',
           category: '',
+          subcategory: '',
+          gatesOpen: '',
+          entryAge: '18+',
+          layout: 'Standing',
+          seating: 'General Admission',
         });
         setTicketCategories([]);
         setRules([{ id: '1', text: '' }]);
@@ -316,7 +406,19 @@ export default function AdminEventHostSection() {
     }
   };
   
-  const isFormValid = selectedCompany && formData.title && formData.date && formData.startTime && formData.location && ticketCategories.length > 0;
+  const selectedCategoryData = categories.find((item) => item.name === formData.category);
+  const subcategoryOptions = selectedCategoryData?.subFilters || [];
+
+  const isFormValid =
+    Boolean(selectedCompany) &&
+    Boolean(formData.title) &&
+    Boolean(formData.subtitle) &&
+    Boolean(formData.description) &&
+    Boolean(formData.date) &&
+    Boolean(formData.startTime) &&
+    Boolean(formData.location) &&
+    Boolean(formData.category) &&
+    ticketCategories.length > 0;
   
   const totalTickets = ticketCategories.reduce((sum, cat) => sum + (cat.quantity || 0), 0);
   const minPrice = ticketCategories.length > 0 ? Math.min(...ticketCategories.map(c => c.price || 0)) : 0;
@@ -479,25 +581,41 @@ export default function AdminEventHostSection() {
                   />
                 </div>
 
+                {/* Subtitle */}
+                <div>
+                  <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Subtitle <span className="text-[#E5A823]">*</span></label>
+                  <input
+                    type="text"
+                    name="subtitle"
+                    value={formData.subtitle}
+                    onChange={handleInputChange}
+                    className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
+                    placeholder="Short line shown on event cards"
+                    required
+                  />
+                </div>
+
                 {/* Category & Date Row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Category</label>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Category <span className="text-[#E5A823]">*</span></label>
                     <div className="relative">
                       <select
                         name="category"
                         value={formData.category}
-                        onChange={handleInputChange}
+                        onChange={(e) => {
+                          handleInputChange(e);
+                          setFormData((prev) => ({ ...prev, subcategory: '' }));
+                        }}
                         className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] appearance-none cursor-pointer transition-all"
+                        required
                       >
                         <option value="">Select category</option>
-                        <option value="Club Night">Club Night</option>
-                        <option value="Concert">Concert</option>
-                        <option value="Festival">Festival</option>
-                        <option value="Party">Party</option>
-                        <option value="Stand-up">Stand-up</option>
-                        <option value="Workshop">Workshop</option>
-                        <option value="Other">Other</option>
+                        {categories.map((category) => (
+                          <option key={category.name} value={category.name}>
+                            {category.name}
+                          </option>
+                        ))}
                       </select>
                       <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/40 pointer-events-none" />
                     </div>
@@ -512,6 +630,28 @@ export default function AdminEventHostSection() {
                       className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all [color-scheme:dark]"
                       required
                     />
+                  </div>
+                </div>
+
+                {/* Subcategory */}
+                <div>
+                  <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Subcategory</label>
+                  <div className="relative">
+                    <select
+                      name="subcategory"
+                      value={formData.subcategory}
+                      onChange={handleInputChange}
+                      disabled={!formData.category || subcategoryOptions.length === 0}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] appearance-none cursor-pointer transition-all disabled:opacity-60"
+                    >
+                      <option value="">Select subcategory</option>
+                      {subcategoryOptions.map((subcategory) => (
+                        <option key={subcategory} value={subcategory}>
+                          {subcategory}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/40 pointer-events-none" />
                   </div>
                 </div>
 
@@ -563,6 +703,27 @@ export default function AdminEventHostSection() {
                   </div>
                 </div>
 
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80">Google Maps Link</label>
+                    <button
+                      type="button"
+                      onClick={handleGenerateGoogleMapsLink}
+                      className="text-xs text-[#E5A823] hover:text-[#F5C542] transition-colors"
+                    >
+                      Auto-generate from location
+                    </button>
+                  </div>
+                  <input
+                    type="url"
+                    name="googleMapsLink"
+                    value={formData.googleMapsLink}
+                    onChange={handleInputChange}
+                    className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
+                    placeholder="https://maps.google.com/..."
+                  />
+                </div>
+
                 {/* Description */}
                 <div>
                   <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Short Description <span className="text-[#E5A823]">*</span></label>
@@ -575,6 +736,51 @@ export default function AdminEventHostSection() {
                     placeholder="A brief tagline or summary that appears on event cards"
                     required
                   />
+                </div>
+
+                {/* Experience Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Gates Open</label>
+                    <input
+                      type="time"
+                      name="gatesOpen"
+                      value={formData.gatesOpen}
+                      onChange={handleInputChange}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all [color-scheme:dark]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Entry Age</label>
+                    <input
+                      type="text"
+                      name="entryAge"
+                      value={formData.entryAge}
+                      onChange={handleInputChange}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all"
+                      placeholder="e.g. 18+"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Layout</label>
+                    <input
+                      type="text"
+                      name="layout"
+                      value={formData.layout}
+                      onChange={handleInputChange}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Seating</label>
+                    <input
+                      type="text"
+                      name="seating"
+                      value={formData.seating}
+                      onChange={handleInputChange}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all"
+                    />
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -703,6 +909,48 @@ export default function AdminEventHostSection() {
                               >
                                 <Trash2 className="w-4 h-4 text-[#F5F5DC]/50 group-hover:text-red-400" />
                               </button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-[#F5F5DC]/50 mb-1.5 block">Available From (Date)</label>
+                              <input
+                                type="date"
+                                value={cat.availableFromDate || ''}
+                                onChange={(e) => updateTicketCategory(cat.id, 'availableFromDate', e.target.value)}
+                                className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-2.5 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all text-sm [color-scheme:dark]"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-[#F5F5DC]/50 mb-1.5 block">Available From (Time)</label>
+                              <input
+                                type="time"
+                                value={cat.availableFromTime || ''}
+                                onChange={(e) => updateTicketCategory(cat.id, 'availableFromTime', e.target.value)}
+                                className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-2.5 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all text-sm [color-scheme:dark]"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-[#F5F5DC]/50 mb-1.5 block">Available Until (Date)</label>
+                              <input
+                                type="date"
+                                value={cat.availableUntilDate || ''}
+                                onChange={(e) => updateTicketCategory(cat.id, 'availableUntilDate', e.target.value)}
+                                className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-2.5 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all text-sm [color-scheme:dark]"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-[#F5F5DC]/50 mb-1.5 block">Available Until (Time)</label>
+                              <input
+                                type="time"
+                                value={cat.availableUntilTime || ''}
+                                onChange={(e) => updateTicketCategory(cat.id, 'availableUntilTime', e.target.value)}
+                                className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-2.5 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all text-sm [color-scheme:dark]"
+                              />
                             </div>
                           </div>
                         </div>

@@ -59,6 +59,7 @@ export default function OutletHostEventPage() {
     date: '',
     time: '',
     venue: '',
+    googleMapsLink: '',
     category: '',
     price: '',
     image: '',
@@ -129,6 +130,9 @@ export default function OutletHostEventPage() {
       date: template.date,
       time: template.time,
       venue: template.venue,
+      googleMapsLink: template.venue
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(template.venue)}`
+        : '',
       category: template.category,
       price: template.price,
       image: template.image,
@@ -211,6 +215,7 @@ export default function OutletHostEventPage() {
             date: eventData.date,
             time: eventData.time,
             venue: eventData.venue,
+            googleMapsLink: eventData.googleMapsLink,
             category: eventData.category,
             price: eventData.price,
             image: eventData.image,
@@ -240,7 +245,7 @@ export default function OutletHostEventPage() {
             ? 'Event request submitted successfully. It is now in the admin dashboard and has been emailed to admin for approval.'
             : 'Event request submitted successfully. It is now in the admin dashboard and waiting for admin approval.',
         });
-        setEventData({ title: '', subtitle: '', date: '', time: '', venue: '', category: '', price: '', image: '', description: '', fullDescription: '', gatesOpen: '', entryAge: '21+', layout: 'Indoor Club', seating: 'Standing' });
+        setEventData({ title: '', subtitle: '', date: '', time: '', venue: '', googleMapsLink: '', category: '', price: '', image: '', description: '', fullDescription: '', gatesOpen: '', entryAge: '21+', layout: 'Indoor Club', seating: 'Standing' });
         setSelectedTemplate('');
         setEventImages([]);
         setNumberOfTickets('');
@@ -349,6 +354,16 @@ export default function OutletHostEventPage() {
                     <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#F5F5DC]/55" />
                     <input name="venue" value={eventData.venue} onChange={handleInputChange} required className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg pl-9 pr-4 py-2.5 focus:outline-none focus:border-[#E5A823]" />
                   </div>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm mb-2">Google Maps Link</label>
+                  <input
+                    name="googleMapsLink"
+                    value={eventData.googleMapsLink}
+                    onChange={handleInputChange}
+                    placeholder="https://maps.google.com/..."
+                    className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-4 py-2.5 focus:outline-none focus:border-[#E5A823]"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm mb-2">Gates Open</label>

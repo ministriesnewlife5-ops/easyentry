@@ -2,6 +2,110 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { createEventRequest, updateEventRequestStatus } from '@/lib/event-request-store';
+import { publishEventFromRequest } from '@/lib/public-events-store';
+
+const BROWSE_FILTERS_SETTINGS_KEY = 'browse_filters';
+
+function normalizeText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizePrice(value: unknown): string {
+  const cleaned = String(value ?? '').replace(/[^\d.]/g, '');
+  const numeric = Number(cleaned);
+  if (!Number.isFinite(numeric)) return '₹0';
+  return `₹${numeric}`;
+}
+
+function normalizeGoogleMapsLink(value: unknown, venue: string): string | undefined {
+  const raw = normalizeText(value);
+  if (raw) {
+    if (/^https?:\/\//i.test(raw)) {
+      return raw;
+    }
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(raw)}`;
+  }
+
+  if (!venue) return undefined;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue)}`;
+}
+
+type HostEventTicketCategory = {
+  id?: string;
+  name?: string;
+  price?: number | string;
+  quantity?: number | string;
+  availableFrom?: string;
+  availableUntil?: string;
+};
+
+async function upsertBrowseCategoryFromEvent(categoryRaw?: string, subcategoryRaw?: string) {
+  const category = normalizeText(categoryRaw);
+  const subcategory = normalizeText(subcategoryRaw);
+  if (!category) return;
+
+  const supabase = getSupabaseServerClient();
+  const { data } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', BROWSE_FILTERS_SETTINGS_KEY)
+    .single();
+
+  const settingsValue = (data?.value as Record<string, unknown>) || {};
+  const categories = Array.isArray(settingsValue.categories)
+    ? [...(settingsValue.categories as Array<Record<string, unknown>>)]
+    : [];
+
+  const categoryIndex = categories.findIndex((item) => {
+    const name = typeof item?.name === 'string' ? item.name.trim().toLowerCase() : '';
+    return name === category.toLowerCase();
+  });
+
+  if (categoryIndex >= 0) {
+    const existing = categories[categoryIndex];
+    const existingSubFilters = Array.isArray(existing.subFilters)
+      ? (existing.subFilters as unknown[])
+          .filter((value): value is string => typeof value === 'string')
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : [];
+
+    if (subcategory && !existingSubFilters.some((value) => value.toLowerCase() === subcategory.toLowerCase())) {
+      existingSubFilters.push(subcategory);
+    }
+
+    categories[categoryIndex] = {
+      ...existing,
+      name: typeof existing.name === 'string' && existing.name.trim() ? existing.name : category,
+      icon: typeof existing.icon === 'string' && existing.icon.trim() ? existing.icon : 'Tag',
+      subFilters: existingSubFilters,
+    };
+  } else {
+    categories.push({
+      name: category,
+      icon: 'Tag',
+      subFilters: subcategory ? [subcategory] : [],
+    });
+  }
+
+  const nextValue = {
+    mainFilters: Array.isArray(settingsValue.mainFilters) ? settingsValue.mainFilters : [],
+    categories,
+    locationFilters: Array.isArray(settingsValue.locationFilters) ? settingsValue.locationFilters : [],
+  };
+
+  await supabase
+    .from('app_settings')
+    .upsert(
+      {
+        key: BROWSE_FILTERS_SETTINGS_KEY,
+        value: nextValue,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'key' }
+    );
+}
 
 // POST /api/admin/host-event - Admin creates and publishes event directly
 export async function POST(request: NextRequest) {
@@ -23,71 +127,96 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Event data is required' }, { status: 400 });
     }
 
-    const supabase = getSupabaseServerClient();
-    
-    // Insert the event directly as published
-    const { data: event, error: insertError } = await supabase
-      .from('published_events')
-      .insert({
-        title: eventData.title,
-        date: eventData.date,
-        time: eventData.time,
-        description: eventData.description,
-        venue_id: eventData.hostCompanyType === 'outlet' ? eventData.hostCompanyId : null,
-        organizer_id: eventData.hostCompanyType === 'promoter' ? eventData.hostCompanyId : null,
-        promoter_name: eventData.hostCompanyName,
-        event_type: eventData.category,
-        category: eventData.category,
-        image_url: eventData.image,
-        gallery_images: eventData.mediaFiles,
-        ticket_price: parseFloat(eventData.price?.replace('₹', '') || '0'),
-        max_attendance: eventData.numberOfTickets,
-        is_public: true,
-        is_featured: false,
-        status: 'published',
-        social_links: {
-          gatesOpen: eventData.gatesOpen,
-          entryAge: eventData.entryAge,
-          layout: eventData.layout,
-          seating: eventData.seating,
-          rules: eventData.rules,
-        },
-        published_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    const title = normalizeText(eventData.title);
+    const date = normalizeText(eventData.date);
+    const venue = normalizeText(eventData.venue);
 
-    if (insertError) {
-      console.error('Error creating event:', insertError);
-      return NextResponse.json({ error: 'Failed to create event' }, { status: 500 });
+    if (!title || !date || !venue) {
+      return NextResponse.json({ error: 'Missing required event fields' }, { status: 400 });
     }
 
-    // Insert ticket categories if provided
-    if (eventData.ticketCategories?.length > 0) {
-      const { error: ticketsError } = await supabase
-        .from('ticket_categories')
-        .insert(
-          eventData.ticketCategories.map((cat: any) => ({
-            event_id: event.id,
-            name: cat.name,
-            price: cat.price,
-            quantity: cat.quantity,
-            available_from: cat.availableFrom,
-            available_until: cat.availableUntil,
-            created_at: new Date().toISOString(),
+    const category = normalizeText(eventData.category) || 'General';
+    const subcategory = normalizeText(eventData.subcategory) || undefined;
+    const startTime = normalizeText(eventData.startTime || eventData.time);
+    const endTime = normalizeText(eventData.endTime);
+    const time = normalizeText(eventData.time) || (startTime && endTime ? `${startTime} - ${endTime}` : startTime);
+    const hostCompanyType = normalizeText(eventData.hostCompanyType) as 'outlet' | 'promoter';
+    const hostCompanyId = normalizeText(eventData.hostCompanyId);
+    const hostCompanyOwnerId = normalizeText(eventData.hostCompanyOwnerId);
+    const hostCompanyName = normalizeText(eventData.hostCompanyName) || 'Easy Entry';
+
+    const outletUserId =
+      hostCompanyType === 'outlet'
+        ? hostCompanyOwnerId || (typeof session.user.id === 'string' ? session.user.id : '')
+        : hostCompanyId || (typeof session.user.id === 'string' ? session.user.id : '');
+
+    const ticketCategories = Array.isArray(eventData.ticketCategories)
+      ? (eventData.ticketCategories as HostEventTicketCategory[])
+          .filter((cat) => normalizeText(cat?.name) && Number(cat?.price) >= 0)
+          .map((cat) => ({
+            id: normalizeText(cat.id) || crypto.randomUUID(),
+            name: normalizeText(cat.name).toUpperCase(),
+            price: Number(cat.price) || 0,
+            quantity: Number(cat.quantity) || 0,
+            availableFrom: normalizeText(cat.availableFrom) || undefined,
+            availableUntil: normalizeText(cat.availableUntil) || undefined,
           }))
-        );
+      : [];
 
-      if (ticketsError) {
-        console.error('Error creating ticket categories:', ticketsError);
-      }
+    if (ticketCategories.length === 0) {
+      return NextResponse.json({ error: 'At least one ticket category is required' }, { status: 400 });
     }
+
+    const totalTickets = ticketCategories.reduce((sum: number, cat) => sum + (cat.quantity || 0), 0);
+    const minPrice = Math.min(...ticketCategories.map((cat) => cat.price || 0));
+    const googleMapsLink = normalizeGoogleMapsLink(eventData.googleMapsLink, venue);
+
+    const createdRequest = await createEventRequest(
+      outletUserId,
+      hostCompanyName,
+      {
+        title,
+        subtitle: normalizeText(eventData.subtitle) || normalizeText(eventData.description),
+        date,
+        time,
+        venue,
+        category,
+        subcategory,
+        price: normalizePrice(eventData.price ?? minPrice),
+        image: normalizeText(eventData.image),
+        mediaFiles: Array.isArray(eventData.mediaFiles)
+          ? eventData.mediaFiles.filter((item: unknown): item is string => typeof item === 'string')
+          : [],
+        numberOfTickets: String(Number(eventData.numberOfTickets) || totalTickets),
+        rules: Array.isArray(eventData.rules)
+          ? eventData.rules
+              .filter((item: unknown): item is string => typeof item === 'string')
+              .map((value: string) => value.trim())
+              .filter(Boolean)
+          : [],
+        ticketCategories,
+        description: normalizeText(eventData.description),
+        fullDescription: normalizeText(eventData.fullDescription) || normalizeText(eventData.description),
+        googleMapsLink,
+        gatesOpen: normalizeText(eventData.gatesOpen) || startTime,
+        entryAge: normalizeText(eventData.entryAge) || '18+',
+        layout: normalizeText(eventData.layout) || 'Standing',
+        seating: normalizeText(eventData.seating) || 'General Admission',
+      }
+    );
+
+    const approvedRequest = await updateEventRequestStatus(createdRequest.id, 'approved', session.user.id as string);
+    if (!approvedRequest) {
+      return NextResponse.json({ error: 'Failed to approve admin event request' }, { status: 500 });
+    }
+
+    const event = await publishEventFromRequest(approvedRequest);
+    await upsertBrowseCategoryFromEvent(category, subcategory);
 
     return NextResponse.json({ 
       success: true, 
       event,
+      requestId: createdRequest.id,
       message: 'Event created and published successfully' 
     });
   } catch (error) {

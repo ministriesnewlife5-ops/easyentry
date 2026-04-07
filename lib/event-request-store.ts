@@ -26,6 +26,7 @@ export type EventRequest = {
     venue: string;
     category: string;
     subcategory?: string;
+    googleMapsLink?: string;
     price: string;
     image: string;
     mediaFiles?: string[];
