@@ -231,12 +231,31 @@ export default function BrowseFilters({
 
   const currentStateFilter = filters.locationFilters.find(sf => sf.state === modalActiveState);
 
+  const emitFiltersChange = (overrides?: Partial<BrowseFilterSelection>) => {
+    onFiltersChange?.({
+      category: activeCategory,
+      subFilters: activeSubFilters,
+      selectedAreas,
+      hasDateFilter: Boolean(dateLabel) && Boolean(dateRangeStart),
+      dateStart: dateRangeStart ? dateRangeStart.toISOString() : undefined,
+      dateEnd: (dateRangeEnd || dateRangeStart)?.toISOString(),
+      hasPriceFilter: Boolean(priceLabel),
+      priceMin,
+      priceMax,
+      ...overrides,
+    });
+  };
+
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleCategoryClick = (catName: string, isActive: boolean) => {
     const newCat = isActive ? null : catName;
     setActiveCategory(newCat);
     if (isActive) setActiveSubFilters([]);
     onCategorySelect?.(newCat);
+    emitFiltersChange({
+      category: newCat,
+      subFilters: isActive ? [] : activeSubFilters,
+    });
     setTimeout(() => onFilterStateChange?.(newCat !== null || activeSubFilters.length > 0 || hasActiveFilters), 0);
   };
 
@@ -245,6 +264,7 @@ export default function BrowseFilters({
       ? activeSubFilters.filter(s => s !== sub)
       : [...activeSubFilters, sub];
     setActiveSubFilters(updated);
+    emitFiltersChange({ subFilters: updated });
     setTimeout(() => onFilterStateChange?.(updated.length > 0 || activeCategory !== null || hasActiveFilters), 0);
   };
 
@@ -253,6 +273,7 @@ export default function BrowseFilters({
     setSelectedState(state);
     setSelectedAreas([]);
     setShowLocationModal(false);
+    emitFiltersChange({ selectedAreas: [] });
     setTimeout(() => onFilterStateChange?.(hasActiveFilters), 0);
   };
 
@@ -261,6 +282,7 @@ export default function BrowseFilters({
       ? selectedAreas.filter(a => a !== area)
       : [...selectedAreas, area];
     setSelectedAreas(updated);
+    emitFiltersChange({ selectedAreas: updated });
     setTimeout(() => onFilterStateChange?.(updated.length > 0 || !!dateLabel || !!priceLabel || activeCategory !== null), 0);
   };
 
@@ -642,15 +664,31 @@ export default function BrowseFilters({
                   </div>
                 </div>
                 <div className="flex gap-3 mt-6">
-                  <button onClick={() => { setDateRangeStart(null); setDateRangeEnd(null); setDateLabel(''); setShowDatePicker(false); }}
+                  <button onClick={() => {
+                    setDateRangeStart(null);
+                    setDateRangeEnd(null);
+                    setDateLabel('');
+                    setShowDatePicker(false);
+                    emitFiltersChange({
+                      hasDateFilter: false,
+                      dateStart: undefined,
+                      dateEnd: undefined,
+                    });
+                  }}
                     className="flex-1 rounded-xl bg-[#2A2A2A] px-4 py-3 text-sm font-semibold text-[#F5F5DC] hover:bg-[#3A3A3A] transition">Cancel</button>
                   <button
                     onClick={() => {
                       if (dateRangeStart) {
                         const s = dateRangeStart.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }).toUpperCase();
                         const e = dateRangeEnd ? dateRangeEnd.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }).toUpperCase() : s;
-                        setDateLabel(dateRangeEnd && dateRangeEnd.getTime() !== dateRangeStart.getTime() ? `${s} → ${e}` : s);
+                        const nextLabel = dateRangeEnd && dateRangeEnd.getTime() !== dateRangeStart.getTime() ? `${s} → ${e}` : s;
+                        setDateLabel(nextLabel);
                         setShowDatePicker(false);
+                        emitFiltersChange({
+                          hasDateFilter: true,
+                          dateStart: dateRangeStart.toISOString(),
+                          dateEnd: (dateRangeEnd || dateRangeStart).toISOString(),
+                        });
                         setTimeout(() => onFilterStateChange?.(true), 0);
                       }
                     }}
@@ -713,14 +751,30 @@ export default function BrowseFilters({
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => { setPriceMin(0); setPriceMax(10000); setPriceLabel(''); setShowPricePicker(false); }}
+                  <button onClick={() => {
+                    setPriceMin(0);
+                    setPriceMax(10000);
+                    setPriceLabel('');
+                    setShowPricePicker(false);
+                    emitFiltersChange({
+                      hasPriceFilter: false,
+                      priceMin: 0,
+                      priceMax: 10000,
+                    });
+                  }}
                     className="flex-1 rounded-lg bg-[#2A2A2A] px-3 py-2 text-xs font-semibold text-[#F5F5DC] hover:bg-[#3A3A3A] transition">Cancel</button>
                   <button
                     onClick={() => {
                       const minT = priceMin === 0 ? 'FREE' : `₹${priceMin}`;
                       const maxT = priceMax >= 10000 ? 'ANY' : `₹${priceMax}`;
-                      setPriceLabel(priceMin === 0 && priceMax >= 10000 ? '' : `${minT}→${maxT}`);
+                      const nextLabel = priceMin === 0 && priceMax >= 10000 ? '' : `${minT}→${maxT}`;
+                      setPriceLabel(nextLabel);
                       setShowPricePicker(false);
+                      emitFiltersChange({
+                        hasPriceFilter: Boolean(nextLabel),
+                        priceMin,
+                        priceMax,
+                      });
                       setTimeout(() => onFilterStateChange?.(true), 0);
                     }}
                     className="flex-1 rounded-lg bg-[#E5A823] px-3 py-2 text-xs font-bold text-[#0D0D0D] hover:bg-[#F5C542] transition">Apply</button>
@@ -779,7 +833,10 @@ export default function BrowseFilters({
                     transition={{ delay: 0, type: 'spring', stiffness: 300 }}
                     whileHover={{ scale: 1.1, y: -2 }}
                     whileTap={{ scale: 0.9 }}
-                    onClick={() => setActiveSubFilters([])}
+                    onClick={() => {
+                      setActiveSubFilters([]);
+                      emitFiltersChange({ subFilters: [] });
+                    }}
                     className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap border ${
                       activeSubFilters.length === 0
                         ? 'bg-gradient-to-r from-[#E5A823] to-[#EB4D4B] text-[#0D0D0D] border-transparent shadow-[0_0_15px_rgba(229,168,35,0.5)]'

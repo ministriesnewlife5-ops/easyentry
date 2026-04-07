@@ -373,7 +373,7 @@ export default function EventsPage() {
               </div>
             ) : filteredEvents.length === 0 ? (
               <div className="rounded-2xl border border-[#2A2A2A] bg-[#101018] px-6 py-10 text-center text-[#F5F5DC]/60">
-                {selectedCategory ? `No events found in category "${selectedCategory}"` : 'No events available'}
+                No events available
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
