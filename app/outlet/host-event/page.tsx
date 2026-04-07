@@ -7,7 +7,7 @@ import { Calendar, Clock3, ImageIcon, IndianRupee, Info, MapPin, Percent, Sparkl
 import DragDropUpload from '@/components/ui/DragDropUpload';
 
 type EventTemplate = {
-  id: number;
+  id: string | number;
   title: string;
   subtitle: string;
   date: string;
@@ -34,60 +34,6 @@ type TicketCategory = {
   availableUntil?: string;
 };
 
-const websiteEventTemplates: EventTemplate[] = [
-  {
-    id: 1,
-    title: 'Namma Chennai Night with DJ Goutham',
-    subtitle: 'Ultimate Chennai night experience with DJ Goutham spinning commercial tracks.',
-    date: '2026-07-01',
-    time: '22:00 - 04:00',
-    venue: 'Gatsby 2000, Alwarpet, Chennai',
-    price: '₹1500',
-    category: 'Commercial',
-    image: 'https://images.unsplash.com/photo-1514525253440-b393452e3726?auto=format&fit=crop&q=80&w=1200',
-    description: 'Get ready for the most happening night in Chennai with premium visuals and atmosphere.',
-    fullDescription: 'Experience a premium nightlife setup with curated tracks, high energy crowd, and world-class production.',
-    gatesOpen: '4:00 PM',
-    entryAge: '21+',
-    layout: 'Indoor Club',
-    seating: 'Standing/VIP Tables',
-  },
-  {
-    id: 2,
-    title: 'Electronic City Beats | Night 2',
-    subtitle: 'Experience the electric pulse of the city with special guest DJs.',
-    date: '2026-05-30',
-    time: '21:00 - 03:00',
-    venue: 'Pasha - The Park, Chennai',
-    price: '₹2000',
-    category: 'EDM',
-    image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&q=80&w=1200',
-    description: 'A high energy EDM night with immersive light and sound setup.',
-    fullDescription: 'This event focuses on premium EDM programming, smooth entry management, and elevated guest experience.',
-    gatesOpen: '8:00 PM',
-    entryAge: '21+',
-    layout: 'Indoor Club',
-    seating: 'Standing',
-  },
-  {
-    id: 3,
-    title: 'The Underground Session',
-    subtitle: 'Deep Techno Experience',
-    date: '2026-09-19',
-    time: '23:00 - 04:00',
-    venue: 'The Slate Hotels, Chennai',
-    price: '₹1500',
-    category: 'Techno',
-    image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=1200',
-    description: 'An intimate techno experience with underground sounds.',
-    fullDescription: 'Built for techno audiences with focused curation, sound-first production, and targeted community reach.',
-    gatesOpen: '10:00 PM',
-    entryAge: '21+',
-    layout: 'Indoor Club',
-    seating: 'Standing',
-  },
-];
-
 export default function OutletHostEventPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -97,6 +43,7 @@ export default function OutletHostEventPage() {
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [numberOfTickets, setNumberOfTickets] = useState('');
   const [ticketCategories, setTicketCategories] = useState<TicketCategory[]>([]);
+  const [websiteEventTemplates, setWebsiteEventTemplates] = useState<EventTemplate[]>([]);
   const [newTicketCategory, setNewTicketCategory] = useState<TicketCategory>({
     id: '',
     name: '',
@@ -132,6 +79,45 @@ export default function OutletHostEventPage() {
       router.push('/events');
     }
   }, [status, session, router]);
+
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const response = await fetch('/api/events', { cache: 'no-store' });
+        if (!response.ok) {
+          setWebsiteEventTemplates([]);
+          return;
+        }
+
+        const data = await response.json();
+        const detailedEvents = Array.isArray(data.detailedEvents) ? data.detailedEvents : [];
+
+        const templates: EventTemplate[] = detailedEvents.map((event: any) => ({
+          id: String(event.id),
+          title: event.title || 'Untitled Event',
+          subtitle: event.subtitle || '',
+          date: event.date || '',
+          time: event.time || '',
+          venue: event.venue || '',
+          price: event.price ? `₹${String(event.price).replace(/^₹/, '')}` : '₹0',
+          category: event.category || '',
+          image: event.image || '',
+          description: event.description || '',
+          fullDescription: event.fullDescription || event.description || '',
+          gatesOpen: event.gatesOpen || '',
+          entryAge: event.entryAge || '21+',
+          layout: event.layout || 'Indoor Club',
+          seating: event.seating || 'Standing',
+        }));
+
+        setWebsiteEventTemplates(templates);
+      } catch {
+        setWebsiteEventTemplates([]);
+      }
+    };
+
+    loadTemplates();
+  }, []);
 
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplate(templateId);

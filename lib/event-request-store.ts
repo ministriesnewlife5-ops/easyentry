@@ -25,6 +25,7 @@ export type EventRequest = {
     time: string;
     venue: string;
     category: string;
+    subcategory?: string;
     price: string;
     image: string;
     mediaFiles?: string[];

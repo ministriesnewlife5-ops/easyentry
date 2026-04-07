@@ -5,74 +5,16 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Instagram, Music, ExternalLink, ArrowLeft, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
-const demoArtists = [
-  {
-    id: 1,
-    name: 'DJ GOUTHAM',
-    role: 'DJ',
-    image: 'https://images.unsplash.com/photo-1574391884720-2e45599e9633?auto=format&fit=crop&q=80&w=500',
-    genre: 'Commercial',
-    followers: '45K'
-  },
-  {
-    id: 2,
-    name: 'DJ KASH',
-    role: 'DJ',
-    image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&q=80&w=500',
-    genre: 'EDM',
-    followers: '32K'
-  },
-  {
-    id: 3,
-    name: 'DJ SARAH CHEN',
-    role: 'DJ',
-    image: 'https://images.unsplash.com/photo-1598387993441-a364f854c3e1?auto=format&fit=crop&q=80&w=500',
-    genre: 'Techno',
-    followers: '67K'
-  },
-  {
-    id: 4,
-    name: 'DJ MARCUS WAVES',
-    role: 'DJ',
-    image: 'https://images.unsplash.com/photo-1571266028243-3716f02d2d2e?auto=format&fit=crop&q=80&w=500',
-    genre: 'House',
-    followers: '28K'
-  },
-  {
-    id: 5,
-    name: 'DJ ANR',
-    role: 'DJ',
-    image: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&q=80&w=500',
-    genre: 'Progressive',
-    followers: '89K'
-  },
-  {
-    id: 6,
-    name: 'DJ MEERA',
-    role: 'DJ',
-    image: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?auto=format&fit=crop&q=80&w=500',
-    genre: 'Bollywood',
-    followers: '54K'
-  },
-  {
-    id: 7,
-    name: 'DJ VORTEX',
-    role: 'DJ',
-    image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=500',
-    genre: 'Deep House',
-    followers: '41K'
-  },
-  {
-    id: 8,
-    name: 'DJ NOVA',
-    role: 'DJ',
-    image: 'https://images.unsplash.com/photo-1514525253440-b393452e3726?auto=format&fit=crop&q=80&w=500',
-    genre: 'Tech House',
-    followers: '73K'
-  }
-];
+type ArtistListItem = {
+  id: string;
+  name: string;
+  role: string;
+  image: string;
+  genre: string;
+  followers: string;
+};
 
-function ArtistCard({ artist, index, onImageClick }: { artist: typeof demoArtists[0]; index: number; onImageClick?: () => void }) {
+function ArtistCard({ artist, index, onImageClick }: { artist: ArtistListItem; index: number; onImageClick?: () => void }) {
   const [isHovered, setIsHovered] = useState(false);
 
   const shareToWhatsApp = async (e: React.MouseEvent) => {
@@ -243,7 +185,7 @@ function ArtistCard({ artist, index, onImageClick }: { artist: typeof demoArtist
 }
 
 export default function ArtistsPage() {
-  const [artists, setArtists] = useState<typeof demoArtists>([]);
+  const [artists, setArtists] = useState<ArtistListItem[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -261,8 +203,8 @@ export default function ArtistsPage() {
           id: artist.id,
           name: (artist.name || artist.email || 'Artist').toUpperCase(),
           role: 'DJ',
-          image: `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name || artist.email || 'Artist')}&background=1f2937&color=fff&size=500`,
-          genre: 'Live Performance',
+          image: artist.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name || artist.email || 'Artist')}&background=1f2937&color=fff&size=500`,
+          genre: artist.genre || 'Live Performance',
           followers: '--',
         }));
 

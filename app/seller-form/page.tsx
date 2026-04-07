@@ -460,7 +460,7 @@ export default function SellerFormPage() {
           venue: formData.location,
           price: `₹${minPrice}`,
           imageColor: 'bg-blue-900',
-          category: 'General',
+          category: resolvedSubcategory ? `${resolvedCategory} • ${resolvedSubcategory}` : resolvedCategory,
           imageUrl: coverImageUrlToUse,
           createdAt: Date.now()
         });

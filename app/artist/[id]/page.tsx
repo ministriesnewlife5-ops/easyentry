@@ -72,6 +72,36 @@ export default function ArtistViewProfile() {
         }
 
         const displayName = artist.name || artist.realName || artist.email || 'Artist';
+        const genres = Array.isArray(artist.genres)
+          ? artist.genres.filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim()))
+          : artist.genre
+            ? String(artist.genre).split(',').map((value: string) => value.trim()).filter(Boolean)
+            : [];
+        const languages = Array.isArray(artist.languages)
+          ? artist.languages.filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim()))
+          : [];
+        const uploadedVideos = Array.isArray(artist.videos)
+          ? artist.videos
+              .filter((video: any) => video && typeof video === 'object')
+              .map((video: any, index: number) => ({
+                id: String(video.id || index),
+                thumbnail: String(video.thumbnail || artist.coverImage || artist.profileImage || 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=800'),
+                title: String(video.title || `Performance ${index + 1}`),
+                duration: String(video.duration || ''),
+              }))
+          : [];
+        const uploadedPhotos = Array.isArray(artist.photoGallery)
+          ? artist.photoGallery
+              .filter((photo: unknown): photo is string => typeof photo === 'string' && Boolean(photo.trim()))
+              .map((photo: string, index: number) => ({
+                id: `${index + 1}`,
+                image: photo,
+                title: `Performance ${index + 1}`,
+              }))
+          : [];
+        const socialLinks = artist.socialMedia && typeof artist.socialMedia === 'object'
+          ? artist.socialMedia
+          : {};
 
         setFetchedArtist({
           id: artist.id,
@@ -79,30 +109,30 @@ export default function ArtistViewProfile() {
           realName: artist.realName || displayName,
           role: 'DJ',
           verified: true,
-          location: 'India',
-          openToTravel: true,
+          location: artist.location || 'India',
+          openToTravel: String(artist.travelWillingness || '').toLowerCase() !== 'within city',
           rating: 4.8,
           reviews: 0,
           memberSince: artist.experienceYears ? `${artist.experienceYears}+ years` : 'New',
           responseTime: '< 24 hours',
-          hourlyRate: 'Contact for quote',
-          availability: 'Available',
-          languages: ['English'],
-          genres: artist.genre ? [artist.genre] : ['Live Performance'],
+          hourlyRate: artist.hourlyRate || 'Contact for quote',
+          availability: artist.availability || 'Available',
+          languages: languages.length > 0 ? languages : ['English'],
+          genres: genres.length > 0 ? genres : ['Live Performance'],
           eventsPerformed: 0,
           experience: artist.experienceYears ? `${artist.experienceYears}+ Years` : 'Emerging Artist',
           bio: artist.bio || `${displayName} is available for performances.`,
-          profileImage: 'https://images.unsplash.com/photo-1514525253440-b393452e3726?auto=format&fit=crop&q=80&w=400',
-          coverImage: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
-          videos: [],
-          performances: [],
-          awards: [],
-          eventTypes: ['Club Shows', 'Private Events', 'Festivals'],
+          profileImage: artist.profileImage || 'https://images.unsplash.com/photo-1514525253440-b393452e3726?auto=format&fit=crop&q=80&w=400',
+          coverImage: artist.coverImage || artist.profileImage || 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+          videos: uploadedVideos,
+          performances: uploadedPhotos,
+          awards: Array.isArray(artist.awards) ? artist.awards : [],
+          eventTypes: Array.isArray(artist.eventTypes) && artist.eventTypes.length > 0 ? artist.eventTypes : ['Club Shows', 'Private Events', 'Festivals'],
           socialLinks: {
-            instagram: artist.socialMedia || '#',
-            youtube: '#',
-            twitter: '#',
-            facebook: '#',
+            instagram: typeof socialLinks.instagram === 'string' ? socialLinks.instagram : '#',
+            youtube: typeof socialLinks.youtube === 'string' ? socialLinks.youtube : '#',
+            twitter: typeof socialLinks.twitter === 'string' ? socialLinks.twitter : '#',
+            facebook: typeof socialLinks.facebook === 'string' ? socialLinks.facebook : '#',
           },
         });
       } catch {

@@ -1,74 +1,22 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Instagram, Megaphone, ExternalLink, ArrowLeft, Star } from 'lucide-react';
 
-const promoters = [
-  {
-    id: 1,
-    name: 'Rahul Mehta',
-    companyName: 'Mehta Events & Media',
-    role: 'Promoter',
-    image: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=500',
-    specialty: 'Corporate Events',
-    eventsPromoted: 150,
-    verified: true
-  },
-  {
-    id: 2,
-    name: 'Priya Sharma',
-    companyName: 'Star Promotions',
-    role: 'Promoter',
-    image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=500',
-    specialty: 'Music Festivals',
-    eventsPromoted: 89,
-    verified: true
-  },
-  {
-    id: 3,
-    name: 'Vikram Singh',
-    companyName: 'Royal Events',
-    role: 'Promoter',
-    image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=500',
-    specialty: 'Nightlife & Parties',
-    eventsPromoted: 210,
-    verified: true
-  },
-  {
-    id: 4,
-    name: 'Ananya Reddy',
-    companyName: 'Reddy Media Group',
-    role: 'Influencer & Promoter',
-    image: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=500',
-    specialty: 'Social Media Marketing',
-    eventsPromoted: 75,
-    verified: true
-  },
-  {
-    id: 5,
-    name: 'Karan Patel',
-    companyName: 'Urban Buzz',
-    role: 'Promoter',
-    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=500',
-    specialty: 'Club Nights',
-    eventsPromoted: 120,
-    verified: false
-  },
-  {
-    id: 6,
-    name: 'Divya Krishnan',
-    companyName: 'Chennai Events',
-    role: 'Promoter',
-    image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=500',
-    specialty: 'Cultural Events',
-    eventsPromoted: 95,
-    verified: true
-  }
-];
+type PromoterCardData = {
+  id: string;
+  name: string;
+  companyName: string;
+  role: string;
+  image: string;
+  specialty: string;
+  eventsPromoted: number;
+  verified: boolean;
+};
 
-function PromoterCard({ promoter, index }: { promoter: typeof promoters[0]; index: number }) {
+function PromoterCard({ promoter, index }: { promoter: PromoterCardData; index: number }) {
   const [isHovered, setIsHovered] = useState(false);
 
   const shareToWhatsApp = async (e: React.MouseEvent) => {
@@ -247,6 +195,41 @@ function PromoterCard({ promoter, index }: { promoter: typeof promoters[0]; inde
 }
 
 export default function PromotersPage() {
+  const [promoters, setPromoters] = useState<PromoterCardData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadPromoters = async () => {
+      try {
+        const response = await fetch('/api/promoters', { cache: 'no-store' });
+        if (!response.ok) {
+          setPromoters([]);
+          return;
+        }
+
+        const data = await response.json();
+        const mapped = (data.promoters || []).map((promoter: any) => ({
+          id: String(promoter.id),
+          name: promoter.name || promoter.email || 'Promoter',
+          companyName: promoter.companyName || 'Independent Promoter',
+          role: 'Promoter',
+          image: promoter.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(promoter.name || promoter.email || 'Promoter')}&background=1f2937&color=fff&size=500`,
+          specialty: promoter.bio ? String(promoter.bio).slice(0, 40) : 'Event Promotions',
+          eventsPromoted: Number(promoter.eventsPromoted || 0),
+          verified: Boolean(promoter.companyName),
+        }));
+
+        setPromoters(mapped);
+      } catch {
+        setPromoters([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPromoters();
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC] pt-24 pb-20">
       <div className="container mx-auto px-4">
@@ -277,11 +260,21 @@ export default function PromotersPage() {
         </motion.div>
 
         {/* Promoters Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {promoters.map((promoter, index) => (
-            <PromoterCard key={promoter.id} promoter={promoter} index={index} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="rounded-2xl border border-[#2A2A2A] bg-[#101018] px-6 py-10 text-center text-[#F5F5DC]/60">
+            Loading promoters...
+          </div>
+        ) : promoters.length === 0 ? (
+          <div className="rounded-2xl border border-[#2A2A2A] bg-[#101018] px-6 py-10 text-center text-[#F5F5DC]/60">
+            No promoters available.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {promoters.map((promoter, index) => (
+              <PromoterCard key={promoter.id} promoter={promoter} index={index} />
+            ))}
+          </div>
+        )}
 
         {/* Load More Button */}
         <motion.div

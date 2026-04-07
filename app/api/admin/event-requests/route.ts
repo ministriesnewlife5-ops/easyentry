@@ -7,6 +7,75 @@ import {
 } from '@/lib/event-request-store';
 import { sendEventRequestNotificationEmail } from '@/lib/mailer';
 import { publishEventFromRequest, unpublishEventByRequestId } from '@/lib/public-events-store';
+import { getSupabaseServerClient } from '@/lib/supabase';
+
+const BROWSE_FILTERS_SETTINGS_KEY = 'browse_filters';
+
+async function upsertBrowseCategoryFromEvent(categoryRaw?: string, subcategoryRaw?: string) {
+  const category = typeof categoryRaw === 'string' ? categoryRaw.trim() : '';
+  const subcategory = typeof subcategoryRaw === 'string' ? subcategoryRaw.trim() : '';
+
+  if (!category) return;
+
+  const supabase = getSupabaseServerClient();
+
+  const { data } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', BROWSE_FILTERS_SETTINGS_KEY)
+    .single();
+
+  const settingsValue = (data?.value as Record<string, unknown>) || {};
+  const categories = Array.isArray(settingsValue.categories)
+    ? [...(settingsValue.categories as Array<Record<string, unknown>>)]
+    : [];
+
+  const categoryIndex = categories.findIndex((item) => {
+    const name = typeof item?.name === 'string' ? item.name.trim().toLowerCase() : '';
+    return name === category.toLowerCase();
+  });
+
+  if (categoryIndex >= 0) {
+    const existing = categories[categoryIndex];
+    const existingSubFilters = Array.isArray(existing.subFilters)
+      ? (existing.subFilters as unknown[]).filter((value): value is string => typeof value === 'string').map((value) => value.trim()).filter(Boolean)
+      : [];
+
+    if (subcategory && !existingSubFilters.some((value) => value.toLowerCase() === subcategory.toLowerCase())) {
+      existingSubFilters.push(subcategory);
+    }
+
+    categories[categoryIndex] = {
+      ...existing,
+      name: typeof existing.name === 'string' && existing.name.trim() ? existing.name : category,
+      icon: typeof existing.icon === 'string' && existing.icon.trim() ? existing.icon : 'Tag',
+      subFilters: existingSubFilters,
+    };
+  } else {
+    categories.push({
+      name: category,
+      icon: 'Tag',
+      subFilters: subcategory ? [subcategory] : [],
+    });
+  }
+
+  const nextValue = {
+    mainFilters: Array.isArray(settingsValue.mainFilters) ? settingsValue.mainFilters : [],
+    categories,
+    locationFilters: Array.isArray(settingsValue.locationFilters) ? settingsValue.locationFilters : [],
+  };
+
+  await supabase
+    .from('app_settings')
+    .upsert(
+      {
+        key: BROWSE_FILTERS_SETTINGS_KEY,
+        value: nextValue,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'key' }
+    );
+}
 
 // GET - Admin: Get all event requests
 export async function GET(request: NextRequest) {
@@ -53,6 +122,8 @@ export async function POST(request: NextRequest) {
       outletName,
       eventData
     );
+
+    await upsertBrowseCategoryFromEvent(eventData.category, eventData.subcategory);
 
     let adminNotificationSent = false;
 

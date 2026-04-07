@@ -319,10 +319,7 @@ function OutletProfileContent() {
       formData.financeContact.name,
       formData.financeContact.email,
       formData.financeContact.phone,
-      // Documents (2 fields)
-      formData.gstNumber,
-      formData.panCard,
-      formData.termsAccepted,
+      // Documents are optional and not included in profile completion score
     ];
     
     const filledFields = fields.filter(Boolean).length;

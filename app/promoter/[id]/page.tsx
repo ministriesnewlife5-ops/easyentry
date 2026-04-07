@@ -9,10 +9,10 @@ import {
   Instagram, Twitter, Facebook, ArrowLeft,
   Megaphone, Building2, Users, Clock
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface PromoterData {
-  id: number;
+  id: string;
   name: string;
   companyName: string;
   role: string;
@@ -36,42 +36,76 @@ interface PromoterData {
   };
 }
 
-const promotersData: Record<string, PromoterData> = {
-  '1': {
-    id: 1,
-    name: 'Rahul Mehta',
-    companyName: 'Mehta Events & Media',
-    role: 'Promoter',
-    verified: true,
-    location: 'Mumbai, Maharashtra',
-    rating: 4.8,
-    reviews: 85,
-    memberSince: '3+ years',
-    responseTime: '< 2 hours',
-    experienceYears: '8+ Years',
-    eventsPromoted: 120,
-    bio: 'Rahul Mehta is a leading event promoter in Mumbai, specializing in high-end club nights and music festivals. With a network of over 50,000 active club-goers, Mehta Events & Media has successfully promoted some of the biggest international acts in India.',
-    profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400',
-    coverImage: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&q=80&w=1200',
-    eventTypes: [
-      'Club Shows',
-      'Music Festivals',
-      'Concerts',
-      'Private Parties'
-    ],
-    website: 'https://mehtaevents.com',
-    socialLinks: {
-      instagram: 'https://instagram.com',
-      twitter: 'https://twitter.com',
-      facebook: 'https://facebook.com',
-    },
-  },
-};
-
 export default function PromoterViewProfile() {
   const params = useParams();
   const promoterId = params.id as string;
-  const promoter = promotersData[promoterId];
+  const [promoter, setPromoter] = useState<PromoterData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadPromoter = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/promoters/${promoterId}`, { cache: 'no-store' });
+        if (!response.ok) {
+          setPromoter(null);
+          return;
+        }
+
+        const data = await response.json();
+        const p = data.promoter;
+
+        if (!p) {
+          setPromoter(null);
+          return;
+        }
+
+        const displayName = p.name || p.email || 'Promoter';
+        const experience = Number(p.experienceYears || 0);
+
+        setPromoter({
+          id: String(p.id),
+          name: displayName,
+          companyName: p.companyName || 'Independent Promoter',
+          role: 'Promoter',
+          verified: Boolean(p.companyName),
+          location: p.location || 'India',
+          rating: 4.8,
+          reviews: 0,
+          memberSince: experience > 0 ? `${experience}+ years` : 'New',
+          responseTime: '< 24 hours',
+          experienceYears: experience > 0 ? `${experience}+ Years` : 'New',
+          eventsPromoted: Number(p.eventsPromoted || 0),
+          bio: p.bio || `${displayName} is available for event promotion partnerships.`,
+          profileImage: p.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=1f2937&color=fff&size=400`,
+          coverImage: p.coverImage || p.profileImage || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&q=80&w=1200',
+          eventTypes: Array.isArray(p.eventTypes) && p.eventTypes.length > 0 ? p.eventTypes : ['Event Promotions'],
+          website: p.website || '',
+          socialLinks: {
+            instagram: p.socialLinks?.instagram || '#',
+            twitter: p.socialLinks?.twitter || '#',
+            facebook: p.socialLinks?.facebook || '#',
+          },
+        });
+      } catch {
+        setPromoter(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPromoter();
+  }, [promoterId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC] flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Loading promoter profile...</h1>
+        </div>
+      </div>
+    );
+  }
 
   if (!promoter) {
     return (
@@ -79,7 +113,7 @@ export default function PromoterViewProfile() {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Promoter Not Found</h1>
           <Link href="/events" className="text-[#E5A823] hover:text-[#F5C542]">
-            Back to Events
+            Back to Promoters
           </Link>
         </div>
       </div>
@@ -101,7 +135,7 @@ export default function PromoterViewProfile() {
         
         <div className="absolute top-4 left-4 z-10">
           <Link 
-            href="/events"
+            href="/promoters"
             className="inline-flex items-center gap-2 px-4 py-2 bg-[#0D0D0D]/60 backdrop-blur-md rounded-full text-[#F5F5DC] hover:bg-[#E5A823] hover:text-[#0D0D0D] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />

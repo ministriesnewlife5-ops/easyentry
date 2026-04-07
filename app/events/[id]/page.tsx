@@ -727,13 +727,18 @@ export default function EventDetailsPage() {
                   <Star className="w-4 h-4 text-[#E5A823]" />
                   <span className="text-sm font-bold text-[#F5F5DC]">Performing Artists</span>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                   {event.taggedArtists.map((artist) => (
                     <Link
                       key={artist.id}
                       href={artist.profileUrl || `/artist/${artist.id}`}
-                      className="px-3 py-1.5 rounded-full border border-[#E5A823]/40 bg-[#E5A823]/10 text-[#E5A823] text-xs font-semibold hover:bg-[#E5A823] hover:text-[#0D0D0D] transition-colors"
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-full border border-[#E5A823]/40 bg-[#E5A823]/10 text-[#E5A823] text-xs font-semibold hover:bg-[#E5A823] hover:text-[#0D0D0D] transition-colors"
                     >
+                      <img
+                        src={artist.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name || 'Artist')}&background=1f2937&color=fff&size=80`}
+                        alt={artist.name}
+                        className="w-6 h-6 rounded-full object-cover border border-[#E5A823]/40"
+                      />
                       {artist.name}
                     </Link>
                   ))}

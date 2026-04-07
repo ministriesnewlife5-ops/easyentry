@@ -16,6 +16,7 @@ type PublicEventTaggedArtist = {
   name: string;
   email?: string;
   profileUrl: string;
+  imageUrl?: string;
 };
 
 export type PublicEventHighlight = {
@@ -69,6 +70,7 @@ export type PublicEvent = {
   description: string;
   fullDescription: string;
   category: string;
+  subcategory?: string;
   entryAge: string;
   layout: string;
   seating: string;
@@ -91,12 +93,17 @@ export type PublicEventCard = {
   price: string;
   imageColor: string;
   category: string;
+  subcategory?: string;
   imageUrl: string;
   createdAt: number;
 };
 
 // Map legacy PublicEvent to database schema
 function mapLegacyToDb(event: Partial<PublicEvent> & { sourceRequestId?: string }): Record<string, unknown> {
+  const allMedia = Array.from(
+    new Set([...(event.images || []), ...(event.mediaFiles || [])].filter(Boolean))
+  );
+
   return {
     title: event.title || 'Untitled Event',
     date: event.date || new Date().toISOString().split('T')[0],
@@ -106,18 +113,38 @@ function mapLegacyToDb(event: Partial<PublicEvent> & { sourceRequestId?: string 
     organizer_id: null,
     event_type: event.category || null,
     category: event.category || null,
-    image_url: event.image || null,
-    gallery_images: event.images || event.mediaFiles || null,
+    image_url: event.image || allMedia[0] || null,
+    gallery_images: allMedia,
     ticket_price: event.price ? parseFloat(event.price) : null,
     ticket_url: null,
     max_attendance: null,
-    tags: null,
+    tags: event.subcategory ? [event.subcategory] : null,
     is_featured: false,
     is_public: true,
     status: 'upcoming',
     social_links: null,
     request_id: event.sourceRequestId || null,
   };
+}
+
+function isVideoUrl(url: string): boolean {
+  return /\.(mp4|webm|ogg|mov|m4v|avi)(\?|#|$)/i.test(url);
+}
+
+function splitMediaFiles(media: string[]): { images: string[]; videos: string[] } {
+  const images: string[] = [];
+  const videos: string[] = [];
+
+  for (const item of media) {
+    if (!item) continue;
+    if (isVideoUrl(item)) {
+      videos.push(item);
+    } else {
+      images.push(item);
+    }
+  }
+
+  return { images, videos };
 }
 
 // Map database record to legacy PublicEvent
@@ -127,12 +154,18 @@ function mapDbToLegacy(
   taggedArtistsOverride?: PublicEventTaggedArtist[]
 ): PublicEvent {
   const gallery = (record.gallery_images as string[]) || [];
-  const imageUrl = (record.image_url as string) || gallery[0] || '';
+  const { images: imageGallery, videos } = splitMediaFiles(gallery);
+  const imageUrl = (record.image_url as string) || imageGallery[0] || '';
+  const images = imageGallery.length > 0 ? imageGallery : imageUrl ? [imageUrl] : [];
   const ticketCategoriesFromRecord = Array.isArray(record.ticket_categories)
     ? (record.ticket_categories as PublicEventTicketCategory[])
     : [];
   const ticketCategories = ticketCategoriesOverride ?? ticketCategoriesFromRecord;
   const taggedArtists = taggedArtistsOverride ?? [];
+  const tags = Array.isArray(record.tags)
+    ? (record.tags as unknown[]).filter((tag): tag is string => typeof tag === 'string')
+    : [];
+  const subcategory = tags[0] || undefined;
 
   return {
     id: record.id as string,
@@ -146,11 +179,12 @@ function mapDbToLegacy(
     price: (record.ticket_price as number)?.toString() || '0',
     priceSubtext: 'onwards',
     image: imageUrl,
-    images: gallery,
-    mediaFiles: gallery,
+    images,
+    mediaFiles: videos,
     description: (record.description as string) || '',
     fullDescription: (record.description as string) || '',
     category: (record.category as string) || (record.event_type as string) || '',
+    subcategory,
     entryAge: '',
     layout: '',
     seating: '',
@@ -260,12 +294,35 @@ async function getTaggedArtistsFromSourceRequest(requestId: string): Promise<Pub
     .select('id, name, email')
     .in('id', ids);
 
+  const { data: artistProfilesData } = await supabase
+    .from('artist_profiles')
+    .select('user_id, social_media')
+    .in('user_id', ids);
+
+  const profileImageByUserId = new Map<string, string>();
+  for (const profile of (artistProfilesData as Array<Record<string, unknown>> | null) || []) {
+    const userId = String(profile.user_id || '');
+    const socialMediaRaw = profile.social_media;
+    if (!userId || typeof socialMediaRaw !== 'string') continue;
+
+    try {
+      const social = JSON.parse(socialMediaRaw) as Record<string, unknown>;
+      const profileImage = typeof social.profileImage === 'string' ? social.profileImage.trim() : '';
+      if (profileImage) {
+        profileImageByUserId.set(userId, profileImage);
+      }
+    } catch {
+      // ignore invalid JSON
+    }
+  }
+
   const usersById = new Map(
     ((artistsData as Array<Record<string, unknown>> | null) || []).map((user) => [
       String(user.id),
       {
         name: typeof user.name === 'string' ? user.name : '',
         email: typeof user.email === 'string' ? user.email : undefined,
+        imageUrl: profileImageByUserId.get(String(user.id)),
       },
     ])
   );
@@ -279,6 +336,7 @@ async function getTaggedArtistsFromSourceRequest(requestId: string): Promise<Pub
       name: displayName,
       email: artist.email || user?.email,
       profileUrl: `/artist/${artist.id}`,
+      imageUrl: user?.imageUrl,
     };
   });
 }
@@ -327,6 +385,7 @@ function createApprovedEvent(request: EventRequest): Partial<PublicEvent> {
     description: request.eventData.description,
     fullDescription: request.eventData.fullDescription,
     category: request.eventData.category,
+    subcategory: request.eventData.subcategory,
     entryAge: request.eventData.entryAge,
     layout: request.eventData.layout,
     seating: request.eventData.seating,
@@ -415,6 +474,7 @@ export async function getPublishedEventCards(): Promise<PublicEventCard[]> {
     price: event.price,
     imageColor: getImageColor(event.category),
     category: event.category,
+    subcategory: event.subcategory,
     imageUrl: event.image,
     createdAt: event.publishedAt,
   }));
@@ -546,6 +606,9 @@ export async function updatePublishedEvent(
   if (updates.category !== undefined) {
     dbData.category = updates.category;
     dbData.event_type = updates.category;
+  }
+  if (updates.subcategory !== undefined) {
+    dbData.tags = updates.subcategory ? [updates.subcategory] : null;
   }
   if (updates.price !== undefined) dbData.ticket_price = parseFloat(updates.price) || null;
 

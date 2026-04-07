@@ -152,11 +152,11 @@ export default function BrowseFilters({
   // ── Dynamic categories from events ───────────────────────────────────────
   useEffect(() => {
     if (events.length === 0) return;
-    const categoryMap = new Map<string, string>();
+    const categoryMap = new Map<string, { icon: string; subFilters: Set<string> }>();
     events.forEach(event => {
       if (event.category) {
         const norm = event.category.trim();
-        if (norm && !categoryMap.has(norm.toLowerCase())) {
+        if (norm) {
           const lower = norm.toLowerCase();
           let icon = 'Mic';
           if (lower.includes('dj') || lower.includes('disc')) icon = 'Disc';
@@ -164,12 +164,23 @@ export default function BrowseFilters({
           else if (lower.includes('comedy')) icon = 'Smile';
           else if (lower.includes('theatre') || lower.includes('drama')) icon = 'Drama';
           else if (lower.includes('art') || lower.includes('paint')) icon = 'Palette';
-          categoryMap.set(norm.toLowerCase(), icon);
+
+          const key = norm.toLowerCase();
+          const existing = categoryMap.get(key);
+          const next = existing || { icon, subFilters: new Set<string>() };
+          if (event.subcategory) {
+            const sub = event.subcategory.trim();
+            if (sub) next.subFilters.add(sub);
+          }
+          next.icon = next.icon || icon;
+          categoryMap.set(key, next);
         }
       }
     });
-    setDynamicCategories(Array.from(categoryMap.entries()).map(([name, icon]) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1), icon, subFilters: []
+    setDynamicCategories(Array.from(categoryMap.entries()).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      icon: value.icon,
+      subFilters: Array.from(value.subFilters),
     })));
   }, [events]);
 

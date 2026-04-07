@@ -15,11 +15,12 @@ interface EventCardProps {
   imageColor: string;
   imageUrl?: string;
   category: string;
+  subcategory?: string;
   layout?: 'horizontal' | 'vertical';
   index?: number;
 }
 
-export default function EventCard({ id, title, date, venue, price, imageColor, imageUrl, category, layout = 'horizontal', index = 0 }: EventCardProps) {
+export default function EventCard({ id, title, date, venue, price, imageColor, imageUrl, category, subcategory, layout = 'horizontal', index = 0 }: EventCardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -337,7 +338,7 @@ export default function EventCard({ id, title, date, venue, price, imageColor, i
               className="absolute top-3 left-3"
             >
               <span className="px-3 py-1.5 bg-[#0D0D0D]/70 backdrop-blur-xl rounded-full text-xs font-bold text-[#F5F5DC] border border-[#F5F5DC]/20 shadow-lg">
-                {category}
+                {subcategory ? `${category} • ${subcategory}` : category}
               </span>
             </motion.div>
 
