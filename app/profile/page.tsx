@@ -59,7 +59,7 @@ function ProfileContent() {
           title: booking.event_title || 'Untitled Event',
           date: booking.event_date ? new Date(booking.event_date).toLocaleDateString() : 'Date TBD',
           venue: booking.event_venue || 'Venue TBD',
-          image: booking.event_image || '/dj1.jfif',
+          image: booking.event_image || '/dgwob.png',
           status: isCompleted ? 'Completed' : 'Upcoming',
           tickets: totalTickets,
           price: `₹${Number(booking.amount_paid || 0).toLocaleString('en-IN')}`,
@@ -268,11 +268,11 @@ function ProfileContent() {
                     <div key={event.id} className="bg-[#2A2A2A] rounded-xl p-4 flex gap-4">
                       <div className="w-24 h-24 rounded-lg bg-[#0D0D0D] overflow-hidden flex-shrink-0">
                         <img 
-                          src={event.imageUrl || '/dj1.jfif'} 
+                          src={event.imageUrl || '/dgwob.png'} 
                           alt={event.title}
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/dj1.jfif';
+                            (e.target as HTMLImageElement).src = '/dgwob.png';
                           }}
                         />
                       </div>
@@ -339,7 +339,7 @@ function ProfileContent() {
                             alt={booking.title}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/dj1.jfif';
+                              (e.target as HTMLImageElement).src = '/dgwob.png';
                             }}
                           />
                         </div>

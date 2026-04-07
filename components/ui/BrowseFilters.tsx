@@ -22,6 +22,18 @@ type BrowseFiltersData = {
   locationFilters: StateFilter[];
 };
 
+export type BrowseFilterSelection = {
+  category: string | null;
+  subFilters: string[];
+  selectedAreas: string[];
+  hasDateFilter: boolean;
+  dateStart?: string;
+  dateEnd?: string;
+  hasPriceFilter: boolean;
+  priceMin: number;
+  priceMax: number;
+};
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const iconMap: Record<string, LucideIcon> = {
@@ -66,11 +78,13 @@ export default function BrowseFilters({
   onFilterStateChange,
   onCategorySelect,
   selectedCategory,
+  onFiltersChange,
 }: {
   events?: PublicEventCard[];
   onFilterStateChange?: (hasActiveFilters: boolean) => void;
   onCategorySelect?: (category: string | null) => void;
   selectedCategory?: string | null;
+  onFiltersChange?: (filters: BrowseFilterSelection) => void;
 }) {
   const [filters, setFilters] = useState<BrowseFiltersData>(defaultFilters);
   const [filtersLoading, setFiltersLoading] = useState(true);
@@ -82,6 +96,7 @@ export default function BrowseFilters({
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [locationSearch, setLocationSearch] = useState('');
   const [modalActiveState, setModalActiveState] = useState<string>('');
+  const [areaSearch, setAreaSearch] = useState('');
 
   // Category / filter state
   const [activeCategory, setActiveCategory] = useState<string | null>(selectedCategory || null);
@@ -195,6 +210,14 @@ export default function BrowseFilters({
   const hasActiveFilters = activeCategory !== null || activeSubFilters.length > 0 ||
     selectedAreas.length > 0 || !!dateLabel || !!priceLabel;
 
+  const filteredAreas = selectedCity
+    ? selectedCity.areas.filter((area) =>
+        areaSearch.trim()
+          ? area.toLowerCase().includes(areaSearch.trim().toLowerCase())
+          : true
+      )
+    : [];
+
   // Filtered cities in modal based on search
   const filteredLocationFilters = locationSearch.trim()
     ? filters.locationFilters.map(sf => ({
@@ -245,6 +268,31 @@ export default function BrowseFilters({
   const locationLabel = selectedAreas.length > 0
     ? selectedAreas.length === 1 ? selectedAreas[0] : `${selectedAreas[0]} +${selectedAreas.length - 1}`
     : (selectedCity?.name ?? 'Location');
+
+  useEffect(() => {
+    onFiltersChange?.({
+      category: activeCategory,
+      subFilters: activeSubFilters,
+      selectedAreas,
+      hasDateFilter: Boolean(dateLabel) && Boolean(dateRangeStart),
+      dateStart: dateRangeStart ? dateRangeStart.toISOString() : undefined,
+      dateEnd: (dateRangeEnd || dateRangeStart)?.toISOString(),
+      hasPriceFilter: Boolean(priceLabel),
+      priceMin,
+      priceMax,
+    });
+  }, [
+    onFiltersChange,
+    activeCategory,
+    activeSubFilters,
+    selectedAreas,
+    dateLabel,
+    dateRangeStart,
+    dateRangeEnd,
+    priceLabel,
+    priceMin,
+    priceMax,
+  ]);
 
   return (
     <motion.div
@@ -447,6 +495,21 @@ export default function BrowseFilters({
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden mb-4"
             >
+              <div className="mb-3 flex items-center gap-2 rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2">
+                <Search className="h-4 w-4 text-[#F5F5DC]/40" />
+                <input
+                  value={areaSearch}
+                  onChange={(e) => setAreaSearch(e.target.value)}
+                  placeholder={`Search area in ${selectedCity.name}`}
+                  className="w-full bg-transparent text-sm text-[#F5F5DC] placeholder:text-[#F5F5DC]/35 outline-none"
+                />
+                {areaSearch && (
+                  <button onClick={() => setAreaSearch('')}>
+                    <X className="h-3.5 w-3.5 text-[#F5F5DC]/50" />
+                  </button>
+                )}
+              </div>
+
               <div className="flex items-center gap-2">
                 {/* Left Arrow */}
                 <motion.button
@@ -464,7 +527,7 @@ export default function BrowseFilters({
                 {/* Scrollable Areas */}
                 <div id="areas-scroll-container" className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 flex-1">
                   <span className="text-xs text-[#F5F5DC]/30 self-center whitespace-nowrap pr-1 flex-shrink-0">Areas in {selectedCity.name}:</span>
-                  {selectedCity.areas.map(area => {
+                  {filteredAreas.map(area => {
                     const isActive = selectedAreas.includes(area);
                     return (
                       <motion.button
@@ -482,6 +545,9 @@ export default function BrowseFilters({
                       </motion.button>
                     );
                   })}
+                  {filteredAreas.length === 0 && (
+                    <span className="self-center text-xs text-[#F5F5DC]/35">No matching areas</span>
+                  )}
                 </div>
 
                 {/* Right Arrow */}

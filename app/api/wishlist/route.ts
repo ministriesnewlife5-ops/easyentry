@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ wishlist: [] });
     }
 
     const supabase = getSupabaseServerClient();
@@ -121,7 +121,7 @@ export async function PATCH(request: NextRequest) {
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ isInWishlist: false });
     }
 
     const { searchParams } = new URL(request.url);

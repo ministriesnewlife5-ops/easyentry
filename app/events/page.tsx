@@ -2,6 +2,7 @@
 
 import { motion, useScroll, useTransform } from 'framer-motion';
 import BrowseFilters from '@/components/ui/BrowseFilters';
+import type { BrowseFilterSelection } from '@/components/ui/BrowseFilters';
 import PromoBanner from '@/components/ui/PromoBanner';
 import EventCard from '@/components/ui/EventCard';
 import { ArrowRight } from 'lucide-react';
@@ -124,6 +125,7 @@ export default function EventsPage() {
   const [filteredEvents, setFilteredEvents] = useState<PublicEventCard[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeFilters, setActiveFilters] = useState<BrowseFilterSelection | null>(null);
   const { scrollY } = useScroll();
   
   // Parallax effect for hero
@@ -142,14 +144,6 @@ export default function EventsPage() {
 
   const handleCategorySelect = (category: string | null) => {
     setSelectedCategory(category);
-    if (category) {
-      const filtered = allEvents.filter(event => 
-        event.category?.toLowerCase() === category.toLowerCase()
-      );
-      setFilteredEvents(filtered);
-    } else {
-      setFilteredEvents(allEvents);
-    }
   };
 
   useEffect(() => {
@@ -173,6 +167,62 @@ export default function EventsPage() {
 
     fetchEvents();
   }, []);
+
+  useEffect(() => {
+    if (!activeFilters) {
+      setFilteredEvents(allEvents);
+      return;
+    }
+
+    const filtered = allEvents.filter((event) => {
+      // Category
+      if (activeFilters.category) {
+        if ((event.category || '').toLowerCase() !== activeFilters.category.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Subcategory chips
+      if (activeFilters.subFilters.length > 0) {
+        const eventSub = (event.subcategory || '').toLowerCase();
+        const eventCategory = (event.category || '').toLowerCase();
+        const matchesSubFilter = activeFilters.subFilters.some((sub) => {
+          const normalizedSub = sub.toLowerCase();
+          return eventSub === normalizedSub || eventCategory.includes(normalizedSub);
+        });
+
+        if (!matchesSubFilter) return false;
+      }
+
+      // Area (match against venue string)
+      if (activeFilters.selectedAreas.length > 0) {
+        const venue = (event.venue || '').toLowerCase();
+        const matchesArea = activeFilters.selectedAreas.some((area) => venue.includes(area.toLowerCase()));
+        if (!matchesArea) return false;
+      }
+
+      // Date range
+      if (activeFilters.hasDateFilter && activeFilters.dateStart && activeFilters.dateEnd) {
+        const eventDate = new Date(event.date);
+        const start = new Date(activeFilters.dateStart);
+        const end = new Date(activeFilters.dateEnd);
+
+        if (Number.isNaN(eventDate.getTime())) return false;
+        if (eventDate < start || eventDate > end) return false;
+      }
+
+      // Price range
+      if (activeFilters.hasPriceFilter) {
+        const numericPrice = Number(String(event.price || '0').replace(/[^\d.]/g, ''));
+        if (!Number.isFinite(numericPrice)) return false;
+        if (numericPrice < activeFilters.priceMin || numericPrice > activeFilters.priceMax) return false;
+      }
+
+      return true;
+    });
+
+    setFilteredEvents(filtered);
+  }, [allEvents, activeFilters]);
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">
@@ -302,6 +352,7 @@ export default function EventsPage() {
             onFilterStateChange={handleFilterStateChange}
             onCategorySelect={handleCategorySelect}
             selectedCategory={selectedCategory}
+            onFiltersChange={setActiveFilters}
           />
         </motion.div>
           {/* Promo Banner */}

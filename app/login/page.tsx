@@ -405,7 +405,7 @@ export default function LoginPage() {
                   </div>
 
                   <div className="text-center">
-                    <Link href="/forgot-password" className="text-sm text-purple-500 hover:text-purple-600 transition-colors">
+                      <Link href="/forgot-password" className="text-sm text-purple-500 hover:text-purple-600 transition-colors">
                       Forget your password?
                     </Link>
                   </div>
@@ -430,7 +430,7 @@ export default function LoginPage() {
           {/* Background Image with reduced blur */}
           <div className="absolute inset-0">
             <img 
-              src="/dj1.jfif" 
+              src="/dgwob.png" 
               alt="Background"
               className="w-full h-full object-cover blur-[2px] scale-110"
             />
