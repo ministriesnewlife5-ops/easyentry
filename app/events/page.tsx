@@ -169,25 +169,25 @@ export default function EventsPage() {
   }, []);
 
   useEffect(() => {
-    if (!activeFilters) {
-      setFilteredEvents(allEvents);
-      return;
-    }
+    const categoryFilter = activeFilters?.category ?? selectedCategory;
+    const subFilters = activeFilters?.subFilters || [];
+    const selectedAreas = activeFilters?.selectedAreas || [];
+    const normalize = (value: string | null | undefined) => (value || '').trim().toLowerCase();
 
     const filtered = allEvents.filter((event) => {
-      // Category
-      if (activeFilters.category) {
-        if ((event.category || '').toLowerCase() !== activeFilters.category.toLowerCase()) {
+      // Category (always apply when selected)
+      if (categoryFilter) {
+        if (normalize(event.category) !== normalize(categoryFilter)) {
           return false;
         }
       }
 
       // Subcategory chips
-      if (activeFilters.subFilters.length > 0) {
-        const eventSub = (event.subcategory || '').toLowerCase();
-        const eventCategory = (event.category || '').toLowerCase();
-        const matchesSubFilter = activeFilters.subFilters.some((sub) => {
-          const normalizedSub = sub.toLowerCase();
+      if (subFilters.length > 0) {
+        const eventSub = normalize(event.subcategory);
+        const eventCategory = normalize(event.category);
+        const matchesSubFilter = subFilters.some((sub) => {
+          const normalizedSub = normalize(sub);
           return eventSub === normalizedSub || eventCategory.includes(normalizedSub);
         });
 
@@ -195,14 +195,14 @@ export default function EventsPage() {
       }
 
       // Area (match against venue string)
-      if (activeFilters.selectedAreas.length > 0) {
+      if (selectedAreas.length > 0) {
         const venue = (event.venue || '').toLowerCase();
-        const matchesArea = activeFilters.selectedAreas.some((area) => venue.includes(area.toLowerCase()));
+        const matchesArea = selectedAreas.some((area) => venue.includes(area.toLowerCase()));
         if (!matchesArea) return false;
       }
 
-      // Date range
-      if (activeFilters.hasDateFilter && activeFilters.dateStart && activeFilters.dateEnd) {
+      // Additional filters from advanced selections
+      if (activeFilters?.hasDateFilter && activeFilters.dateStart && activeFilters.dateEnd) {
         const eventDate = new Date(event.date);
         const start = new Date(activeFilters.dateStart);
         const end = new Date(activeFilters.dateEnd);
@@ -211,8 +211,7 @@ export default function EventsPage() {
         if (eventDate < start || eventDate > end) return false;
       }
 
-      // Price range
-      if (activeFilters.hasPriceFilter) {
+      if (activeFilters?.hasPriceFilter) {
         const numericPrice = Number(String(event.price || '0').replace(/[^\d.]/g, ''));
         if (!Number.isFinite(numericPrice)) return false;
         if (numericPrice < activeFilters.priceMin || numericPrice > activeFilters.priceMax) return false;
@@ -222,7 +221,7 @@ export default function EventsPage() {
     });
 
     setFilteredEvents(filtered);
-  }, [allEvents, activeFilters]);
+  }, [allEvents, activeFilters, selectedCategory]);
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">
