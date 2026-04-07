@@ -714,6 +714,32 @@ export default function EventDetailsPage() {
                 </button>
               </div>
             </motion.div>
+
+            {/* Tagged Artists */}
+            {event.taggedArtists && event.taggedArtists.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45 }}
+                className="bg-[#2A2A2A] rounded-xl p-4 border border-[#2A2A2A]"
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <Star className="w-4 h-4 text-[#E5A823]" />
+                  <span className="text-sm font-bold text-[#F5F5DC]">Performing Artists</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {event.taggedArtists.map((artist) => (
+                    <Link
+                      key={artist.id}
+                      href={artist.profileUrl || `/artist/${artist.id}`}
+                      className="px-3 py-1.5 rounded-full border border-[#E5A823]/40 bg-[#E5A823]/10 text-[#E5A823] text-xs font-semibold hover:bg-[#E5A823] hover:text-[#0D0D0D] transition-colors"
+                    >
+                      {artist.name}
+                    </Link>
+                  ))}
+                </div>
+              </motion.div>
+            )}
           </div>
 
           {/* Right Column - Get Tickets */}

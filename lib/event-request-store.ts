@@ -30,6 +30,7 @@ export type EventRequest = {
     mediaFiles?: string[];
     numberOfTickets?: string;
     rules?: string[];
+    taggedArtists?: Array<{ id: string; name: string | null; email?: string }>;
     ticketCategories?: TicketCategory[];
     description: string;
     fullDescription: string;

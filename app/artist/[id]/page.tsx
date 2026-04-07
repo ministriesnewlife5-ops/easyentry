@@ -9,10 +9,10 @@ import {
   Heart, Share2, MessageCircle, Instagram, Youtube, 
   Twitter, Facebook, ArrowLeft, X
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface ArtistData {
-  id: number;
+  id: string | number;
   name: string;
   realName: string;
   role: string;
@@ -101,9 +101,75 @@ const artistsData: Record<string, ArtistData> = {
 export default function ArtistViewProfile() {
   const params = useParams();
   const artistId = params.id as string;
-  const artist = artistsData[artistId];
   const [showContactModal, setShowContactModal] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [fetchedArtist, setFetchedArtist] = useState<ArtistData | null>(null);
+  const [artistLoading, setArtistLoading] = useState(true);
+
+  useEffect(() => {
+    const loadArtist = async () => {
+      try {
+        setArtistLoading(true);
+        const response = await fetch(`/api/artists/${artistId}`);
+
+        if (!response.ok) {
+          setFetchedArtist(null);
+          return;
+        }
+
+        const data = await response.json();
+        const artist = data.artist;
+
+        if (!artist) {
+          setFetchedArtist(null);
+          return;
+        }
+
+        const displayName = artist.name || artist.realName || artist.email || 'Artist';
+
+        setFetchedArtist({
+          id: artist.id,
+          name: displayName,
+          realName: artist.realName || displayName,
+          role: 'DJ',
+          verified: true,
+          location: 'India',
+          openToTravel: true,
+          rating: 4.8,
+          reviews: 0,
+          memberSince: artist.experienceYears ? `${artist.experienceYears}+ years` : 'New',
+          responseTime: '< 24 hours',
+          hourlyRate: 'Contact for quote',
+          availability: 'Available',
+          languages: ['English'],
+          genres: artist.genre ? [artist.genre] : ['Live Performance'],
+          eventsPerformed: 0,
+          experience: artist.experienceYears ? `${artist.experienceYears}+ Years` : 'Emerging Artist',
+          bio: artist.bio || `${displayName} is available for performances.`,
+          profileImage: 'https://images.unsplash.com/photo-1514525253440-b393452e3726?auto=format&fit=crop&q=80&w=400',
+          coverImage: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+          videos: [],
+          performances: [],
+          awards: [],
+          eventTypes: ['Club Shows', 'Private Events', 'Festivals'],
+          socialLinks: {
+            instagram: artist.socialMedia || '#',
+            youtube: '#',
+            twitter: '#',
+            facebook: '#',
+          },
+        });
+      } catch {
+        setFetchedArtist(null);
+      } finally {
+        setArtistLoading(false);
+      }
+    };
+
+    loadArtist();
+  }, [artistId]);
+
+  const artist = fetchedArtist || artistsData[artistId];
 
   const shareToWhatsApp = () => {
     if (!artist) return;
@@ -120,6 +186,16 @@ export default function ArtistViewProfile() {
     window.open('https://instagram.com', '_blank');
     setShowShareMenu(false);
   };
+
+  if (artistLoading && !artist) {
+    return (
+      <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC] flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Loading artist profile...</h1>
+        </div>
+      </div>
+    );
+  }
 
   if (!artist) {
     return (

@@ -11,6 +11,13 @@ type PublicEventTicketCategory = {
   availableUntil?: string;
 };
 
+type PublicEventTaggedArtist = {
+  id: string;
+  name: string;
+  email?: string;
+  profileUrl: string;
+};
+
 export type PublicEventHighlight = {
   iconKey: 'star' | 'zap';
   title: string;
@@ -73,6 +80,7 @@ export type PublicEvent = {
   publishedAt: number;
   sourceRequestId?: string;
   ticketCategories?: PublicEventTicketCategory[];
+  taggedArtists?: PublicEventTaggedArtist[];
 };
 
 export type PublicEventCard = {
@@ -113,13 +121,18 @@ function mapLegacyToDb(event: Partial<PublicEvent> & { sourceRequestId?: string 
 }
 
 // Map database record to legacy PublicEvent
-function mapDbToLegacy(record: Record<string, unknown>, ticketCategoriesOverride?: PublicEventTicketCategory[]): PublicEvent {
+function mapDbToLegacy(
+  record: Record<string, unknown>,
+  ticketCategoriesOverride?: PublicEventTicketCategory[],
+  taggedArtistsOverride?: PublicEventTaggedArtist[]
+): PublicEvent {
   const gallery = (record.gallery_images as string[]) || [];
   const imageUrl = (record.image_url as string) || gallery[0] || '';
   const ticketCategoriesFromRecord = Array.isArray(record.ticket_categories)
     ? (record.ticket_categories as PublicEventTicketCategory[])
     : [];
   const ticketCategories = ticketCategoriesOverride ?? ticketCategoriesFromRecord;
+  const taggedArtists = taggedArtistsOverride ?? [];
 
   return {
     id: record.id as string,
@@ -149,6 +162,7 @@ function mapDbToLegacy(record: Record<string, unknown>, ticketCategoriesOverride
     publishedAt: new Date(record.published_at as string).getTime(),
     sourceRequestId: (record.request_id as string) || undefined,
     ticketCategories,
+    taggedArtists,
   };
 }
 
@@ -205,6 +219,68 @@ async function getTicketCategoriesFromSourceRequest(requestId: string): Promise<
     availableFrom: cat.availableFrom,
     availableUntil: cat.availableUntil,
   }));
+}
+
+async function getTaggedArtistsFromSourceRequest(requestId: string): Promise<PublicEventTaggedArtist[]> {
+  const { data, error } = await supabase
+    .from('event_requests')
+    .select('event_data')
+    .eq('id', requestId)
+    .single();
+
+  if (error || !data) {
+    return [];
+  }
+
+  const row = data as Record<string, unknown>;
+  const eventData = row.event_data as Record<string, unknown> | null;
+  const rawTaggedArtists = Array.isArray(eventData?.taggedArtists)
+    ? (eventData?.taggedArtists as Array<Record<string, unknown>>)
+    : [];
+
+  if (rawTaggedArtists.length === 0) {
+    return [];
+  }
+
+  const normalized = rawTaggedArtists
+    .map((artist) => ({
+      id: String(artist.id || '').trim(),
+      name: typeof artist.name === 'string' ? artist.name.trim() : '',
+      email: typeof artist.email === 'string' ? artist.email : undefined,
+    }))
+    .filter((artist) => Boolean(artist.id));
+
+  if (normalized.length === 0) {
+    return [];
+  }
+
+  const ids = Array.from(new Set(normalized.map((artist) => artist.id)));
+  const { data: artistsData } = await supabase
+    .from('app_users')
+    .select('id, name, email')
+    .in('id', ids);
+
+  const usersById = new Map(
+    ((artistsData as Array<Record<string, unknown>> | null) || []).map((user) => [
+      String(user.id),
+      {
+        name: typeof user.name === 'string' ? user.name : '',
+        email: typeof user.email === 'string' ? user.email : undefined,
+      },
+    ])
+  );
+
+  return normalized.map((artist) => {
+    const user = usersById.get(artist.id);
+    const displayName = artist.name || user?.name || artist.email || user?.email || 'Artist';
+
+    return {
+      id: artist.id,
+      name: displayName,
+      email: artist.email || user?.email,
+      profileUrl: `/artist/${artist.id}`,
+    };
+  });
 }
 
 function getImageColor(category: string): string {
@@ -289,7 +365,7 @@ export async function getAllPublishedEvents(): Promise<PublicEvent[]> {
     throw new Error(`Failed to get published events: ${error.message}`);
   }
 
-  return (data as Record<string, unknown>[])?.map(mapDbToLegacy) || [];
+  return (data as Record<string, unknown>[])?.map((record) => mapDbToLegacy(record)) || [];
 }
 
 /**
@@ -310,13 +386,20 @@ export async function getPublishedEventById(id: string): Promise<PublicEvent | u
   }
 
   let ticketCategories = await getTicketCategoriesByEventId(id);
+  let taggedArtists: PublicEventTaggedArtist[] = [];
+  const requestId = (data as Record<string, unknown>).request_id as string | null;
+
   if (ticketCategories.length === 0) {
-    const requestId = (data as Record<string, unknown>).request_id as string | null;
     if (requestId) {
       ticketCategories = await getTicketCategoriesFromSourceRequest(requestId);
     }
   }
-  return mapDbToLegacy(data as Record<string, unknown>, ticketCategories);
+
+  if (requestId) {
+    taggedArtists = await getTaggedArtistsFromSourceRequest(requestId);
+  }
+
+  return mapDbToLegacy(data as Record<string, unknown>, ticketCategories, taggedArtists);
 }
 
 /**
@@ -515,7 +598,7 @@ export async function getPublishedEventsByStatus(status: string): Promise<Public
     throw new Error(`Failed to get events by status: ${error.message}`);
   }
 
-  return (data as Record<string, unknown>[])?.map(mapDbToLegacy) || [];
+  return (data as Record<string, unknown>[])?.map((record) => mapDbToLegacy(record)) || [];
 }
 
 /**
@@ -533,5 +616,5 @@ export async function getFeaturedEvents(): Promise<PublicEvent[]> {
     throw new Error(`Failed to get featured events: ${error.message}`);
   }
 
-  return (data as Record<string, unknown>[])?.map(mapDbToLegacy) || [];
+  return (data as Record<string, unknown>[])?.map((record) => mapDbToLegacy(record)) || [];
 }
