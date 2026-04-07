@@ -44,15 +44,6 @@ export default function OutletHostEventPage() {
   const [numberOfTickets, setNumberOfTickets] = useState('');
   const [ticketCategories, setTicketCategories] = useState<TicketCategory[]>([]);
   const [websiteEventTemplates, setWebsiteEventTemplates] = useState<EventTemplate[]>([]);
-  const [newTicketCategory, setNewTicketCategory] = useState<TicketCategory>({
-    id: '',
-    name: '',
-    price: 0,
-    quantity: 0,
-    commissionPercent: 0,
-    availableFrom: '',
-    availableUntil: '',
-  });
   const [eventData, setEventData] = useState({
     title: '',
     subtitle: '',
@@ -156,29 +147,30 @@ export default function OutletHostEventPage() {
   };
 
   const addTicketCategory = () => {
-    if (!newTicketCategory.name || newTicketCategory.price <= 0) {
-      alert('Please fill in ticket category name and price');
-      return;
-    }
-    if (newTicketCategory.quantity <= 0) {
-      alert('Please enter a valid quantity for this ticket category');
-      return;
-    }
     const category: TicketCategory = {
       id: Date.now().toString(),
-      name: newTicketCategory.name,
-      price: newTicketCategory.price,
-      quantity: newTicketCategory.quantity,
-      commissionPercent: newTicketCategory.commissionPercent,
-      availableFrom: newTicketCategory.availableFrom || undefined,
-      availableUntil: newTicketCategory.availableUntil || undefined,
+      name: '',
+      price: 0,
+      quantity: 0,
+      commissionPercent: 0,
+      availableFrom: undefined,
+      availableUntil: undefined,
     };
     setTicketCategories([...ticketCategories, category]);
-    setNewTicketCategory({ id: '', name: '', price: 0, quantity: 0, commissionPercent: 0, availableFrom: '', availableUntil: '' });
   };
 
   const removeTicketCategory = (categoryId: string) => {
     setTicketCategories(ticketCategories.filter(c => c.id !== categoryId));
+  };
+
+  const updateTicketCategory = (categoryId: string, updates: Partial<TicketCategory>) => {
+    setTicketCategories((prev) =>
+      prev.map((category) =>
+        category.id === categoryId
+          ? { ...category, ...updates }
+          : category
+      )
+    );
   };
 
   const removeImageAt = (indexToRemove: number) => {
@@ -455,90 +447,126 @@ export default function OutletHostEventPage() {
                   </div>
                 </div>
 
-                {/* Add ticket category form */}
                 <div className="mt-4">
                   <h3 className="text-sm font-medium mb-3">Ticket Categories</h3>
-                  <div className="space-y-3 mb-4 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A]/50 p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Category Name <span className="text-[#EB4D4B]">*</span></label>
-                        <input
-                          type="text"
-                          value={newTicketCategory.name}
-                          onChange={(e) => setNewTicketCategory({ ...newTicketCategory, name: e.target.value })}
-                          placeholder="e.g., General, VIP, Premium"
-                          className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Price (₹) <span className="text-[#EB4D4B]">*</span></label>
-                        <input
-                          type="number"
-                          value={newTicketCategory.price || ''}
-                          onChange={(e) => setNewTicketCategory({ ...newTicketCategory, price: parseFloat(e.target.value) || 0 })}
-                          placeholder="e.g., 1500"
-                          className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Quantity <span className="text-[#EB4D4B]">*</span></label>
-                        <div className="relative">
-                          <Users className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#F5F5DC]/55" />
-                          <input
-                            type="number"
-                            value={newTicketCategory.quantity || ''}
-                            onChange={(e) => setNewTicketCategory({ ...newTicketCategory, quantity: parseInt(e.target.value) || 0 })}
-                            placeholder="e.g., 200"
-                            className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
-                          />
+                  <div className="space-y-3">
+                    {ticketCategories.map((category, index) => {
+                      const commAmt = category.price * category.commissionPercent / 100;
+                      const totalRev = category.price * category.quantity;
+                      const totalComm = commAmt * category.quantity;
+
+                      return (
+                        <div key={category.id} className="rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] p-4">
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <h4 className="text-sm font-medium text-[#E5A823]">Ticket Category {index + 1}</h4>
+                            <button
+                              type="button"
+                              onClick={() => removeTicketCategory(category.id)}
+                              className="text-[#EB4D4B] hover:bg-[#EB4D4B]/10 rounded-lg p-1.5 transition-colors"
+                              aria-label="Remove ticket category"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-[#F5F5DC]/70 mb-1">Category Name <span className="text-[#EB4D4B]">*</span></label>
+                              <input
+                                type="text"
+                                value={category.name}
+                                onChange={(e) => updateTicketCategory(category.id, { name: e.target.value })}
+                                placeholder="e.g., General, VIP, Premium"
+                                className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-[#F5F5DC]/70 mb-1">Price (₹) <span className="text-[#EB4D4B]">*</span></label>
+                              <input
+                                type="number"
+                                value={category.price || ''}
+                                onChange={(e) => updateTicketCategory(category.id, { price: parseFloat(e.target.value) || 0 })}
+                                placeholder="e.g., 1500"
+                                className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-[#F5F5DC]/70 mb-1">Quantity <span className="text-[#EB4D4B]">*</span></label>
+                              <div className="relative">
+                                <Users className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#F5F5DC]/55" />
+                                <input
+                                  type="number"
+                                  value={category.quantity || ''}
+                                  onChange={(e) => updateTicketCategory(category.id, { quantity: parseInt(e.target.value) || 0 })}
+                                  placeholder="e.g., 200"
+                                  className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs text-[#F5F5DC]/70 mb-1">
+                                Commission % <span className="text-[#EB4D4B]">*</span>
+                                <span className="ml-1 text-[#F5F5DC]/40">(your cut per ticket sold)</span>
+                              </label>
+                              <div className="relative">
+                                <Percent className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#F5F5DC]/55" />
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  value={category.commissionPercent || ''}
+                                  onChange={(e) => updateTicketCategory(category.id, { commissionPercent: parseFloat(e.target.value) || 0 })}
+                                  placeholder="e.g., 10"
+                                  className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-[#F5F5DC]/70 mb-1">Available From (Optional)</label>
+                              <input
+                                type="datetime-local"
+                                value={category.availableFrom || ''}
+                                onChange={(e) => updateTicketCategory(category.id, { availableFrom: e.target.value || undefined })}
+                                className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-[#F5F5DC]/70 mb-1">Available Until (Optional)</label>
+                              <input
+                                type="datetime-local"
+                                value={category.availableUntil || ''}
+                                onChange={(e) => updateTicketCategory(category.id, { availableUntil: e.target.value || undefined })}
+                                className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                            <div className="rounded-md bg-[#0D0D0D] border border-[#2A2A2A] px-3 py-2">
+                              <p className="text-xs text-[#F5F5DC]/50">Quantity</p>
+                              <p className="font-medium text-[#F5F5DC]">{category.quantity}</p>
+                            </div>
+                            <div className="rounded-md bg-[#0D0D0D] border border-[#2A2A2A] px-3 py-2">
+                              <p className="text-xs text-[#F5F5DC]/50">Per ticket money flow</p>
+                              <p className="font-medium text-[#F5F5DC]">Ticket: ₹{category.price.toLocaleString('en-IN')}</p>
+                              <p className="text-xs text-emerald-400">Commission: ₹{commAmt.toFixed(2)}</p>
+                            </div>
+                            <div className="rounded-md bg-[#0D0D0D] border border-[#2A2A2A] px-3 py-2">
+                              <p className="text-xs text-[#F5F5DC]/50">Money Flow</p>
+                              <p className="font-medium text-[#F5F5DC]">Revenue: ₹{totalRev.toLocaleString('en-IN')}</p>
+                              <p className="text-xs text-emerald-400">Commission: ₹{totalComm.toFixed(2)}</p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">
-                          Commission % <span className="text-[#EB4D4B]">*</span>
-                          <span className="ml-1 text-[#F5F5DC]/40">(your cut per ticket sold)</span>
-                        </label>
-                        <div className="relative">
-                          <Percent className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#F5F5DC]/55" />
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
-                            value={newTicketCategory.commissionPercent || ''}
-                            onChange={(e) => setNewTicketCategory({ ...newTicketCategory, commissionPercent: parseFloat(e.target.value) || 0 })}
-                            placeholder="e.g., 10"
-                            className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
-                          />
-                        </div>
-                        {newTicketCategory.price > 0 && newTicketCategory.commissionPercent > 0 && (
-                          <p className="mt-1 text-xs text-[#E5A823]/80">
-                            = ₹{((newTicketCategory.price * newTicketCategory.commissionPercent) / 100).toFixed(2)} per ticket
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Available From (Optional)</label>
-                        <input
-                          type="datetime-local"
-                          value={newTicketCategory.availableFrom || ''}
-                          onChange={(e) => setNewTicketCategory({ ...newTicketCategory, availableFrom: e.target.value })}
-                          className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-[#F5F5DC]/70 mb-1">Available Until (Optional)</label>
-                        <input
-                          type="datetime-local"
-                          value={newTicketCategory.availableUntil || ''}
-                          onChange={(e) => setNewTicketCategory({ ...newTicketCategory, availableUntil: e.target.value })}
-                          className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#E5A823]"
-                        />
-                      </div>
-                    </div>
+                      );
+                    })}
+
                     <button
                       type="button"
                       onClick={addTicketCategory}
@@ -547,52 +575,6 @@ export default function OutletHostEventPage() {
                       + Add Ticket Category
                     </button>
                   </div>
-
-                  {/* Added categories */}
-                  {ticketCategories.length > 0 && (
-                    <div className="space-y-3">
-                      {ticketCategories.map((category) => {
-                        const commAmt = category.price * category.commissionPercent / 100;
-                        const totalRev = category.price * category.quantity;
-                        const totalComm = commAmt * category.quantity;
-
-                        return (
-                          <div key={category.id} className="rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] p-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-medium text-[#E5A823]">{category.name}</p>
-                                <p className="text-xs text-[#F5F5DC]/60">₹{category.price.toLocaleString('en-IN')} / ticket</p>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => removeTicketCategory(category.id)}
-                                className="text-[#EB4D4B] hover:bg-[#EB4D4B]/10 rounded-lg p-1.5 transition-colors"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-
-                            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                              <div className="rounded-md bg-[#0D0D0D] border border-[#2A2A2A] px-3 py-2">
-                                <p className="text-xs text-[#F5F5DC]/50">Quantity</p>
-                                <p className="font-medium text-[#F5F5DC]">{category.quantity}</p>
-                              </div>
-                              <div className="rounded-md bg-[#0D0D0D] border border-[#2A2A2A] px-3 py-2">
-                                <p className="text-xs text-[#F5F5DC]/50">Commission</p>
-                                <p className="font-medium text-emerald-400">{category.commissionPercent}%</p>
-                                <p className="text-xs text-[#F5F5DC]/50">₹{commAmt.toFixed(2)} / ticket</p>
-                              </div>
-                              <div className="rounded-md bg-[#0D0D0D] border border-[#2A2A2A] px-3 py-2">
-                                <p className="text-xs text-[#F5F5DC]/50">Money Flow</p>
-                                <p className="font-medium text-[#F5F5DC]">Revenue: ₹{totalRev.toLocaleString('en-IN')}</p>
-                                <p className="text-xs text-emerald-400">Commission: ₹{totalComm.toFixed(2)}</p>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
