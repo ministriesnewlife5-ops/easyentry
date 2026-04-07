@@ -16,11 +16,7 @@ import EventsTable from '@/components/EventsTable';
 import { getAllPublishedEvents, getPublishedEventCards } from '@/lib/public-events-store';
 import { getAllEventRequests } from '@/lib/event-request-store';
 import { getAllUsers } from '@/lib/auth-store';
-
-// Data structures will be populated with real data from database
-let revenueBars: number[] = [];
-let bookingSources: { name: string; value: number }[] = [];
-let recentActivity: any[] = [];
+import { getSupabaseServerClient } from '@/lib/supabase';
 
 export default async function AdminPage({
   searchParams,
@@ -42,6 +38,22 @@ export default async function AdminPage({
   const eventCards = await getPublishedEventCards();
   const eventRequests = await getAllEventRequests();
   const allUsers = await getAllUsers();
+  const supabase = getSupabaseServerClient();
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  const { data: monthBookings } = await supabase
+    .from('ticket_bookings')
+    .select('event_id, event_title, amount_paid, total_tickets, booked_at')
+    .gte('booked_at', startOfMonth)
+    .order('booked_at', { ascending: false });
+
+  const { data: recentBookings } = await supabase
+    .from('ticket_bookings')
+    .select('event_title, amount_paid, total_tickets, booked_at')
+    .order('booked_at', { ascending: false })
+    .limit(10);
   
   // Get real artists (users with artist role)
   const enrolledArtists = allUsers.filter((user: { role: string }) => user.role === 'artist');
@@ -96,21 +108,58 @@ export default async function AdminPage({
   }));
 
   // Get upcoming events for the overview section (limit to 6)
+  const bookingCountByEvent = new Map<string, number>();
+  (monthBookings || []).forEach((booking: any) => {
+    const key = String(booking.event_id || booking.event_title || 'unknown');
+    bookingCountByEvent.set(key, (bookingCountByEvent.get(key) || 0) + Number(booking.total_tickets || 0));
+  });
+
+  const totalRevenueThisMonth = (monthBookings || []).reduce((sum: number, booking: any) => sum + Number(booking.amount_paid || 0), 0);
+  const totalTicketsThisMonth = (monthBookings || []).reduce((sum: number, booking: any) => sum + Number(booking.total_tickets || 0), 0);
+
   const upcomingEvents = publishedEvents
     .slice(0, 6)
     .map((event, index) => {
       const colors = ['bg-[#E5A823]', 'bg-emerald-400', 'bg-[#EB4D4B]', 'bg-violet-400', 'bg-blue-400', 'bg-orange-400'];
+      const soldCount = bookingCountByEvent.get(String(event.id)) || 0;
       return {
         name: event.title,
         date: `${event.date} · ${event.time}`,
-        sold: '0/100',
+        sold: `${soldCount} sold`,
         color: colors[index % colors.length],
       };
     });
 
+  const topEventsByTickets = Array.from(bookingCountByEvent.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([eventKey, tickets]) => {
+      const event = publishedEvents.find((item) => String(item.id) === eventKey) || null;
+      return {
+        name: event?.title || 'Event',
+        tickets,
+      };
+    });
+
+  const recentActivity = [
+    ...(recentBookings || []).map((booking: any) => ({
+      id: `booking-${booking.booked_at}-${booking.event_title}`,
+      text: `Booking: ${booking.event_title || 'Event'} · ₹${Number(booking.amount_paid || 0).toLocaleString('en-IN')}`,
+      timestamp: booking.booked_at,
+    })),
+    ...eventRequests.slice(0, 10).map((request) => ({
+      id: `request-${request.id}`,
+      text: `Request: ${request.eventData.title} · ${request.status.toUpperCase()}`,
+      timestamp: new Date(request.submittedAt).toISOString(),
+    })),
+  ]
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 8);
+
   // Stats based on real data
   const stats = [
     { label: 'Total Events', value: publishedEvents.length.toString(), delta: 'Published events', icon: CalendarDays },
+    { label: 'Revenue (Month)', value: `₹${Math.round(totalRevenueThisMonth).toLocaleString('en-IN')}`, delta: `${totalTicketsThisMonth} tickets sold`, icon: IndianRupee },
     { label: 'Artists Enrolled', value: enrolledArtists.length.toString(), delta: 'Active artists', icon: Mic2 },
     { label: 'Promoters', value: enrolledInfluencers.length.toString(), delta: 'Active promoters', icon: Megaphone },
     { label: 'Outlet Providers', value: outletProviders.length.toString(), delta: 'Active outlets', icon: Store },
@@ -272,17 +321,26 @@ export default async function AdminPage({
                 </article>
                 <article className="rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5">
                   <h2 className="text-xl font-semibold">Revenue this month</h2>
-                  <div className="mt-6 flex h-44 items-center justify-center rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/90">
-                    <p className="text-[#F5F5DC]/50">Revenue data coming soon</p>
+                  <div className="mt-6 rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/90 p-5">
+                    <p className="text-3xl font-bold text-[#E5A823]">₹{Math.round(totalRevenueThisMonth).toLocaleString('en-IN')}</p>
+                    <p className="mt-1 text-sm text-[#F5F5DC]/60">From {totalTicketsThisMonth} tickets in current month</p>
                   </div>
                 </article>
               </div>
               <div className="mt-4 grid gap-4 xl:grid-cols-2">
                 <article className="rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5">
-                  <h2 className="text-xl font-semibold">Bookings by source</h2>
-                  <div className="mt-4 flex h-40 items-center justify-center">
-                    <p className="text-[#F5F5DC]/50">Analytics coming soon</p>
-                  </div>
+                  <h2 className="text-xl font-semibold">Top events by tickets</h2>
+                  <ul className="mt-4 space-y-3">
+                    {topEventsByTickets.map((item) => (
+                      <li key={`${item.name}-${item.tickets}`} className="flex items-center justify-between rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/70 px-3 py-2.5">
+                        <p className="font-medium">{item.name}</p>
+                        <p className="font-semibold text-[#E5A823]">{item.tickets}</p>
+                      </li>
+                    ))}
+                    {topEventsByTickets.length === 0 && (
+                      <li className="text-center py-8 text-[#F5F5DC]/50">No bookings yet</li>
+                    )}
+                  </ul>
                 </article>
                 <article className="rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5">
                   <h2 className="text-xl font-semibold">Top artists by tickets</h2>
@@ -303,9 +361,17 @@ export default async function AdminPage({
               </div>
               <article className="mt-4 rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5">
                 <h2 className="text-xl font-semibold">Recent Activity</h2>
-                <div className="mt-4 flex h-40 items-center justify-center">
-                  <p className="text-[#F5F5DC]/50">Activity feed coming soon</p>
-                </div>
+                <ul className="mt-4 space-y-2">
+                  {recentActivity.map((item) => (
+                    <li key={item.id} className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/70 px-3 py-2 text-sm">
+                      <p className="text-[#F5F5DC]">{item.text}</p>
+                      <p className="text-xs text-[#F5F5DC]/45">{new Date(item.timestamp).toLocaleString('en-IN')}</p>
+                    </li>
+                  ))}
+                  {recentActivity.length === 0 && (
+                    <li className="text-center py-8 text-[#F5F5DC]/50">No recent activity</li>
+                  )}
+                </ul>
               </article>
             </>
           )}

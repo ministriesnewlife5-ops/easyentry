@@ -44,60 +44,6 @@ interface ArtistData {
   };
 }
 
-const artistsData: Record<string, ArtistData> = {
-  '1': {
-    id: 1,
-    name: 'DJ GOUTHAM',
-    realName: 'Goutham Raj',
-    role: 'DJ',
-    verified: true,
-    location: 'Chennai, Tamil Nadu',
-    openToTravel: true,
-    rating: 4.9,
-    reviews: 128,
-    memberSince: '5+ years',
-    responseTime: '< 1 hour',
-    hourlyRate: '35,000+',
-    availability: 'Available',
-    languages: ['Tamil', 'English', 'Hindi'],
-    genres: ['Commercial', 'Bollywood', 'EDM'],
-    eventsPerformed: 450,
-    experience: '10+ Years',
-    bio: 'DJ GOUTHAM is a household name in Chennai\'s nightlife scene. With over a decade of experience, he has headlined the city\'s most iconic venues including Gatsby 2000 and Pasha. Known for his high-energy commercial sets and seamless Bollywood fusion.',
-    profileImage: 'https://images.unsplash.com/photo-1574391884720-2e45599e9633?auto=format&fit=crop&q=80&w=400',
-    coverImage: 'https://images.unsplash.com/photo-1574391884720-2e45599e9633?auto=format&fit=crop&q=80&w=1200',
-    videos: [
-      { id: '1', thumbnail: 'https://images.unsplash.com/photo-1514525253440-b393452e3726?auto=format&fit=crop&q=80&w=400', title: 'Live at Gatsby 2000', duration: '3:45' },
-      { id: '2', thumbnail: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&q=80&w=400', title: 'Pasha Anniversary Night', duration: '5:20' },
-      { id: '3', thumbnail: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=400', title: 'ECR Beach Festival', duration: '4:15' },
-      { id: '4', thumbnail: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&q=80&w=400', title: 'OMR Club Night', duration: '6:30' },
-    ],
-    performances: [
-      { id: '1', image: 'https://images.unsplash.com/photo-1514525253440-b393452e3726?auto=format&fit=crop&q=80&w=400', title: 'Gatsby 2000' },
-      { id: '2', image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&q=80&w=400', title: 'Pasha - The Park' },
-      { id: '3', image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=400', title: 'The Leather Bar' },
-      { id: '4', image: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&q=80&w=400', title: 'High - Radisson Blu' },
-    ],
-    awards: [
-      { id: '1', title: 'Best Commercial DJ', year: '2023', description: 'Chennai Nightlife Awards' },
-      { id: '2', title: 'Most Popular DJ', year: '2022', description: 'Times Food & Nightlife Awards' },
-    ],
-    eventTypes: [
-      'Club Shows',
-      'Corporate Events',
-      'Weddings', 
-      'Private Parties',
-      'Festivals',
-    ],
-    socialLinks: {
-      instagram: 'https://instagram.com',
-      youtube: 'https://youtube.com',
-      twitter: 'https://twitter.com',
-      facebook: 'https://facebook.com',
-    },
-  },
-};
-
 export default function ArtistViewProfile() {
   const params = useParams();
   const artistId = params.id as string;
@@ -169,7 +115,7 @@ export default function ArtistViewProfile() {
     loadArtist();
   }, [artistId]);
 
-  const artist = fetchedArtist || artistsData[artistId];
+  const artist = fetchedArtist;
 
   const shareToWhatsApp = () => {
     if (!artist) return;

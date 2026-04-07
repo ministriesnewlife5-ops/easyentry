@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Instagram, Music, ExternalLink, ArrowLeft, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
-const artists = [
+const demoArtists = [
   {
     id: 1,
     name: 'DJ GOUTHAM',
@@ -72,7 +72,7 @@ const artists = [
   }
 ];
 
-function ArtistCard({ artist, index, onImageClick }: { artist: typeof artists[0]; index: number; onImageClick?: () => void }) {
+function ArtistCard({ artist, index, onImageClick }: { artist: typeof demoArtists[0]; index: number; onImageClick?: () => void }) {
   const [isHovered, setIsHovered] = useState(false);
 
   const shareToWhatsApp = async (e: React.MouseEvent) => {
@@ -243,8 +243,37 @@ function ArtistCard({ artist, index, onImageClick }: { artist: typeof artists[0]
 }
 
 export default function ArtistsPage() {
+  const [artists, setArtists] = useState<typeof demoArtists>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    const loadArtists = async () => {
+      try {
+        const response = await fetch('/api/artists', { cache: 'no-store' });
+        if (!response.ok) {
+          setArtists([]);
+          return;
+        }
+
+        const data = await response.json();
+        const mapped = (data.artists || []).map((artist: any) => ({
+          id: artist.id,
+          name: (artist.name || artist.email || 'Artist').toUpperCase(),
+          role: 'DJ',
+          image: `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name || artist.email || 'Artist')}&background=1f2937&color=fff&size=500`,
+          genre: 'Live Performance',
+          followers: '--',
+        }));
+
+        setArtists(mapped);
+      } catch {
+        setArtists([]);
+      }
+    };
+
+    loadArtists();
+  }, []);
 
   const openModal = (index: number) => {
     setCurrentIndex(index);
@@ -256,12 +285,14 @@ export default function ArtistsPage() {
   };
 
   const goToPrev = useCallback(() => {
+    if (artists.length === 0) return;
     setCurrentIndex((prev) => (prev === 0 ? artists.length - 1 : prev - 1));
-  }, []);
+  }, [artists.length]);
 
   const goToNext = useCallback(() => {
+    if (artists.length === 0) return;
     setCurrentIndex((prev) => (prev === artists.length - 1 ? 0 : prev + 1));
-  }, []);
+  }, [artists.length]);
 
   // Keyboard navigation
   useEffect(() => {

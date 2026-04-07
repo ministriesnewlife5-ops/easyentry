@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import DragDropUpload from '@/components/ui/DragDropUpload';
+import { uploadFileDirectToSupabase } from '@/lib/browser-storage';
+import { getHostedEvents } from '@/lib/hosted-events';
 
 interface Award {
   id: string;
@@ -70,47 +72,51 @@ export default function ArtistProfilePage() {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [photoGallery, setPhotoGallery] = useState<string[]>([]);
 
-  const handlePhotoUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPhotoGallery(prev => [...prev, reader.result as string]);
-    };
-    reader.readAsDataURL(file);
+  const handlePhotoUpload = async (file: File) => {
+    try {
+      const { url } = await uploadFileDirectToSupabase(file, 'artist-gallery');
+      setPhotoGallery(prev => [...prev, url]);
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to upload photo' });
+    }
   };
 
   const removePhoto = (index: number) => {
     setPhotoGallery(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleProfileImageUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProfileImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+  const handleProfileImageUpload = async (file: File) => {
+    try {
+      const { url } = await uploadFileDirectToSupabase(file, 'artist-profile');
+      setProfileImage(url);
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to upload profile image' });
+    }
   };
 
-  const handleCoverImageUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setCoverImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+  const handleCoverImageUpload = async (file: File) => {
+    try {
+      const { url } = await uploadFileDirectToSupabase(file, 'artist-cover');
+      setCoverImage(url);
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to upload cover image' });
+    }
   };
 
-  const handleVideoUploadFile = (file: File) => {
+  const handleVideoUploadFile = async (file: File) => {
     if (videos.length < 4) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+      try {
+        const { url } = await uploadFileDirectToSupabase(file, 'artist-videos');
         const newVideo: VideoThumbnail = {
           id: Date.now().toString(),
-          url: reader.result as string,
-          thumbnail: reader.result as string,
+          url,
+          thumbnail: coverImage || profileImage || url,
           title: file.name,
         };
         setVideos([...videos, newVideo]);
-      };
-      reader.readAsDataURL(file);
+      } catch {
+        setMessage({ type: 'error', text: 'Failed to upload video' });
+      }
     }
   };
 
@@ -152,13 +158,60 @@ export default function ArtistProfilePage() {
     discountPercent: ''
   });
   const [promoRequests, setPromoRequests] = useState<Array<{ id: number; eventTitle: string; code: string; status: string }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const { getHostedEvents } = require('@/lib/hosted-events');
-      const hostedEvents = getHostedEvents();
-      setEvents(hostedEvents);
-    }
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        const [hosted, profileResponse] = await Promise.all([
+          getHostedEvents(),
+          fetch('/api/artist/profile', { cache: 'no-store' }),
+        ]);
+
+        setEvents(hosted || []);
+
+        if (profileResponse.ok) {
+          const data = await profileResponse.json();
+          const profile = data.profile;
+          if (profile) {
+            setFormData((prev) => ({
+              ...prev,
+              stageName: profile.stageName || '',
+              realName: profile.realName || '',
+              email: profile.email || '',
+              phone: profile.phone || '',
+              location: profile.location || '',
+              bio: profile.bio || '',
+              experience: profile.experience || '',
+              hourlyRate: profile.hourlyRate || '',
+              languages: Array.isArray(profile.languages) ? profile.languages : [],
+              genres: Array.isArray(profile.genres) ? profile.genres : [],
+              availability: profile.availability || 'Available',
+              travelWillingness: profile.travelWillingness || 'Within City',
+              category: profile.category || '',
+              otherCategory: profile.otherCategory || '',
+            }));
+            setProfileImage(profile.profileImage || null);
+            setCoverImage(profile.coverImage || null);
+            setVideos(Array.isArray(profile.videos) ? profile.videos : []);
+            setPhotoGallery(Array.isArray(profile.photoGallery) ? profile.photoGallery : []);
+            setAwards(Array.isArray(profile.awards) ? profile.awards : []);
+            if (Array.isArray(profile.preferences) && profile.preferences.length > 0) {
+              setPreferences(profile.preferences);
+            }
+          }
+        }
+      } catch {
+        setMessage({ type: 'error', text: 'Failed to load artist profile data' });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
 
   const handlePromoInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -203,17 +256,42 @@ export default function ArtistProfilePage() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Artist Profile:', {
-      ...formData,
-      profileImage,
-      coverImage,
-      videos,
-      awards,
-      preferences: preferences.filter(p => p.selected),
-    });
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setIsSaving(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch('/api/artist/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          profileImage,
+          coverImage,
+          videos,
+          photoGallery,
+          awards,
+          preferences,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to save profile');
+      }
+
+      setMessage({ type: 'success', text: 'Profile saved successfully' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to save profile' });
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC] flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">
@@ -229,10 +307,11 @@ export default function ArtistProfilePage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleSubmit}
+            disabled={isSaving}
             className="px-6 py-2 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center gap-2"
           >
             <CheckCircle2 className="w-4 h-4" />
-            Save Profile
+            {isSaving ? 'Saving...' : 'Save Profile'}
           </motion.button>
         </div>
       </div>
@@ -265,6 +344,11 @@ export default function ArtistProfilePage() {
       </div>
 
       <form onSubmit={handleSubmit} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {message && (
+          <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${message.type === 'success' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-[#EB4D4B]/30 bg-[#EB4D4B]/10 text-[#EB4D4B]'}`}>
+            {message.text}
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">

@@ -15,6 +15,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import DragDropUpload from '@/components/ui/DragDropUpload';
+import { uploadFileDirectToSupabase } from '@/lib/browser-storage';
 
 type ActiveTab = 'dashboard' | 'details' | 'about' | 'contacts' | 'documents' | 'events';
 
@@ -191,9 +192,8 @@ function OutletProfileContent() {
     }
   }, [status, session, fetchVenueProfile, fetchOutletEvents]);
 
-  // Compress image to a max width/height and quality before storing as base64
-  // This keeps images well under 300KB so Supabase doesn't reject the payload
-  const compressImage = (file: File, maxWidth: number, maxHeight: number, quality = 0.75): Promise<string> => {
+  // Compress image to a max width/height and quality before upload
+  const compressImageFile = (file: File, maxWidth: number, maxHeight: number, quality = 0.75): Promise<File> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -214,7 +214,16 @@ function OutletProfileContent() {
           const ctx = canvas.getContext('2d');
           if (!ctx) return reject(new Error('Canvas not supported'));
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', quality));
+
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              reject(new Error('Failed to compress image'));
+              return;
+            }
+
+            const compressedName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+            resolve(new File([blob], compressedName, { type: 'image/jpeg' }));
+          }, 'image/jpeg', quality);
         };
         img.onerror = reject;
         img.src = reader.result as string;
@@ -226,35 +235,46 @@ function OutletProfileContent() {
 
   const handleProfileImageUpload = async (file: File) => {
     try {
-      const compressed = await compressImage(file, 400, 400, 0.8);
-      setProfileImage(compressed);
+      const compressedFile = await compressImageFile(file, 400, 400, 0.8);
+      const { url } = await uploadFileDirectToSupabase(compressedFile, 'venue-profile');
+      setProfileImage(url);
     } catch {
-      // Fallback to uncompressed if canvas fails
-      const reader = new FileReader();
-      reader.onloadend = () => setProfileImage(reader.result as string);
-      reader.readAsDataURL(file);
+      try {
+        const { url } = await uploadFileDirectToSupabase(file, 'venue-profile');
+        setProfileImage(url);
+      } catch {
+        setMessage({ type: 'error', text: 'Failed to upload profile image. Please try again.' });
+      }
     }
   };
 
   const handleCoverImageUpload = async (file: File) => {
     try {
-      const compressed = await compressImage(file, 1200, 400, 0.8);
-      setCoverImage(compressed);
+      const compressedFile = await compressImageFile(file, 1200, 400, 0.8);
+      const { url } = await uploadFileDirectToSupabase(compressedFile, 'venue-cover');
+      setCoverImage(url);
     } catch {
-      const reader = new FileReader();
-      reader.onloadend = () => setCoverImage(reader.result as string);
-      reader.readAsDataURL(file);
+      try {
+        const { url } = await uploadFileDirectToSupabase(file, 'venue-cover');
+        setCoverImage(url);
+      } catch {
+        setMessage({ type: 'error', text: 'Failed to upload cover image. Please try again.' });
+      }
     }
   };
 
   const handleGalleryImageUpload = async (file: File) => {
     try {
-      const compressed = await compressImage(file, 800, 600, 0.75);
-      setVenueImages(prev => [...prev, compressed]);
+      const compressedFile = await compressImageFile(file, 800, 600, 0.75);
+      const { url } = await uploadFileDirectToSupabase(compressedFile, 'venue-gallery');
+      setVenueImages(prev => [...prev, url]);
     } catch {
-      const reader = new FileReader();
-      reader.onloadend = () => setVenueImages(prev => [...prev, reader.result as string]);
-      reader.readAsDataURL(file);
+      try {
+        const { url } = await uploadFileDirectToSupabase(file, 'venue-gallery');
+        setVenueImages(prev => [...prev, url]);
+      } catch {
+        setMessage({ type: 'error', text: 'Failed to upload gallery image. Please try again.' });
+      }
     }
   };
 

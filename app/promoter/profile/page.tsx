@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import DragDropUpload from '@/components/ui/DragDropUpload';
+import { uploadFileDirectToSupabase } from '@/lib/browser-storage';
+import { getHostedEvents } from '@/lib/hosted-events';
 
 interface GalleryImage {
   id: string;
@@ -56,13 +58,56 @@ export default function PromoterProfilePage() {
     discountPercent: ''
   });
   const [promoRequests, setPromoRequests] = useState<Array<{ id: number; eventTitle: string; code: string; status: string }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const { getHostedEvents } = require('@/lib/hosted-events');
-      const hostedEvents = getHostedEvents();
-      setEvents(hostedEvents);
-    }
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+
+        const [eventsData, profileResponse] = await Promise.all([
+          getHostedEvents(),
+          fetch('/api/promoter/profile', { cache: 'no-store' }),
+        ]);
+
+        setEvents(eventsData || []);
+
+        if (profileResponse.ok) {
+          const data = await profileResponse.json();
+          const profile = data.profile;
+
+          if (profile) {
+            setFormData((prev) => ({
+              ...prev,
+              name: profile.name || '',
+              companyName: profile.companyName || '',
+              email: profile.email || '',
+              phone: profile.phone || '',
+              location: profile.location || '',
+              bio: profile.bio || '',
+              experienceYears: profile.experienceYears || '',
+              website: profile.website || '',
+              instagram: profile.instagram || '',
+              twitter: profile.twitter || '',
+              facebook: profile.facebook || '',
+            }));
+
+            setProfileImage(profile.profileImage || null);
+            setCoverImage(profile.coverImage || null);
+            setGalleryImages(Array.isArray(profile.galleryImages) ? profile.galleryImages : []);
+            setVideos(Array.isArray(profile.videos) ? profile.videos : []);
+          }
+        }
+      } catch {
+        setMessage({ type: 'error', text: 'Failed to load promoter profile data' });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
 
   const handlePromoInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -97,50 +142,54 @@ export default function PromoterProfilePage() {
     setPromoForm({ eventId: '', promoCode: '', discountPercent: '' });
   };
 
-  const handleProfileImageUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProfileImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleCoverImageUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setCoverImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleVideoUploadFile = (file: File) => {
-    if (videos.length < 4) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const newVideo: VideoThumbnail = {
-          id: Date.now().toString(),
-          url: reader.result as string,
-          thumbnail: reader.result as string,
-          title: file.name,
-        };
-        setVideos([...videos, newVideo]);
-      };
-      reader.readAsDataURL(file);
+  const handleProfileImageUpload = async (file: File) => {
+    try {
+      const { url } = await uploadFileDirectToSupabase(file, 'promoter-profile');
+      setProfileImage(url);
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to upload profile image' });
     }
   };
 
-  const handleGalleryImageUploadFile = (file: File) => {
+  const handleCoverImageUpload = async (file: File) => {
+    try {
+      const { url } = await uploadFileDirectToSupabase(file, 'promoter-cover');
+      setCoverImage(url);
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to upload cover image' });
+    }
+  };
+
+  const handleVideoUploadFile = async (file: File) => {
+    if (videos.length < 4) {
+      try {
+        const { url } = await uploadFileDirectToSupabase(file, 'promoter-videos');
+        const newVideo: VideoThumbnail = {
+          id: Date.now().toString(),
+          url,
+          thumbnail: coverImage || profileImage || url,
+          title: file.name,
+        };
+        setVideos([...videos, newVideo]);
+      } catch {
+        setMessage({ type: 'error', text: 'Failed to upload video' });
+      }
+    }
+  };
+
+  const handleGalleryImageUploadFile = async (file: File) => {
     if (galleryImages.length < 9) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+      try {
+        const { url } = await uploadFileDirectToSupabase(file, 'promoter-gallery');
         const newImage: GalleryImage = {
           id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          url: reader.result as string,
+          url,
           name: file.name,
         };
         setGalleryImages(prev => [...prev, newImage]);
-      };
-      reader.readAsDataURL(file);
+      } catch {
+        setMessage({ type: 'error', text: 'Failed to upload gallery image' });
+      }
     }
   };
 
@@ -157,17 +206,40 @@ export default function PromoterProfilePage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Promoter Profile:', {
-      ...formData,
-      profileImage,
-      coverImage,
-      galleryImages,
-      videos,
-    });
-    alert('Profile saved successfully!');
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setIsSaving(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch('/api/promoter/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          profileImage,
+          coverImage,
+          galleryImages,
+          videos,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to save profile');
+      }
+
+      setMessage({ type: 'success', text: 'Profile saved successfully' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to save profile' });
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC] flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">
@@ -182,10 +254,11 @@ export default function PromoterProfilePage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleSubmit}
+            disabled={isSaving}
             className="px-6 py-2 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center gap-2"
           >
             <CheckCircle2 className="w-4 h-4" />
-            Save Profile
+            {isSaving ? 'Saving...' : 'Save Profile'}
           </motion.button>
         </div>
       </div>
@@ -217,6 +290,11 @@ export default function PromoterProfilePage() {
       </div>
 
       <form onSubmit={handleSubmit} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {message && (
+          <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${message.type === 'success' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-[#EB4D4B]/30 bg-[#EB4D4B]/10 text-[#EB4D4B]'}`}>
+            {message.text}
+          </div>
+        )}
         <div className="space-y-6">
           {activeTab === 'details' && (
             <motion.div
