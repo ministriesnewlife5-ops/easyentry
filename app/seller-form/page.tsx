@@ -1104,7 +1104,18 @@ export default function SellerFormPage() {
                     <div>
                       <label className="block text-sm font-medium mb-3">Ticket Categories *</label>
                       <div className="space-y-4">
-                        {ticketCategories.map((cat, idx) => (
+                        {ticketCategories.map((cat, idx) => {
+                          const gross = cat.price || 0;
+                          const discountAmt = gross * (cat.discount / 100);
+                          const customerPays = Math.max(gross - discountAmt, 0);
+                          const pgFee = customerPays * 0.05;
+                          const platformFeeAmt = customerPays * (cat.platformFee / 100);
+                          const artistAmt = gross * (cat.artistShare / 100);
+                          const influencerAmt = gross * (cat.influencerShare / 100);
+                          const outletNet = Math.max(customerPays - pgFee - platformFeeAmt - artistAmt - influencerAmt, 0);
+                          const fmt = (n: number) => `₹${n.toFixed(0)}`;
+
+                          return (
                           <div key={cat.id} className="bg-[#0F0F0F] rounded-xl p-4 border border-[#2A2A2A]">
                             {/* Labels Row */}
                             <div className="grid grid-cols-12 gap-3 mb-2">
@@ -1282,9 +1293,114 @@ export default function SellerFormPage() {
                                   />
                                 </div>
                               </div>
+
+                              {/* Inline Per-ticket Money Flow for this category */}
+                              <div className="mt-2 rounded-xl border border-[#2A2A2A] bg-[#111111] p-3">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h5 className="text-sm font-bold text-[#E5A823]">Per-ticket Money Flow</h5>
+                                  <span className="text-[11px] text-[#F5F5DC]/50">{cat.name || `Category ${idx + 1}`}</span>
+                                </div>
+
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                                    <p className="text-[10px] text-[#F5F5DC]/50">Customer Pays</p>
+                                    <p className="text-sm font-bold text-[#F5F5DC]">{fmt(customerPays)}</p>
+                                  </div>
+                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                                    <p className="text-[10px] text-[#F5F5DC]/50">PG Fee (5%)</p>
+                                    <p className="text-sm font-bold text-[#F5F5DC]">{fmt(pgFee)}</p>
+                                  </div>
+                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                                    <p className="text-[10px] text-[#F5F5DC]/50">Platform Fee</p>
+                                    <p className="text-sm font-bold text-[#F5F5DC]">{fmt(platformFeeAmt)}</p>
+                                  </div>
+                                  <div className="rounded-lg border border-[#3E83B6]/50 bg-[#3E83B6]/10 p-2">
+                                    <p className="text-[10px] text-[#3E83B6]">Outlet Net</p>
+                                    <p className="text-sm font-bold text-[#3E83B6]">{fmt(outletNet)}</p>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                                    <label className="text-[11px] text-[#F5F5DC]/60">Discount %</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      step={0.5}
+                                      value={cat.discount || ''}
+                                      onChange={(e) => {
+                                        const num = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                        setTicketCategories((prev) =>
+                                          prev.map((c) => (c.id === cat.id ? { ...c, discount: num } : c))
+                                        );
+                                      }}
+                                      className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                    />
+                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(discountAmt)}</p>
+                                  </div>
+
+                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                                    <label className="text-[11px] text-[#F5F5DC]/60">Artist Share %</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      step={0.5}
+                                      value={cat.artistShare || ''}
+                                      onChange={(e) => {
+                                        const num = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                        setTicketCategories((prev) =>
+                                          prev.map((c) => (c.id === cat.id ? { ...c, artistShare: num } : c))
+                                        );
+                                      }}
+                                      className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                    />
+                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(artistAmt)}</p>
+                                  </div>
+
+                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                                    <label className="text-[11px] text-[#F5F5DC]/60">Influencer Share %</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      step={0.5}
+                                      value={cat.influencerShare || ''}
+                                      onChange={(e) => {
+                                        const num = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                        setTicketCategories((prev) =>
+                                          prev.map((c) => (c.id === cat.id ? { ...c, influencerShare: num } : c))
+                                        );
+                                      }}
+                                      className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                    />
+                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(influencerAmt)}</p>
+                                  </div>
+
+                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                                    <label className="text-[11px] text-[#F5F5DC]/60">Platform Fee %</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      step={0.5}
+                                      value={cat.platformFee || ''}
+                                      onChange={(e) => {
+                                        const num = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                        setTicketCategories((prev) =>
+                                          prev.map((c) => (c.id === cat.id ? { ...c, platformFee: num } : c))
+                                        );
+                                      }}
+                                      className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                    />
+                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(platformFeeAmt)}</p>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        ))}
+                        )})}
                         <button
                           type="button"
                           onClick={() => {
@@ -1308,269 +1424,7 @@ export default function SellerFormPage() {
                       </div>
                     </div>
 
-                    {/* Money Flow Cards for Each Category */}
-                    {ticketCategories.length > 0 && (
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-2 mb-4">
-                          <IndianRupee className="w-5 h-5 text-[#E5A823]" />
-                          <h4 className="text-base font-bold text-[#F5F5DC]">Per-Ticket Money Flow</h4>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {ticketCategories.map((category) => {
-                            const gross = category.price || 0;
-                            const discountAmt = gross * (category.discount / 100);
-                            const customerPays = Math.max(gross - discountAmt, 0);
-                            const pgFee = customerPays * 0.05;
-                            const platformFeeAmt = customerPays * (category.platformFee / 100);
-                            const artistAmt = gross * (category.artistShare / 100);
-                            const influencerAmt = gross * (category.influencerShare / 100);
-                            const outletNet = Math.max(customerPays - pgFee - platformFeeAmt - artistAmt - influencerAmt, 0);
-                            const fmt = (n: number) => `₹${n.toFixed(0)}`;
-
-                            return (
-                              <motion.div
-                                key={category.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="bg-gradient-to-br from-[#1A1A1A] to-[#0F0F0F] rounded-2xl p-6 border border-[#2A2A2A] hover:border-[#E5A823]/50 transition-all"
-                              >
-                                {/* Category Header */}
-                                <div className="pb-4 mb-4 border-b border-[#2A2A2A]">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <h5 className="text-lg font-bold text-[#E5A823]">{category.name}</h5>
-                                    <span className="text-xs px-2 py-1 bg-[#E5A823]/10 text-[#E5A823] rounded-full font-medium">
-                                      {category.quantity} tickets
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-[#F5F5DC]/50">Configure revenue split</p>
-                                </div>
-
-                                <div className="space-y-3">
-                                  {/* Customer Pays */}
-                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div>
-                                        <div className="text-xs text-[#F5F5DC]/50">Customer Pays</div>
-                                        <div className="text-lg font-black text-[#F5F5DC]">{fmt(customerPays)}</div>
-                                      </div>
-                                      {category.originalPrice && category.originalPrice > category.price && (
-                                        <div className="text-right">
-                                          <div className="text-xs text-[#F5F5DC]/50">Original</div>
-                                          <div className="text-sm text-[#F5F5DC]/70 line-through">{fmt(gross)}</div>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* Discount Control */}
-                                    <div className="space-y-2 mt-3 pt-3 border-t border-[#2A2A2A]">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <label className="text-xs font-medium text-[#F5F5DC]/70 flex-1">Discount %</label>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          max={100}
-                                          step={0.5}
-                                          value={category.discount || ''}
-                                          onChange={(e) => {
-                                            const val = e.target.value;
-                                            if (val === '') {
-                                              setTicketCategories((prev) =>
-                                                prev.map((c) => (c.id === category.id ? { ...c, discount: 0 } : c))
-                                              );
-                                              return;
-                                            }
-                                            const num = parseFloat(val);
-                                            if (!isNaN(num)) {
-                                              setTicketCategories((prev) =>
-                                                prev.map((c) => (c.id === category.id ? { ...c, discount: num } : c))
-                                              );
-                                            }
-                                          }}
-                                          onBlur={(e) => {
-                                            const num = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                            setTicketCategories((prev) =>
-                                              prev.map((c) => (c.id === category.id ? { ...c, discount: num } : c))
-                                            );
-                                          }}
-                                          className="w-16 bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1 text-xs text-[#F5F5DC] text-center focus:outline-none focus:border-[#E5A823]"
-                                        />
-                                        <span className="text-[#E5A823] font-bold text-xs">%</span>
-                                      </div>
-                                      <input
-                                        type="range"
-                                        min={0}
-                                        max={100}
-                                        step={0.5}
-                                        value={category.discount}
-                                        onChange={(e) => {
-                                          const num = parseFloat(e.target.value);
-                                          setTicketCategories((prev) =>
-                                            prev.map((c) => (c.id === category.id ? { ...c, discount: num } : c))
-                                          );
-                                        }}
-                                        className="w-full h-1 accent-[#E5A823]"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* Artist Share */}
-                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div>
-                                        <div className="text-xs text-[#F5F5DC]/50">Artist Share</div>
-                                        <div className="text-lg font-black text-[#F5F5DC]">{fmt(artistAmt)}</div>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-2 mt-2">
-                                      <label className="text-xs font-medium text-[#F5F5DC]/70 flex-1">Share %</label>
-                                      <input
-                                        type="number"
-                                        min={0}
-                                        max={100}
-                                        step={0.5}
-                                        value={category.artistShare || ''}
-                                        onChange={(e) => {
-                                          const val = e.target.value;
-                                          if (val === '') {
-                                            setTicketCategories((prev) =>
-                                              prev.map((c) => (c.id === category.id ? { ...c, artistShare: 0 } : c))
-                                            );
-                                            return;
-                                          }
-                                          const num = parseFloat(val);
-                                          if (!isNaN(num)) {
-                                            setTicketCategories((prev) =>
-                                              prev.map((c) => (c.id === category.id ? { ...c, artistShare: num } : c))
-                                            );
-                                          }
-                                        }}
-                                        onBlur={(e) => {
-                                          const num = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                          setTicketCategories((prev) =>
-                                            prev.map((c) => (c.id === category.id ? { ...c, artistShare: num } : c))
-                                          );
-                                        }}
-                                        className="w-16 bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1 text-xs text-[#F5F5DC] text-center focus:outline-none focus:border-[#E5A823]"
-                                      />
-                                      <span className="text-[#E5A823] font-bold text-xs">%</span>
-                                    </div>
-                                  </div>
-
-                                  {/* Influencer Share */}
-                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div>
-                                        <div className="text-xs text-[#F5F5DC]/50">Influencer Share</div>
-                                        <div className="text-lg font-black text-[#F5F5DC]">{fmt(influencerAmt)}</div>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-2 mt-2">
-                                      <label className="text-xs font-medium text-[#F5F5DC]/70 flex-1">Share %</label>
-                                      <input
-                                        type="number"
-                                        min={0}
-                                        max={100}
-                                        step={0.5}
-                                        value={category.influencerShare || ''}
-                                        onChange={(e) => {
-                                          const val = e.target.value;
-                                          if (val === '') {
-                                            setTicketCategories((prev) =>
-                                              prev.map((c) => (c.id === category.id ? { ...c, influencerShare: 0 } : c))
-                                            );
-                                            return;
-                                          }
-                                          const num = parseFloat(val);
-                                          if (!isNaN(num)) {
-                                            setTicketCategories((prev) =>
-                                              prev.map((c) => (c.id === category.id ? { ...c, influencerShare: num } : c))
-                                            );
-                                          }
-                                        }}
-                                        onBlur={(e) => {
-                                          const num = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                          setTicketCategories((prev) =>
-                                            prev.map((c) => (c.id === category.id ? { ...c, influencerShare: num } : c))
-                                          );
-                                        }}
-                                        className="w-16 bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1 text-xs text-[#F5F5DC] text-center focus:outline-none focus:border-[#E5A823]"
-                                      />
-                                      <span className="text-[#E5A823] font-bold text-xs">%</span>
-                                    </div>
-                                  </div>
-
-                                  {/* Platform Fee */}
-                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div>
-                                        <div className="text-xs text-[#F5F5DC]/50">Platform Fee</div>
-                                        <div className="text-lg font-black text-[#F5F5DC]">{fmt(platformFeeAmt)}</div>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-2 mt-2">
-                                      <label className="text-xs font-medium text-[#F5F5DC]/70 flex-1">Fee %</label>
-                                      <input
-                                        type="number"
-                                        min={0}
-                                        max={100}
-                                        step={0.5}
-                                        value={category.platformFee || ''}
-                                        onChange={(e) => {
-                                          const val = e.target.value;
-                                          if (val === '') {
-                                            setTicketCategories((prev) =>
-                                              prev.map((c) => (c.id === category.id ? { ...c, platformFee: 0 } : c))
-                                            );
-                                            return;
-                                          }
-                                          const num = parseFloat(val);
-                                          if (!isNaN(num)) {
-                                            setTicketCategories((prev) =>
-                                              prev.map((c) => (c.id === category.id ? { ...c, platformFee: num } : c))
-                                            );
-                                          }
-                                        }}
-                                        onBlur={(e) => {
-                                          const num = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                          setTicketCategories((prev) =>
-                                            prev.map((c) => (c.id === category.id ? { ...c, platformFee: num } : c))
-                                          );
-                                        }}
-                                        className="w-16 bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1 text-xs text-[#F5F5DC] text-center focus:outline-none focus:border-[#E5A823]"
-                                      />
-                                      <span className="text-[#E5A823] font-bold text-xs">%</span>
-                                    </div>
-                                  </div>
-
-                                  {/* Payment Gateway Fee */}
-                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-3">
-                                    <div className="flex items-center justify-between">
-                                      <div>
-                                        <div className="text-xs text-[#F5F5DC]/50">Payment Gateway (5% Fixed)</div>
-                                        <div className="text-lg font-black text-[#F5F5DC]">{fmt(pgFee)}</div>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Outlet Net */}
-                                  <div className="rounded-lg border border-[#3E83B6]/50 bg-gradient-to-r from-[#3E83B6]/10 to-[#3E83B6]/5 p-3">
-                                    <div className="flex items-center justify-between">
-                                      <div>
-                                        <div className="text-xs text-[#3E83B6]">Outlet Net Revenue</div>
-                                        <div className="text-xl font-black text-[#3E83B6]">{fmt(outletNet)}</div>
-                                      </div>
-                                      <div className="text-right">
-                                        <div className="text-xs text-[#3E83B6]/70">After all deductions</div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </motion.div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
+                    
                   </div>
                 </div>
               </motion.div>
