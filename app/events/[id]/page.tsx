@@ -693,8 +693,6 @@ export default function EventDetailsPage() {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-        </div>
 
         {/* Two Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
