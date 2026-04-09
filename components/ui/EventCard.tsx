@@ -114,9 +114,21 @@ export default function EventCard({ id, title, date, venue, price, imageColor, i
   const handleInstagramShare = (type: 'reel' | 'story' | 'post') => {
     const url = `${window.location.origin}/events/${id}`;
     const text = `Check out ${title} at ${venue}! ${url}`;
-    navigator.clipboard.writeText(text);
-    alert(`Link copied! Share it on Instagram ${type}.`);
-    window.open('https://instagram.com', '_blank');
+    
+    // Try to open Instagram app with deep link, falls back to web
+    const instagramDeepLink = `instagram://user?username=instagram`;
+    const instagramWeb = `https://instagram.com`;
+    
+    // For mobile, try deep link first
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      window.location.href = `instagram://share?url=${encodeURIComponent(url)}`;
+      setTimeout(() => {
+        window.open(instagramWeb, '_blank');
+      }, 500);
+    } else {
+      window.open(instagramWeb, '_blank');
+    }
+    
     setShowInstagramModal(false);
   };
 
@@ -125,12 +137,21 @@ export default function EventCard({ id, title, date, venue, price, imageColor, i
     const text = `Check out ${title} at ${venue}! ${url}`;
     
     if (type === 'status') {
-      navigator.clipboard.writeText(text);
-      alert("Link copied! Paste it in your WhatsApp status.");
-      window.open('https://wa.me', '_blank');
+      // For status, try to open WhatsApp app
+      const waLink = `https://wa.me/?text=${encodeURIComponent(text)}`;
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        window.open(`whatsapp://send?text=${encodeURIComponent(text)}`, '_blank');
+        setTimeout(() => {
+          window.open(waLink, '_blank');
+        }, 500);
+      } else {
+        window.open(waLink, '_blank');
+      }
     } else {
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+      // For send to chat, open WhatsApp directly
+      window.open(`https://api.whatsapp.com/send/?text=${encodeURIComponent(text)}`, '_blank');
     }
+    
     setShowWhatsAppModal(false);
   };
 
