@@ -48,7 +48,11 @@ type EventRequestEmailInput = {
     subtitle: string;
     date: string;
     time: string;
+    endTime?: string;
     venue: string;
+    locationState?: string;
+    locationDistrict?: string;
+    locationArea?: string;
     category: string;
     price: string;
     description: string;
@@ -126,12 +130,20 @@ export async function sendEventRequestNotificationEmail({
             </tr>
             <tr>
               <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 700;">Date & Time</td>
-              <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${eventData.date} · ${eventData.time}</td>
+              <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${eventData.date} · ${eventData.time}${eventData.endTime ? ` to ${eventData.endTime}` : ''}</td>
             </tr>
             <tr>
               <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 700;">Venue</td>
               <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${eventData.venue}</td>
             </tr>
+            ${(eventData.locationState || eventData.locationDistrict || eventData.locationArea) ? `
+            <tr>
+              <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 700;">Location</td>
+              <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">
+                ${[eventData.locationState, eventData.locationDistrict, eventData.locationArea].filter(Boolean).join(' · ')}
+              </td>
+            </tr>
+            ` : ''}
             <tr>
               <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 700;">Price</td>
               <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${eventData.price}</td>
