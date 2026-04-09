@@ -1137,7 +1137,9 @@ export default function SellerFormPage() {
                           name="endTime"
                           value={formData.endTime}
                           onChange={handleInputChange}
-                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
+                          min={formData.startTime}
+                          disabled={!formData.startTime}
+                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] disabled:opacity-50 disabled:cursor-not-allowed [color-scheme:dark]"
                         />
                       </div>
                     </div>
