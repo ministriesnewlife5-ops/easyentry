@@ -43,7 +43,8 @@ export default function EventDetailsPage() {
   const [liked, setLiked] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [showTicketSection, setShowTicketSection] = useState(false);
+  // Ticket section is now always visible by default
+  const [showTicketSection, setShowTicketSection] = useState(true);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [event, setEvent] = useState<PublicEvent | null>(null);
@@ -791,23 +792,8 @@ export default function EventDetailsPage() {
               animate={{ opacity: 1, x: 0 }}
               className="sticky top-4 bg-[#1A1A1A] rounded-xl p-4 border border-[#2A2A2A]"
             >
-              {!showTicketSection ? (
-                // Show Get Tickets button initially
-                <div className="text-center py-4">
-                  <h2 className="text-lg font-black text-[#F5F5DC] mb-4">Get Tickets</h2>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setShowTicketSection(true)}
-                    className="w-full py-3 bg-gradient-to-r from-[#E5A823] to-[#EB4D4B] text-[#0D0D0D] font-black text-sm rounded-lg hover:from-[#F5C542] hover:to-[#FF6B6B] transition-all"
-                  >
-                    GET TICKETS
-                  </motion.button>
-                </div>
-              ) : (
-                // Show ticket categories after clicking
-                <>
-                  <h2 className="text-base font-semibold text-[#F5F5DC] mb-1">Select Tickets</h2>
+              <>
+                <h2 className="text-base font-semibold text-[#F5F5DC] mb-1">Select Tickets</h2>
 
                   {/* Ticket Categories List */}
                   <div className="space-y-2 mt-4">
@@ -902,35 +888,12 @@ export default function EventDetailsPage() {
                           'Proceed'
                         )}
                       </motion.button>
-                      <button 
-                        onClick={() => {
-                          // Test QR modal directly
-                          setBookingDetails({
-                            bookingId: 'TEST-12345',
-                            paymentId: 'pay_test_123',
-                            eventTitle: event.title,
-                            eventDate: event.date,
-                            eventTime: event.time,
-                            venue: event.venue,
-                            tickets: [{id: '1', name: 'Test Ticket', quantity: 2, price: 500}],
-                            totalAmount: 1000,
-                            userName: session?.user?.name || 'Test User',
-                            userEmail: session?.user?.email || 'test@test.com',
-                            bookedAt: new Date().toISOString(),
-                          });
-                          setShowSuccessModal(true);
-                        }}
-                        className="mt-2 text-xs text-[#F5F5DC]/50 hover:text-[#F5F5DC]"
-                      >
-                        Test Success Modal
-                      </button>
-                    </div>
+                      </div>
                     {paymentError && (
                       <p className="mt-2 text-xs text-[#EB4D4B]">{paymentError}</p>
                     )}
                   </div>
                 </>
-              )}
             </motion.div>
           </div>
         </div>
