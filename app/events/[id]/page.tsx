@@ -108,7 +108,7 @@ export default function EventDetailsPage() {
         id: cat.id,
         name: cat.name,
         price: cat.price,
-        description: `Category: ${cat.name}`,
+        description: cat.tagline?.trim() ? cat.tagline.trim() : `Category: ${cat.name}`,
         availableFrom: cat.availableFrom,
         availableUntil: cat.availableUntil,
       }));
@@ -805,6 +805,9 @@ export default function EventDetailsPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-[#F5F5DC]">{ticket.name}</p>
+                            {ticket.description && (
+                              <p className="text-xs text-[#F5F5DC]/70 line-clamp-2">{ticket.description}</p>
+                            )}
                             <p className="text-sm text-[#F5F5DC]/60">₹{ticket.price.toFixed(2)}</p>
                             {(ticket.availableFrom || ticket.availableUntil) && (
                               <p className="text-xs text-[#EB4D4B] mt-1">

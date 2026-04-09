@@ -5,6 +5,7 @@ export type EventRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelle
 export type TicketCategory = {
   id: string;
   name: string;
+  tagline?: string;
   price: number;
   quantity?: number;
   commissionPercent?: number;

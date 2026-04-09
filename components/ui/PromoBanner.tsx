@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useEffect, useState, useCallback } from 'react';
 
 type PromoSlide = {
-  id: number;
+  id: string | number;
   tag: string;
   title: string;
   description: string;
@@ -38,7 +38,7 @@ export default function PromoBanner() {
     // Load banners from API (Supabase)
     const loadBanners = async () => {
       try {
-        const response = await fetch('/api/promo-banners');
+        const response = await fetch('/api/promo-banners', { cache: 'no-store' });
         if (response.ok) {
           const data = await response.json();
           // Convert banner format to promo slide format
@@ -50,7 +50,7 @@ export default function PromoBanner() {
             image: banner.image_url || '',
             buttonLabel: banner.cta_text || 'Learn More',
             buttonLink: banner.cta_link || '#'
-          }));
+          })).filter((slide: PromoSlide) => Boolean(slide.title));
           setPromoSlides(slides);
         }
       } catch (e) {
@@ -82,7 +82,7 @@ export default function PromoBanner() {
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch('/api/promo-banners');
+        const response = await fetch('/api/promo-banners', { cache: 'no-store' });
         if (response.ok) {
           const data = await response.json();
           const slides = (data.banners || []).map((banner: any) => ({
@@ -93,7 +93,7 @@ export default function PromoBanner() {
             image: banner.image_url || '',
             buttonLabel: banner.cta_text || 'Learn More',
             buttonLink: banner.cta_link || '#'
-          }));
+          })).filter((slide: PromoSlide) => Boolean(slide.title));
           setPromoSlides(slides);
           if (currentIndex >= slides.length) {
             setCurrentIndex(0);
@@ -247,14 +247,20 @@ export default function PromoBanner() {
               transition={{ delay: 0.4, duration: 0.5 }}
               className="relative w-full lg:w-[450px] h-[280px] lg:h-[320px] flex-shrink-0"
             >
-              <Image 
-                src={promoSlides[currentIndex].image} 
-                alt={promoSlides[currentIndex].title} 
-                fill 
-                className="object-cover rounded-2xl shadow-2xl border border-[#2A2A2A]" 
-                sizes="(max-width: 1024px) 100vw, 600px" 
-                priority 
-              />
+              {promoSlides[currentIndex].image ? (
+                <Image 
+                  src={promoSlides[currentIndex].image} 
+                  alt={promoSlides[currentIndex].title} 
+                  fill 
+                  className="object-cover rounded-2xl shadow-2xl border border-[#2A2A2A]" 
+                  sizes="(max-width: 1024px) 100vw, 600px" 
+                  priority 
+                />
+              ) : (
+                <div className="w-full h-full rounded-2xl border border-[#2A2A2A] bg-gradient-to-br from-[#1A1A1A] to-[#0D0D0D] flex items-center justify-center">
+                  <Sparkles className="w-10 h-10 text-[#E5A823]/50" />
+                </div>
+              )}
             </motion.div>
           </motion.div>
         </AnimatePresence>

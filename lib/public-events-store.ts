@@ -5,6 +5,7 @@ import type { EventRequest } from './event-request-store';
 type PublicEventTicketCategory = {
   id: string;
   name: string;
+  tagline?: string;
   price: number;
   quantity?: number;
   availableFrom?: string;
@@ -280,11 +281,55 @@ async function getTicketCategoriesFromSourceRequest(requestId: string): Promise<
   return raw.map((cat) => ({
     id: String(cat.id || ''),
     name: String(cat.name || 'General Admission'),
+    tagline: typeof cat.tagline === 'string' ? cat.tagline : undefined,
     price: Number(cat.price || 0),
     quantity: cat.quantity == null ? undefined : Number(cat.quantity),
     availableFrom: cat.availableFrom,
     availableUntil: cat.availableUntil,
   }));
+}
+
+function mergeTicketCategoriesWithSource(
+  dbCategories: PublicEventTicketCategory[],
+  sourceCategories: PublicEventTicketCategory[]
+): PublicEventTicketCategory[] {
+  if (dbCategories.length === 0) {
+    return sourceCategories;
+  }
+
+  if (sourceCategories.length === 0) {
+    return dbCategories;
+  }
+
+  const byId = new Map(
+    sourceCategories
+      .filter((cat) => cat.id)
+      .map((cat) => [cat.id, cat])
+  );
+  const byNameAndPrice = new Map(
+    sourceCategories.map((cat) => [
+      `${cat.name.trim().toLowerCase()}::${Number(cat.price || 0)}`,
+      cat,
+    ])
+  );
+
+  return dbCategories.map((cat) => {
+    const sourceById = cat.id ? byId.get(cat.id) : undefined;
+    const sourceByNameAndPrice = byNameAndPrice.get(
+      `${cat.name.trim().toLowerCase()}::${Number(cat.price || 0)}`
+    );
+    const source = sourceById ?? sourceByNameAndPrice;
+
+    if (!source) {
+      return cat;
+    }
+
+    return {
+      ...source,
+      ...cat,
+      tagline: cat.tagline ?? source.tagline,
+    };
+  });
 }
 
 async function getTaggedArtistsFromSourceRequest(requestId: string): Promise<PublicEventTaggedArtist[]> {
@@ -480,10 +525,15 @@ export async function getPublishedEventById(id: string): Promise<PublicEvent | u
   let ticketCategories = await getTicketCategoriesByEventId(id);
   let taggedArtists: PublicEventTaggedArtist[] = [];
   const requestId = (data as Record<string, unknown>).request_id as string | null;
+  let sourceRequestTicketCategories: PublicEventTicketCategory[] = [];
 
-  if (ticketCategories.length === 0) {
-    if (requestId) {
-      ticketCategories = await getTicketCategoriesFromSourceRequest(requestId);
+  if (requestId) {
+    sourceRequestTicketCategories = await getTicketCategoriesFromSourceRequest(requestId);
+
+    if (ticketCategories.length === 0) {
+      ticketCategories = sourceRequestTicketCategories;
+    } else {
+      ticketCategories = mergeTicketCategoriesWithSource(ticketCategories, sourceRequestTicketCategories);
     }
   }
 

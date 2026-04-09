@@ -142,6 +142,7 @@ export default function SellerFormPage() {
   const [ticketCategories, setTicketCategories] = useState<Array<{ 
     id: string; 
     name: string; 
+    tagline?: string;
     price: number; 
     originalPrice?: number; 
     quantity: number; 
@@ -423,6 +424,7 @@ export default function SellerFormPage() {
         taggedArtists: selectedArtists.map(a => ({ id: a.id, name: a.name, email: a.email })),
         ticketCategories: ticketCategories.map(cat => ({
           ...cat,
+          tagline: (cat.tagline || '').trim() || undefined,
           originalPrice: cat.originalPrice || cat.price,
           availableFrom: cat.availableFromDate && cat.availableFromTime 
             ? `${cat.availableFromDate}T${cat.availableFromTime}` 
@@ -1123,12 +1125,15 @@ export default function SellerFormPage() {
                                 <label className="text-xs text-[#F5F5DC]/50">Category</label>
                               </div>
                               <div className="col-span-2">
+                                <label className="text-xs text-[#F5F5DC]/50">Tagline</label>
+                              </div>
+                              <div className="col-span-2">
                                 <label className="text-xs text-[#F5F5DC]/50">Quantity</label>
                               </div>
-                              <div className="col-span-3">
+                              <div className="col-span-2">
                                 <label className="text-xs text-[#F5F5DC]/50">Sale Price (₹)</label>
                               </div>
-                              <div className="col-span-3">
+                              <div className="col-span-2">
                                 <label className="text-xs text-[#F5F5DC]/50">Original Price (₹)</label>
                               </div>
                               <div className="col-span-1"></div>
@@ -1151,6 +1156,20 @@ export default function SellerFormPage() {
                                 />
                               </div>
                               <div className="col-span-2">
+                                <input
+                                  type="text"
+                                  value={cat.tagline || ''}
+                                  onChange={(e) => {
+                                    const tagline = e.target.value;
+                                    setTicketCategories((prev) =>
+                                      prev.map((c) => (c.id === cat.id ? { ...c, tagline } : c))
+                                    );
+                                  }}
+                                  className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                  placeholder="e.g. Limited offer"
+                                />
+                              </div>
+                              <div className="col-span-2">
                                 <div className="relative">
                                   <input
                                     type="number"
@@ -1169,7 +1188,7 @@ export default function SellerFormPage() {
                                   />
                                 </div>
                               </div>
-                              <div className="col-span-3">
+                              <div className="col-span-2">
                                 <div className="relative">
                                   <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/50" />
                                   <input
@@ -1189,7 +1208,7 @@ export default function SellerFormPage() {
                                   />
                                 </div>
                               </div>
-                              <div className="col-span-3">
+                              <div className="col-span-2">
                                 <div className="relative">
                                   <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/50" />
                                   <input
@@ -1408,6 +1427,7 @@ export default function SellerFormPage() {
                             setTicketCategories((prev) => [...prev, { 
                               id, 
                               name: 'NEW', 
+                              tagline: '',
                               price: 0, 
                               quantity: 0,
                               discount: 0,

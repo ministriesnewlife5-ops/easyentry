@@ -3,23 +3,36 @@ import { getSupabaseServerClient } from '@/lib/supabase';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 
+export const dynamic = 'force-dynamic';
+
 // GET /api/promo-banners - Get all active promo banners
 export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseServerClient();
+    const { searchParams } = new URL(request.url);
+    const position = searchParams.get('position');
     
-    const { data, error } = await supabase
-      .from('promo_banners')
+    let query = supabase
+      .from('ads_banners')
       .select('*')
       .eq('is_active', true)
       .order('display_order', { ascending: true });
+
+    if (position) {
+      query = query.eq('position', position);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching promo banners:', error);
       return NextResponse.json({ error: 'Failed to fetch promo banners' }, { status: 500 });
     }
 
-    return NextResponse.json({ banners: data || [] });
+    return NextResponse.json(
+      { banners: data || [] },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   } catch (error) {
     console.error('Error in promo-banners GET:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -40,19 +53,23 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, subtitle, cta_text, cta_link, gradient_from, gradient_to, display_order } = body;
+    const { title, subtitle, cta_text, cta_link, image_url, position, display_order } = body;
+
+    if (!title || !String(title).trim()) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
+    }
 
     const supabase = getSupabaseServerClient();
     
     const { data, error } = await supabase
-      .from('promo_banners')
+      .from('ads_banners')
       .insert({
         title,
-        subtitle,
+        subtitle: subtitle || null,
         cta_text: cta_text || 'Book Now',
-        cta_link,
-        gradient_from: gradient_from || '#E5A823',
-        gradient_to: gradient_to || '#F5C542',
+        cta_link: cta_link || '#',
+        image_url: image_url || null,
+        position: position || 'home_top',
         display_order: display_order || 0,
         is_active: true,
         created_by: session.user.id,
@@ -97,7 +114,7 @@ export async function PUT(request: NextRequest) {
     const supabase = getSupabaseServerClient();
     
     const { data, error } = await supabase
-      .from('promo_banners')
+      .from('ads_banners')
       .update({
         ...updates,
         updated_at: new Date().toISOString(),
@@ -141,7 +158,7 @@ export async function DELETE(request: NextRequest) {
     const supabase = getSupabaseServerClient();
     
     const { error } = await supabase
-      .from('promo_banners')
+      .from('ads_banners')
       .delete()
       .eq('id', id);
 
