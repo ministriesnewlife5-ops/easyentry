@@ -599,7 +599,7 @@ export default function EventDetailsPage() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.8, y: 20 }}
                 onClick={(e) => e.stopPropagation()}
-                className="bg-[#1A1A1A] border border-[#E5A823]/20 rounded-2xl p-8 max-w-sm w-11/12 shadow-2xl"
+                className="bg-[#0D0D0D]/60 backdrop-blur-xl border border-[#F5F5DC]/10 rounded-2xl p-8 max-w-sm w-11/12 shadow-2xl"
               >
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-2xl font-bold text-[#F5F5DC] flex items-center gap-3">
@@ -619,19 +619,19 @@ export default function EventDetailsPage() {
                 <div className="space-y-3">
                   <button
                     onClick={() => handleInstagramShare('reel')}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-pink-500/50 transition-all"
+                    className="w-full px-4 py-3 bg-pink-500/20 backdrop-blur-md border border-pink-500/40 rounded-xl text-white font-semibold hover:bg-pink-500/30 hover:border-pink-500/60 transition-all"
                   >
                     Share as Reel
                   </button>
                   <button
                     onClick={() => handleInstagramShare('story')}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-orange-400 to-pink-500 rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-orange-500/50 transition-all"
+                    className="w-full px-4 py-3 bg-orange-500/20 backdrop-blur-md border border-orange-500/40 rounded-xl text-white font-semibold hover:bg-orange-500/30 hover:border-orange-500/60 transition-all"
                   >
                     Share in Story
                   </button>
                   <button
                     onClick={() => handleInstagramShare('post')}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-yellow-500/50 transition-all"
+                    className="w-full px-4 py-3 bg-yellow-500/20 backdrop-blur-md border border-yellow-500/40 rounded-xl text-white font-semibold hover:bg-yellow-500/30 hover:border-yellow-500/60 transition-all"
                   >
                     Share as Post
                   </button>
@@ -659,7 +659,7 @@ export default function EventDetailsPage() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.8, y: 20 }}
                 onClick={(e) => e.stopPropagation()}
-                className="bg-[#1A1A1A] border border-[#25D366]/20 rounded-2xl p-8 max-w-sm w-11/12 shadow-2xl"
+                className="bg-[#0D0D0D]/60 backdrop-blur-xl border border-[#F5F5DC]/10 rounded-2xl p-8 max-w-sm w-11/12 shadow-2xl"
               >
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-2xl font-bold text-[#F5F5DC] flex items-center gap-3">
@@ -679,13 +679,13 @@ export default function EventDetailsPage() {
                 <div className="space-y-3">
                   <button
                     onClick={() => handleWhatsAppShare('send')}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-[#25D366] to-[#128C7E] rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-green-500/50 transition-all"
+                    className="w-full px-4 py-3 bg-[#25D366]/20 backdrop-blur-md border border-[#25D366]/40 rounded-xl text-white font-semibold hover:bg-[#25D366]/30 hover:border-[#25D366]/60 transition-all"
                   >
                     Send to Chat
                   </button>
                   <button
                     onClick={() => handleWhatsAppShare('status')}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-[#128C7E] to-[#075E54] rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-teal-500/50 transition-all"
+                    className="w-full px-4 py-3 bg-[#128C7E]/20 backdrop-blur-md border border-[#128C7E]/40 rounded-xl text-white font-semibold hover:bg-[#128C7E]/30 hover:border-[#128C7E]/60 transition-all"
                   >
                     Add to Status
                   </button>
