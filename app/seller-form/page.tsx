@@ -312,7 +312,7 @@ export default function SellerFormPage() {
         try {
           let loadedCategories: BrowseCategory[] = [];
 
-          const adminFiltersResponse = await fetch('/api/admin/filters');
+          const adminFiltersResponse = await fetch('/api/admin/filters', { cache: 'no-store' });
           if (adminFiltersResponse.ok) {
             const data = await adminFiltersResponse.json();
             loadedCategories = normalizeCategories(data?.filters?.categories);
@@ -320,7 +320,7 @@ export default function SellerFormPage() {
           }
 
           if (loadedCategories.length === 0) {
-            const fallbackResponse = await fetch('/api/browse-filters/default');
+            const fallbackResponse = await fetch('/api/browse-filters/default', { cache: 'no-store' });
             if (fallbackResponse.ok) {
               const data = await fallbackResponse.json();
               loadedCategories = normalizeCategories(data?.filters?.categories || data?.filters?.value?.categories);
@@ -393,9 +393,18 @@ export default function SellerFormPage() {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   };
 
+  const isFutureDateTime = (dateValue?: string, timeValue?: string) => {
+    const parsed = parseDateTime(dateValue, timeValue);
+    return Boolean(parsed && parsed.getTime() > Date.now());
+  };
+
   const validateDateTimeRange = (startDate?: string, startTime?: string, endDate?: string, endTime?: string) => {
     const start = parseDateTime(startDate, startTime);
     if (!start) return 'Please enter a valid event date and start time.';
+
+    if (start.getTime() <= Date.now()) {
+      return 'Event date and start time must be in the future.';
+    }
 
     if (endDate || endTime) {
       if (!endDate || !endTime) {
@@ -403,6 +412,7 @@ export default function SellerFormPage() {
       }
       const end = parseDateTime(endDate, endTime);
       if (!end) return 'Please enter a valid end date and end time.';
+      if (end.getTime() <= Date.now()) return 'End date and end time must be in the future.';
       if (end < start) return 'End time must be after the start time.';
     }
 
@@ -429,6 +439,12 @@ export default function SellerFormPage() {
         const until = parseDateTime(cat.availableUntilDate, cat.availableUntilTime);
         if (!from || !until) {
           return `Ticket category ${cat.name || 'Unnamed'} has an invalid availability date/time.`;
+        }
+        if (from.getTime() <= Date.now()) {
+          return `Ticket category ${cat.name || 'Unnamed'} availability start must be in the future.`;
+        }
+        if (until.getTime() <= Date.now()) {
+          return `Ticket category ${cat.name || 'Unnamed'} availability end must be in the future.`;
         }
         if (until < from) {
           return `Ticket category ${cat.name || 'Unnamed'} must end after it starts.`;
@@ -1090,6 +1106,7 @@ export default function SellerFormPage() {
                           name="date"
                           value={formData.date}
                           onChange={handleInputChange}
+                          min={new Date().toISOString().split('T')[0]}
                           className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg pl-11 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
                           required
                         />
@@ -1464,6 +1481,7 @@ export default function SellerFormPage() {
                                         prev.map((c) => (c.id === cat.id ? { ...c, availableFromDate: date } : c))
                                       );
                                     }}
+                                    min={new Date().toISOString().split('T')[0]}
                                     className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
                                   />
                                 </div>
@@ -1494,6 +1512,7 @@ export default function SellerFormPage() {
                                         prev.map((c) => (c.id === cat.id ? { ...c, availableUntilDate: date } : c))
                                       );
                                     }}
+                                    min={cat.availableFromDate || new Date().toISOString().split('T')[0]}
                                     className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-[#F5F5DC] text-sm focus:outline-none focus:border-[#E5A823] [color-scheme:dark]"
                                   />
                                 </div>

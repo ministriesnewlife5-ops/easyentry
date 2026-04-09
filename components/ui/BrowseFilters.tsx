@@ -128,7 +128,7 @@ export default function BrowseFilters({
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/admin/filters');
+        const res = await fetch('/api/admin/filters', { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           if (data.filters) {

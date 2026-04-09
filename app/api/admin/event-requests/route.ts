@@ -27,6 +27,10 @@ function validateEventDateTimes(eventData: Record<string, unknown>): string {
     return 'Please provide a valid event date and start time.';
   }
 
+  if (start.getTime() <= Date.now()) {
+    return 'Event date and start time must be in the future.';
+  }
+
   const endTime = typeof eventData.endTime === 'string' ? eventData.endTime : '';
   if (endTime) {
     const end = parseDateTime(
@@ -34,6 +38,7 @@ function validateEventDateTimes(eventData: Record<string, unknown>): string {
       endTime
     );
     if (!end) return 'Please provide a valid end time.';
+    if (end.getTime() <= Date.now()) return 'End date and end time must be in the future.';
     if (end < start) return 'End time must be after the start time.';
   }
 
@@ -61,6 +66,14 @@ function validateEventDateTimes(eventData: Record<string, unknown>): string {
 
       if (!from || !until) {
         return `Ticket category ${String(category.name || 'Unnamed')} has an invalid availability window.`;
+      }
+
+      if (from.getTime() <= Date.now()) {
+        return `Ticket category ${String(category.name || 'Unnamed')} availability start must be in the future.`;
+      }
+
+      if (until.getTime() <= Date.now()) {
+        return `Ticket category ${String(category.name || 'Unnamed')} availability end must be in the future.`;
       }
 
       if (until < from) {
