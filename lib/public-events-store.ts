@@ -61,6 +61,9 @@ export type PublicEvent = {
   date: string;
   time: string;
   venue: string;
+  locationState?: string;
+  locationDistrict?: string;
+  locationArea?: string;
   googleMapsLink?: string;
   distance: string;
   gatesOpen: string;
@@ -92,6 +95,9 @@ export type PublicEventCard = {
   title: string;
   date: string;
   venue: string;
+  locationState?: string;
+  locationDistrict?: string;
+  locationArea?: string;
   price: string;
   imageColor: string;
   category: string;
@@ -118,6 +124,9 @@ function mapLegacyToDb(event: Partial<PublicEvent> & { sourceRequestId?: string 
   if (event.promoterName) socialLinks.promoterName = event.promoterName;
   if (event.promoterLabel) socialLinks.promoterLabel = event.promoterLabel;
   if (event.subtitle) socialLinks.subtitle = event.subtitle;
+  if (event.locationState) socialLinks.locationState = event.locationState;
+  if (event.locationDistrict) socialLinks.locationDistrict = event.locationDistrict;
+  if (event.locationArea) socialLinks.locationArea = event.locationArea;
 
   return {
     title: event.title || 'Untitled Event',
@@ -186,6 +195,9 @@ function mapDbToLegacy(
     socialLinks && typeof socialLinks.googleMapsLink === 'string'
       ? socialLinks.googleMapsLink
       : undefined;
+  const locationState = socialLinks && typeof socialLinks.locationState === 'string' ? socialLinks.locationState : undefined;
+  const locationDistrict = socialLinks && typeof socialLinks.locationDistrict === 'string' ? socialLinks.locationDistrict : undefined;
+  const locationArea = socialLinks && typeof socialLinks.locationArea === 'string' ? socialLinks.locationArea : undefined;
   const venue = socialLinks && typeof socialLinks.venue === 'string' ? socialLinks.venue : '';
   const distance = socialLinks && typeof socialLinks.distance === 'string' ? socialLinks.distance : 'Newly published event';
   const gatesOpen = socialLinks && typeof socialLinks.gatesOpen === 'string' ? socialLinks.gatesOpen : '';
@@ -206,6 +218,9 @@ function mapDbToLegacy(
     date: (record.date as string) || '',
     time: (record.time as string) || '',
     venue,
+    locationState,
+    locationDistrict,
+    locationArea,
     googleMapsLink,
     distance,
     gatesOpen,
@@ -452,6 +467,9 @@ function createApprovedEvent(request: EventRequest): Partial<PublicEvent> {
     date: request.eventData.date,
     time: request.eventData.time,
     venue: request.eventData.venue,
+    locationState: request.eventData.locationState,
+    locationDistrict: request.eventData.locationDistrict,
+    locationArea: request.eventData.locationArea,
     googleMapsLink: request.eventData.googleMapsLink,
     distance: 'Newly approved event',
     gatesOpen: request.eventData.gatesOpen,
@@ -554,6 +572,9 @@ export async function getPublishedEventCards(): Promise<PublicEventCard[]> {
     title: event.title,
     date: event.date,
     venue: event.venue,
+    locationState: event.locationState,
+    locationDistrict: event.locationDistrict,
+    locationArea: event.locationArea,
     price: event.price,
     imageColor: getImageColor(event.category),
     category: event.category,

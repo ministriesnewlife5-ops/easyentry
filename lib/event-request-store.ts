@@ -24,7 +24,11 @@ export type EventRequest = {
     subtitle: string;
     date: string;
     time: string;
+    endTime?: string;
     venue: string;
+    locationState?: string;
+    locationDistrict?: string;
+    locationArea?: string;
     category: string;
     subcategory?: string;
     googleMapsLink?: string;

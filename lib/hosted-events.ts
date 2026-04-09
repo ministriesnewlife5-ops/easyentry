@@ -3,6 +3,9 @@ export type HostedEventCard = {
   title: string;
   date: string;
   venue: string;
+  locationState?: string;
+  locationDistrict?: string;
+  locationArea?: string;
   price: string;
   imageColor: string;
   category: string;

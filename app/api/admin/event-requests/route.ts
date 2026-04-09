@@ -11,6 +11,67 @@ import { getSupabaseServerClient } from '@/lib/supabase';
 
 const BROWSE_FILTERS_SETTINGS_KEY = 'browse_filters';
 
+function parseDateTime(dateValue?: string, timeValue?: string): Date | null {
+  if (!dateValue) return null;
+  const parsed = new Date(`${dateValue}T${timeValue || '00:00'}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function validateEventDateTimes(eventData: Record<string, unknown>): string {
+  const start = parseDateTime(
+    typeof eventData.date === 'string' ? eventData.date : undefined,
+    typeof eventData.time === 'string' ? eventData.time : undefined
+  );
+
+  if (!start) {
+    return 'Please provide a valid event date and start time.';
+  }
+
+  const endTime = typeof eventData.endTime === 'string' ? eventData.endTime : '';
+  if (endTime) {
+    const end = parseDateTime(
+      typeof eventData.date === 'string' ? eventData.date : undefined,
+      endTime
+    );
+    if (!end) return 'Please provide a valid end time.';
+    if (end < start) return 'End time must be after the start time.';
+  }
+
+  const ticketCategories = Array.isArray(eventData.ticketCategories)
+    ? (eventData.ticketCategories as Array<Record<string, unknown>>)
+    : [];
+
+  for (const category of ticketCategories) {
+    const hasFromDate = typeof category.availableFromDate === 'string' && category.availableFromDate.trim();
+    const hasFromTime = typeof category.availableFromTime === 'string' && category.availableFromTime.trim();
+    const hasUntilDate = typeof category.availableUntilDate === 'string' && category.availableUntilDate.trim();
+    const hasUntilTime = typeof category.availableUntilTime === 'string' && category.availableUntilTime.trim();
+
+    if ((hasFromDate || hasFromTime) && (!hasFromDate || !hasFromTime)) {
+      return `Ticket category ${String(category.name || 'Unnamed')} requires both available-from date and time.`;
+    }
+
+    if ((hasUntilDate || hasUntilTime) && (!hasUntilDate || !hasUntilTime)) {
+      return `Ticket category ${String(category.name || 'Unnamed')} requires both available-until date and time.`;
+    }
+
+    if (hasFromDate && hasFromTime && hasUntilDate && hasUntilTime) {
+      const from = parseDateTime(category.availableFromDate as string, category.availableFromTime as string);
+      const until = parseDateTime(category.availableUntilDate as string, category.availableUntilTime as string);
+
+      if (!from || !until) {
+        return `Ticket category ${String(category.name || 'Unnamed')} has an invalid availability window.`;
+      }
+
+      if (until < from) {
+        return `Ticket category ${String(category.name || 'Unnamed')} must end after it starts.`;
+      }
+    }
+  }
+
+  return '';
+}
+
 async function upsertBrowseCategoryFromEvent(categoryRaw?: string, subcategoryRaw?: string) {
   const category = typeof categoryRaw === 'string' ? categoryRaw.trim() : '';
   const subcategory = typeof subcategoryRaw === 'string' ? subcategoryRaw.trim() : '';
@@ -116,6 +177,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required event data' }, { status: 400 });
     }
 
+    const dateTimeError = validateEventDateTimes(eventData);
+    if (dateTimeError) {
+      return NextResponse.json({ error: dateTimeError }, { status: 400 });
+    }
+
     const outletName = token.name || 'Unknown Outlet';
     const newRequest = await createEventRequest(
       token.sub || '',
@@ -139,7 +205,11 @@ export async function POST(request: NextRequest) {
           subtitle: eventData.subtitle,
           date: eventData.date,
           time: eventData.time,
+          endTime: eventData.endTime,
           venue: eventData.venue,
+          locationState: eventData.locationState,
+          locationDistrict: eventData.locationDistrict,
+          locationArea: eventData.locationArea,
           category: eventData.category,
           price: eventData.price,
           description: eventData.description,

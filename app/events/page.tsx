@@ -147,6 +147,8 @@ export default function EventsPage() {
       const base: BrowseFilterSelection = prev || {
         category: null,
         subFilters: [],
+        selectedState: undefined,
+        selectedDistrict: undefined,
         selectedAreas: [],
         hasDateFilter: false,
         hasPriceFilter: false,
@@ -186,6 +188,8 @@ export default function EventsPage() {
   const filteredEvents = useMemo(() => {
     const categoryFilter = activeFilters?.category ?? selectedCategory;
     const subFilters = activeFilters?.subFilters || [];
+    const selectedState = activeFilters?.selectedState?.trim().toLowerCase() || '';
+    const selectedDistrict = activeFilters?.selectedDistrict?.trim().toLowerCase() || '';
     const selectedAreas = activeFilters?.selectedAreas || [];
     const normalize = (value: string | null | undefined) => (value || '').trim().toLowerCase();
 
@@ -209,10 +213,31 @@ export default function EventsPage() {
         if (!matchesSubFilter) return false;
       }
 
-      // Area (match against venue string)
+      // Location filters
+      if (selectedState) {
+        const eventState = normalize((event as PublicEventCard & { locationState?: string }).locationState);
+        const venueStateFallback = normalize(event.venue);
+        if (eventState ? eventState !== selectedState : !venueStateFallback.includes(selectedState)) {
+          return false;
+        }
+      }
+
+      if (selectedDistrict) {
+        const eventDistrict = normalize((event as PublicEventCard & { locationDistrict?: string }).locationDistrict);
+        const venueDistrictFallback = normalize(event.venue);
+        if (eventDistrict ? eventDistrict !== selectedDistrict : !venueDistrictFallback.includes(selectedDistrict)) {
+          return false;
+        }
+      }
+
+      // Area (match against structured location first, then venue string)
       if (selectedAreas.length > 0) {
+        const eventArea = normalize((event as PublicEventCard & { locationArea?: string }).locationArea);
         const venue = (event.venue || '').toLowerCase();
-        const matchesArea = selectedAreas.some((area) => venue.includes(area.toLowerCase()));
+        const matchesArea = selectedAreas.some((area) => {
+          const normalizedArea = area.toLowerCase();
+          return (eventArea ? eventArea === normalizedArea : false) || venue.includes(normalizedArea);
+        });
         if (!matchesArea) return false;
       }
 

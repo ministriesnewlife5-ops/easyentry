@@ -33,6 +33,8 @@ import DragDropUpload from '@/components/ui/DragDropUpload';
 import { uploadFileDirectToSupabase } from '@/lib/browser-storage';
 
 type BrowseCategory = { name: string; icon: string; subFilters: string[] };
+type BrowseLocationCity = { name: string; icon: string; areas: string[] };
+type BrowseLocationState = { state: string; cities: BrowseLocationCity[] };
 
 const CUSTOM_CATEGORIES_STORAGE_KEY = 'seller_form_custom_categories';
 const FALLBACK_BROWSE_CATEGORIES: BrowseCategory[] = [
@@ -109,6 +111,9 @@ export default function SellerFormPage() {
     price: '',
     organizer: '',
     location: '',
+    locationState: '',
+    locationDistrict: '',
+    locationArea: '',
     date: '',
     startTime: '',
     endTime: '',
@@ -158,6 +163,7 @@ export default function SellerFormPage() {
   const [customCategory, setCustomCategory] = useState('');
   const [customSubcategory, setCustomSubcategory] = useState('');
   const [categories, setCategories] = useState<BrowseCategory[]>([]);
+  const [locationFilters, setLocationFilters] = useState<BrowseLocationState[]>([]);
   const [rules, setRules] = useState<Array<{ id: string; text: string }>>([{ id: '1', text: '' }]);
   
   // Artists state
@@ -215,6 +221,39 @@ export default function SellerFormPage() {
     });
 
     return Array.from(categoryMap.values());
+  };
+
+  const normalizeLocationFilters = (raw: unknown): BrowseLocationState[] => {
+    if (!Array.isArray(raw)) return [];
+
+    return raw
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const record = item as Record<string, unknown>;
+        const state = typeof record.state === 'string' ? normalizeCategoryName(record.state) : '';
+        const cities = Array.isArray(record.cities)
+          ? record.cities
+              .map((city) => {
+                if (!city || typeof city !== 'object') return null;
+                const cityRecord = city as Record<string, unknown>;
+                const name = typeof cityRecord.name === 'string' ? normalizeCategoryName(cityRecord.name) : '';
+                if (!name) return null;
+                const icon = typeof cityRecord.icon === 'string' && cityRecord.icon.trim() ? cityRecord.icon : 'MapPin';
+                const areas = Array.isArray(cityRecord.areas)
+                  ? cityRecord.areas
+                      .filter((area): area is string => typeof area === 'string')
+                      .map((area) => normalizeCategoryName(area))
+                      .filter(Boolean)
+                  : [];
+                return { name, icon, areas };
+              })
+              .filter((city): city is BrowseLocationCity => city !== null)
+          : [];
+
+        if (!state) return null;
+        return { state, cities };
+      })
+      .filter((item): item is BrowseLocationState => item !== null);
   };
 
   const getStoredCustomCategories = (): BrowseCategory[] => {
@@ -277,6 +316,7 @@ export default function SellerFormPage() {
           if (adminFiltersResponse.ok) {
             const data = await adminFiltersResponse.json();
             loadedCategories = normalizeCategories(data?.filters?.categories);
+            setLocationFilters(normalizeLocationFilters(data?.filters?.locationFilters));
           }
 
           if (loadedCategories.length === 0) {
@@ -284,6 +324,7 @@ export default function SellerFormPage() {
             if (fallbackResponse.ok) {
               const data = await fallbackResponse.json();
               loadedCategories = normalizeCategories(data?.filters?.categories || data?.filters?.value?.categories);
+              setLocationFilters(normalizeLocationFilters(data?.filters?.locationFilters || data?.filters?.value?.locationFilters));
             }
           }
 
@@ -345,6 +386,59 @@ export default function SellerFormPage() {
     setPromoForm(prev => ({ ...prev, [name]: value }));
   };
 
+  const parseDateTime = (dateValue?: string, timeValue?: string) => {
+    if (!dateValue) return null;
+    const timePart = timeValue || '00:00';
+    const parsed = new Date(`${dateValue}T${timePart}`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const validateDateTimeRange = (startDate?: string, startTime?: string, endDate?: string, endTime?: string) => {
+    const start = parseDateTime(startDate, startTime);
+    if (!start) return 'Please enter a valid event date and start time.';
+
+    if (endDate || endTime) {
+      if (!endDate || !endTime) {
+        return 'Please provide both end date and end time.';
+      }
+      const end = parseDateTime(endDate, endTime);
+      if (!end) return 'Please enter a valid end date and end time.';
+      if (end < start) return 'End time must be after the start time.';
+    }
+
+    return '';
+  };
+
+  const validateTicketCategoryTimes = () => {
+    for (const cat of ticketCategories) {
+      const hasFromDate = Boolean(cat.availableFromDate);
+      const hasFromTime = Boolean(cat.availableFromTime);
+      const hasUntilDate = Boolean(cat.availableUntilDate);
+      const hasUntilTime = Boolean(cat.availableUntilTime);
+
+      if ((hasFromDate || hasFromTime) && (!hasFromDate || !hasFromTime)) {
+        return `Ticket category ${cat.name || 'Unnamed'} requires both available-from date and time.`;
+      }
+
+      if ((hasUntilDate || hasUntilTime) && (!hasUntilDate || !hasUntilTime)) {
+        return `Ticket category ${cat.name || 'Unnamed'} requires both available-until date and time.`;
+      }
+
+      if (hasFromDate && hasFromTime && hasUntilDate && hasUntilTime) {
+        const from = parseDateTime(cat.availableFromDate, cat.availableFromTime);
+        const until = parseDateTime(cat.availableUntilDate, cat.availableUntilTime);
+        if (!from || !until) {
+          return `Ticket category ${cat.name || 'Unnamed'} has an invalid availability date/time.`;
+        }
+        if (until < from) {
+          return `Ticket category ${cat.name || 'Unnamed'} must end after it starts.`;
+        }
+      }
+    }
+
+    return '';
+  };
+
   const generateUniqueCode = () => {
     const prefix = 'SELLER';
     const random = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -383,6 +477,22 @@ export default function SellerFormPage() {
       setTimeout(() => setShowNotification(false), 5000);
       return;
     }
+
+    const eventDateTimeError = validateDateTimeRange(formData.date, formData.startTime, formData.date, formData.endTime);
+    if (eventDateTimeError) {
+      setNotificationMessage(eventDateTimeError);
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 5000);
+      return;
+    }
+
+    const ticketTimeError = validateTicketCategoryTimes();
+    if (ticketTimeError) {
+      setNotificationMessage(ticketTimeError);
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 5000);
+      return;
+    }
     
     setIsSubmitting(true);
     
@@ -408,6 +518,9 @@ export default function SellerFormPage() {
         startTime: formData.startTime,
         endTime: formData.endTime,
         venue: formData.location,
+        locationState: formData.locationState || undefined,
+        locationDistrict: formData.locationDistrict || undefined,
+        locationArea: formData.locationArea || undefined,
         category: resolvedCategory || 'General',
         subcategory: resolvedSubcategory || undefined,
         price: `₹${minPrice}`,
@@ -460,6 +573,9 @@ export default function SellerFormPage() {
           title: formData.title,
           date: formData.date,
           venue: formData.location,
+          locationState: formData.locationState || undefined,
+          locationDistrict: formData.locationDistrict || undefined,
+          locationArea: formData.locationArea || undefined,
           price: `₹${minPrice}`,
           imageColor: 'bg-blue-900',
           category: resolvedSubcategory ? `${resolvedCategory} • ${resolvedSubcategory}` : resolvedCategory,
@@ -474,6 +590,9 @@ export default function SellerFormPage() {
           price: '',
           organizer: '',
           location: '',
+          locationState: '',
+          locationDistrict: '',
+          locationArea: '',
           date: '',
           startTime: '',
           endTime: '',
@@ -612,6 +731,15 @@ export default function SellerFormPage() {
     ticketCategories.length > 0
       ? Math.min(...ticketCategories.map((c) => Number(c.price) || 0))
       : Number(formData.price || 0);
+
+  const selectedStateFilter = locationFilters.find(
+    (item) => item.state.toLowerCase() === formData.locationState.toLowerCase()
+  );
+  const selectedDistrictFilter = selectedStateFilter?.cities.find(
+    (city) => city.name.toLowerCase() === formData.locationDistrict.toLowerCase()
+  );
+  const districtOptions = selectedStateFilter?.cities || [];
+  const areaOptions = selectedDistrictFilter?.areas || [];
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">
@@ -998,8 +1126,79 @@ export default function SellerFormPage() {
                     </div>
 
                     <div className="md:col-span-3">
-                      <label className="block text-sm font-medium mb-3">Location / Venue *</label>
-                      <div className="relative">
+                      <label className="block text-sm font-medium mb-3">Location Filters *</label>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-xs text-[#F5F5DC]/50 mb-2">State</label>
+                          <select
+                            name="locationState"
+                            value={formData.locationState}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setFormData((prev) => ({
+                                ...prev,
+                                locationState: value,
+                                locationDistrict: '',
+                                locationArea: '',
+                              }));
+                            }}
+                            className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                            required
+                          >
+                            <option value="">Select state</option>
+                            {locationFilters.map((state) => (
+                              <option key={state.state} value={state.state}>{state.state}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-[#F5F5DC]/50 mb-2">District / City</label>
+                          <select
+                            name="locationDistrict"
+                            value={formData.locationDistrict}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setFormData((prev) => ({
+                                ...prev,
+                                locationDistrict: value,
+                                locationArea: '',
+                              }));
+                            }}
+                            className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                            required
+                            disabled={!selectedStateFilter}
+                          >
+                            <option value="">
+                              {!selectedStateFilter ? 'Select state first' : 'Select district'}
+                            </option>
+                            {districtOptions.map((district) => (
+                              <option key={district.name} value={district.name}>{district.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-[#F5F5DC]/50 mb-2">Area</label>
+                          <select
+                            name="locationArea"
+                            value={formData.locationArea}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, locationArea: e.target.value }))}
+                            className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                            required
+                            disabled={!selectedDistrictFilter}
+                          >
+                            <option value="">
+                              {!selectedDistrictFilter ? 'Select district first' : 'Select area'}
+                            </option>
+                            {areaOptions.map((area) => (
+                              <option key={area} value={area}>{area}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 relative">
                         <MapPin className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
                         <input
                           type="text"

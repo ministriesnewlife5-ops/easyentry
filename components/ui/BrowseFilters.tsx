@@ -25,6 +25,8 @@ type BrowseFiltersData = {
 export type BrowseFilterSelection = {
   category: string | null;
   subFilters: string[];
+  selectedState?: string;
+  selectedDistrict?: string;
   selectedAreas: string[];
   hasDateFilter: boolean;
   dateStart?: string;
@@ -93,6 +95,7 @@ export default function BrowseFilters({
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
   const [selectedState, setSelectedState] = useState<string>('');
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [hasSelectedLocation, setHasSelectedLocation] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [locationSearch, setLocationSearch] = useState('');
   const [modalActiveState, setModalActiveState] = useState<string>('');
@@ -208,7 +211,7 @@ export default function BrowseFilters({
   });
 
   const hasActiveFilters = activeCategory !== null || activeSubFilters.length > 0 ||
-    selectedAreas.length > 0 || !!dateLabel || !!priceLabel;
+    hasSelectedLocation || selectedAreas.length > 0 || !!dateLabel || !!priceLabel;
 
   const filteredAreas = selectedCity
     ? selectedCity.areas.filter((area) =>
@@ -232,9 +235,14 @@ export default function BrowseFilters({
   const currentStateFilter = filters.locationFilters.find(sf => sf.state === modalActiveState);
 
   const emitFiltersChange = (overrides?: Partial<BrowseFilterSelection>) => {
+    const locationState = overrides?.selectedState ?? (hasSelectedLocation ? selectedState : undefined);
+    const locationDistrict = overrides?.selectedDistrict ?? (hasSelectedLocation ? selectedCity?.name || undefined : undefined);
+
     onFiltersChange?.({
       category: activeCategory,
       subFilters: activeSubFilters,
+      selectedState: locationState,
+      selectedDistrict: locationDistrict,
       selectedAreas,
       hasDateFilter: Boolean(dateLabel) && Boolean(dateRangeStart),
       dateStart: dateRangeStart ? dateRangeStart.toISOString() : undefined,
@@ -256,7 +264,7 @@ export default function BrowseFilters({
       category: newCat,
       subFilters: isActive ? [] : activeSubFilters,
     });
-    setTimeout(() => onFilterStateChange?.(newCat !== null || activeSubFilters.length > 0 || hasActiveFilters), 0);
+    setTimeout(() => onFilterStateChange?.(newCat !== null || activeSubFilters.length > 0 || hasSelectedLocation || selectedAreas.length > 0 || !!dateLabel || !!priceLabel), 0);
   };
 
   const toggleSubFilter = (sub: string) => {
@@ -265,16 +273,17 @@ export default function BrowseFilters({
       : [...activeSubFilters, sub];
     setActiveSubFilters(updated);
     emitFiltersChange({ subFilters: updated });
-    setTimeout(() => onFilterStateChange?.(updated.length > 0 || activeCategory !== null || hasActiveFilters), 0);
+    setTimeout(() => onFilterStateChange?.(updated.length > 0 || activeCategory !== null || hasSelectedLocation || !!dateLabel || !!priceLabel), 0);
   };
 
   const handleSelectCity = (state: string, city: City) => {
     setSelectedCity(city);
     setSelectedState(state);
     setSelectedAreas([]);
+    setHasSelectedLocation(true);
     setShowLocationModal(false);
-    emitFiltersChange({ selectedAreas: [] });
-    setTimeout(() => onFilterStateChange?.(hasActiveFilters), 0);
+    emitFiltersChange({ selectedState: state, selectedDistrict: city.name, selectedAreas: [] });
+    setTimeout(() => onFilterStateChange?.(Boolean(state) || Boolean(city) || activeCategory !== null || activeSubFilters.length > 0 || selectedAreas.length > 0 || !!dateLabel || !!priceLabel), 0);
   };
 
   const toggleArea = (area: string) => {
@@ -282,8 +291,9 @@ export default function BrowseFilters({
       ? selectedAreas.filter(a => a !== area)
       : [...selectedAreas, area];
     setSelectedAreas(updated);
+    setHasSelectedLocation(true);
     emitFiltersChange({ selectedAreas: updated });
-    setTimeout(() => onFilterStateChange?.(updated.length > 0 || !!dateLabel || !!priceLabel || activeCategory !== null), 0);
+    setTimeout(() => onFilterStateChange?.(updated.length > 0 || hasSelectedLocation || !!dateLabel || !!priceLabel || activeCategory !== null), 0);
   };
 
   // ── Location button label ─────────────────────────────────────────────────
@@ -292,9 +302,14 @@ export default function BrowseFilters({
     : (selectedCity?.name ?? 'Location');
 
   useEffect(() => {
+    const locationState = hasSelectedLocation ? selectedState : undefined;
+    const locationDistrict = hasSelectedLocation ? selectedCity?.name || undefined : undefined;
+
     onFiltersChange?.({
       category: activeCategory,
       subFilters: activeSubFilters,
+      selectedState: locationState,
+      selectedDistrict: locationDistrict,
       selectedAreas,
       hasDateFilter: Boolean(dateLabel) && Boolean(dateRangeStart),
       dateStart: dateRangeStart ? dateRangeStart.toISOString() : undefined,
@@ -311,9 +326,12 @@ export default function BrowseFilters({
     dateLabel,
     dateRangeStart,
     dateRangeEnd,
+    selectedState,
+    selectedCity,
     priceLabel,
     priceMin,
     priceMax,
+    hasSelectedLocation,
   ]);
 
   return (

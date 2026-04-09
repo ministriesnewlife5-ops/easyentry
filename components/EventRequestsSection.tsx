@@ -28,8 +28,13 @@ type EventRequest = {
     subtitle: string;
     date: string;
     time: string;
+    endTime?: string;
     venue: string;
+    locationState?: string;
+    locationDistrict?: string;
+    locationArea?: string;
     category: string;
+    subcategory?: string;
     price: string;
     image: string;
     mediaFiles?: string[];
@@ -227,8 +232,13 @@ export default function EventRequestsSection() {
               <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/60 px-3 py-1">
                 <DetailRow label="Date" value={ed.date} />
                 <DetailRow label="Time" value={ed.time} />
+                <DetailRow label="End Time" value={ed.endTime} />
                 <DetailRow label="Venue" value={ed.venue} />
+                <DetailRow label="State" value={ed.locationState} />
+                <DetailRow label="District" value={ed.locationDistrict} />
+                <DetailRow label="Area" value={ed.locationArea} />
                 <DetailRow label="Category" value={ed.category} />
+                <DetailRow label="Subcategory" value={ed.subcategory} />
                 <DetailRow label="Gates Open" value={ed.gatesOpen} />
                 <DetailRow label="Entry Age" value={ed.entryAge} />
                 <DetailRow label="Layout" value={ed.layout} />
