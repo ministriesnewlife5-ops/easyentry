@@ -579,123 +579,121 @@ export default function EventDetailsPage() {
               <MessageCircle className="w-5 h-5" />
             </motion.button>
           </div>
+        </div>
 
-          {/* Instagram Share Modal */}
-          <AnimatePresence>
-            {showInstagramModal && (
+        {/* Instagram Share Modal */}
+        <AnimatePresence>
+          {showInstagramModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowInstagramModal(false);
+              }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+            >
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowInstagramModal(false);
-                }}
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+                initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-[#1A1A1A] border border-[#E5A823]/20 rounded-2xl p-8 max-w-sm w-11/12 shadow-2xl"
               >
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.8, y: 20 }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="bg-[#1A1A1A] border border-[#E5A823]/20 rounded-2xl p-8 max-w-sm w-11/12 shadow-2xl"
-                >
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-2xl font-bold text-[#F5F5DC] flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 flex items-center justify-center">
-                        <Instagram className="w-5 h-5 text-white" />
-                      </div>
-                      Share to Instagram
-                    </h3>
-                    <button
-                      onClick={() => setShowInstagramModal(false)}
-                      className="text-[#F5F5DC]/50 hover:text-[#F5F5DC] transition"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <p className="text-[#F5F5DC]/70 text-sm mb-8">Choose how to share this event:</p>
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => handleInstagramShare('reel')}
-                      className="w-full px-4 py-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-pink-500/50 transition-all"
-                    >
-                      Share as Reel
-                    </button>
-                    <button
-                      onClick={() => handleInstagramShare('story')}
-                      className="w-full px-4 py-3 bg-gradient-to-r from-orange-400 to-pink-500 rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-orange-500/50 transition-all"
-                    >
-                      Share in Story
-                    </button>
-                    <button
-                      onClick={() => handleInstagramShare('post')}
-                      className="w-full px-4 py-3 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-yellow-500/50 transition-all"
-                    >
-                      Share as Post
-                    </button>
-                  </div>
-                </motion.div>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-2xl font-bold text-[#F5F5DC] flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 flex items-center justify-center">
+                      <Instagram className="w-5 h-5 text-white" />
+                    </div>
+                    Share to Instagram
+                  </h3>
+                  <button
+                    onClick={() => setShowInstagramModal(false)}
+                    className="text-[#F5F5DC]/50 hover:text-[#F5F5DC] transition"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <p className="text-[#F5F5DC]/70 text-sm mb-8">Choose how to share this event:</p>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => handleInstagramShare('reel')}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-pink-500/50 transition-all"
+                  >
+                    Share as Reel
+                  </button>
+                  <button
+                    onClick={() => handleInstagramShare('story')}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-orange-400 to-pink-500 rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-orange-500/50 transition-all"
+                  >
+                    Share in Story
+                  </button>
+                  <button
+                    onClick={() => handleInstagramShare('post')}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-yellow-500/50 transition-all"
+                  >
+                    Share as Post
+                  </button>
+                </div>
               </motion.div>
-            )}
-          </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          {/* WhatsApp Share Modal */}
-          <AnimatePresence>
-            {showWhatsAppModal && (
+        {/* WhatsApp Share Modal */}
+        <AnimatePresence>
+          {showWhatsAppModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowWhatsAppModal(false);
+              }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+            >
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowWhatsAppModal(false);
-                }}
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+                initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-[#1A1A1A] border border-[#25D366]/20 rounded-2xl p-8 max-w-sm w-11/12 shadow-2xl"
               >
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.8, y: 20 }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="bg-[#1A1A1A] border border-[#25D366]/20 rounded-2xl p-8 max-w-sm w-11/12 shadow-2xl"
-                >
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-2xl font-bold text-[#F5F5DC] flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#25D366] flex items-center justify-center">
-                        <MessageCircle className="w-5 h-5 text-white" />
-                      </div>
-                      Share to WhatsApp
-                    </h3>
-                    <button
-                      onClick={() => setShowWhatsAppModal(false)}
-                      className="text-[#F5F5DC]/50 hover:text-[#F5F5DC] transition"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <p className="text-[#F5F5DC]/70 text-sm mb-8">Choose how to share this event:</p>
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => handleWhatsAppShare('send')}
-                      className="w-full px-4 py-3 bg-gradient-to-r from-[#25D366] to-[#128C7E] rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-green-500/50 transition-all"
-                    >
-                      Send to Chat
-                    </button>
-                    <button
-                      onClick={() => handleWhatsAppShare('status')}
-                      className="w-full px-4 py-3 bg-gradient-to-r from-[#128C7E] to-[#075E54] rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-teal-500/50 transition-all"
-                    >
-                      Add to Status
-                    </button>
-                  </div>
-                </motion.div>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-2xl font-bold text-[#F5F5DC] flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#25D366] flex items-center justify-center">
+                      <MessageCircle className="w-5 h-5 text-white" />
+                    </div>
+                    Share to WhatsApp
+                  </h3>
+                  <button
+                    onClick={() => setShowWhatsAppModal(false)}
+                    className="text-[#F5F5DC]/50 hover:text-[#F5F5DC] transition"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <p className="text-[#F5F5DC]/70 text-sm mb-8">Choose how to share this event:</p>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => handleWhatsAppShare('send')}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-[#25D366] to-[#128C7E] rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-green-500/50 transition-all"
+                  >
+                    Send to Chat
+                  </button>
+                  <button
+                    onClick={() => handleWhatsAppShare('status')}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-[#128C7E] to-[#075E54] rounded-xl text-white font-semibold hover:shadow-lg hover:shadow-teal-500/50 transition-all"
+                  >
+                    Add to Status
+                  </button>
+                </div>
               </motion.div>
-            )}
-          </AnimatePresence>
-
-        {/* Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
+            </motion.div>
+          )}
+        </AnimatePresence>
           {/* Left Column - Event Poster & Info */}
           <div className="space-y-6">
             {/* Event Image Gallery with Thumbnails - Mobile Responsive */}
