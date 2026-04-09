@@ -694,6 +694,9 @@ export default function EventDetailsPage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Two Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
           {/* Left Column - Event Poster & Info */}
           <div className="space-y-6">
             {/* Event Image Gallery with Thumbnails - Mobile Responsive */}
