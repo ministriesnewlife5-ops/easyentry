@@ -6,6 +6,7 @@ import {
   Mic2, 
   Building2, 
   Megaphone, 
+  Shield,
   User, 
   Mail, 
   Phone, 
@@ -21,12 +22,13 @@ import {
   EyeOff
 } from 'lucide-react';
 
-type Role = 'artist' | 'promoter' | 'outlet';
+type Role = 'artist' | 'promoter' | 'outlet' | 'admin';
 
 const roles = [
   { id: 'artist' as Role, label: 'Artist', icon: Mic2, desc: 'Perform & grow their audience', color: '#E5A823' },
   { id: 'promoter' as Role, label: 'Influencer/Promoter', icon: Megaphone, desc: 'Sell tickets & promote events', color: '#EB4D4B' },
   { id: 'outlet' as Role, label: 'Outlet Provider', icon: Building2, desc: 'Host events at their venue', color: '#10B981' },
+  { id: 'admin' as Role, label: 'Admin', icon: Shield, desc: 'Manage platform operations', color: '#6366F1' },
 ];
 
 const sectionVariants = {
@@ -174,7 +176,7 @@ export default function AdminOnboardingSection() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-[#F5F5DC]">Onboard Users</h1>
-            <p className="text-sm text-[#F5F5DC]/50">Create accounts for artists, influencers, and outlet providers</p>
+            <p className="text-sm text-[#F5F5DC]/50">Create accounts for artists, influencers, outlet providers, and admins</p>
           </div>
         </div>
       </motion.div>
@@ -200,7 +202,7 @@ export default function AdminOnboardingSection() {
 
       {/* Role Selector */}
       <motion.div 
-        className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
+        className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >

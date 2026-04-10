@@ -90,6 +90,21 @@ export default function EventDetailsPage() {
     fetchEvent();
   }, [params.id]);
 
+  useEffect(() => {
+    if (!event) return;
+
+    if (Array.isArray(event.images) && event.images.length > 0) {
+      setSelectedMediaType('image');
+      setSelectedImageIndex(0);
+      return;
+    }
+
+    if (Array.isArray(event.mediaFiles) && event.mediaFiles.length > 0) {
+      setSelectedMediaType('video');
+      setSelectedImageIndex(0);
+    }
+  }, [event]);
+
   const ticketPrice = useMemo(() => {
     if (!event) {
       return 0;
@@ -541,6 +556,10 @@ export default function EventDetailsPage() {
     );
   }
 
+  const selectedImageSrc = event.images?.[selectedImageIndex] || event.images?.[0] || '';
+  const selectedVideoSrc = event.mediaFiles?.[selectedImageIndex] || event.mediaFiles?.[0] || '';
+  const shouldShowVideo = selectedMediaType === 'video' && !!selectedVideoSrc;
+
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">
       
@@ -756,19 +775,23 @@ export default function EventDetailsPage() {
 
               {/* Main Display - Full width on mobile */}
               <div className="relative flex-1 rounded-xl overflow-hidden shadow-lg border border-[#2A2A2A]">
-                {selectedMediaType === 'video' && event.mediaFiles && event.mediaFiles[selectedImageIndex] ? (
+                {shouldShowVideo ? (
                   <video 
-                    src={event.mediaFiles[selectedImageIndex]} 
+                    src={selectedVideoSrc}
                     controls
                     className="w-full aspect-[1] object-cover"
-                    poster={event.images[0]}
+                    poster={event.images?.[0] || undefined}
                   />
-                ) : (
+                ) : selectedImageSrc ? (
                   <img 
-                    src={event.images[selectedImageIndex]} 
+                    src={selectedImageSrc}
                     alt={event.title}
                     className="w-full aspect-[1] object-cover"
                   />
+                ) : (
+                  <div className="w-full aspect-[1] bg-[#1A1A1A] flex items-center justify-center">
+                    <Video className="w-10 h-10 text-[#F5F5DC]/40" />
+                  </div>
                 )}
                 {/* Like Button */}
                 <motion.button 

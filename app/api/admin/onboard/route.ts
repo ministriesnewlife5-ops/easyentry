@@ -63,9 +63,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate role
-    const validRoles = ['artist', 'promoter', 'outlet'];
+    const validRoles = ['artist', 'promoter', 'outlet', 'admin'];
     if (!validRoles.includes(role)) {
-      return NextResponse.json({ error: 'Invalid role. Must be artist, promoter, or outlet' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid role. Must be artist, promoter, outlet, or admin' }, { status: 400 });
     }
 
     const supabase = getSupabaseServerClient();

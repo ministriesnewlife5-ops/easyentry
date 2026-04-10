@@ -108,9 +108,15 @@ export type PublicEventCard = {
 
 // Map legacy PublicEvent to database schema
 function mapLegacyToDb(event: Partial<PublicEvent> & { sourceRequestId?: string }): Record<string, unknown> {
-  const allMedia = Array.from(
+  const allMediaRaw = Array.from(
     new Set([...(event.images || []), ...(event.mediaFiles || [])].filter(Boolean))
   );
+  const { images: allImages, videos: allVideos } = splitMediaFiles(allMediaRaw);
+  const allMedia = [...allImages, ...allVideos];
+  const preferredImage =
+    event.image && !isVideoUrl(event.image)
+      ? event.image
+      : allImages[0] || null;
   const parsedTicketPrice = Number(String(event.price || '').replace(/[^\d.]/g, ''));
   const socialLinks: Record<string, string> = {};
 
@@ -137,7 +143,7 @@ function mapLegacyToDb(event: Partial<PublicEvent> & { sourceRequestId?: string 
     organizer_id: null,
     event_type: event.category || null,
     category: event.category || null,
-    image_url: event.image || allMedia[0] || null,
+    image_url: preferredImage,
     gallery_images: allMedia,
     ticket_price: Number.isFinite(parsedTicketPrice) ? parsedTicketPrice : null,
     ticket_url: null,
@@ -179,7 +185,8 @@ function mapDbToLegacy(
 ): PublicEvent {
   const gallery = (record.gallery_images as string[]) || [];
   const { images: imageGallery, videos } = splitMediaFiles(gallery);
-  const imageUrl = (record.image_url as string) || imageGallery[0] || '';
+  const rawImageUrl = (record.image_url as string) || '';
+  const imageUrl = (rawImageUrl && !isVideoUrl(rawImageUrl) ? rawImageUrl : '') || imageGallery[0] || '';
   const images = imageGallery.length > 0 ? imageGallery : imageUrl ? [imageUrl] : [];
   const ticketCategoriesFromRecord = Array.isArray(record.ticket_categories)
     ? (record.ticket_categories as PublicEventTicketCategory[])
