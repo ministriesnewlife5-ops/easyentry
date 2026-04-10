@@ -136,10 +136,24 @@ function mapLegacyToDb(request: Partial<EventRequest> & {
   };
 }
 
+function normalizeStoredEventData(raw: unknown): EventRequest['eventData'] | null {
+  if (!raw) return null;
+  if (typeof raw === 'object') return raw as EventRequest['eventData'];
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? (parsed as EventRequest['eventData']) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 // Map database record to legacy EventRequest
 function mapDbToLegacy(record: Record<string, unknown>): EventRequest {
   // Prefer the full event_data JSONB if present
-  const storedEventData = record.event_data as EventRequest['eventData'] | null;
+  const storedEventData = normalizeStoredEventData(record.event_data);
   const ticketCategories = (record.ticket_categories as TicketCategory[]) || storedEventData?.ticketCategories || [];
 
   return {

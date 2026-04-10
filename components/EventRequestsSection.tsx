@@ -30,6 +30,7 @@ type EventRequest = {
     time: string;
     endTime?: string;
     venue: string;
+    googleMapsLink?: string;
     locationState?: string;
     locationDistrict?: string;
     locationArea?: string;
@@ -38,6 +39,8 @@ type EventRequest = {
     price: string;
     image: string;
     mediaFiles?: string[];
+    rules?: string[];
+    taggedArtists?: Array<{ id: string; name: string | null; email?: string }>;
     numberOfTickets?: string | number;
     ticketCategories?: TicketCategory[];
     description: string;
@@ -230,10 +233,13 @@ export default function EventRequestsSection() {
             <div>
               <p className="text-xs font-semibold text-[#F5F5DC]/40 uppercase tracking-wider mb-2">Event Details</p>
               <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/60 px-3 py-1">
+                <DetailRow label="Title" value={ed.title} />
+                <DetailRow label="Subtitle" value={ed.subtitle} />
                 <DetailRow label="Date" value={ed.date} />
                 <DetailRow label="Time" value={ed.time} />
                 <DetailRow label="End Time" value={ed.endTime} />
                 <DetailRow label="Venue" value={ed.venue} />
+                <DetailRow label="Google Maps" value={ed.googleMapsLink} />
                 <DetailRow label="State" value={ed.locationState} />
                 <DetailRow label="District" value={ed.locationDistrict} />
                 <DetailRow label="Area" value={ed.locationArea} />
@@ -252,11 +258,82 @@ export default function EventRequestsSection() {
               </div>
             </div>
 
-            {/* Description */}
-            {ed.description && (
+            {/* Event Content */}
+            {(ed.description || ed.fullDescription) && (
               <div>
-                <p className="text-xs font-semibold text-[#F5F5DC]/40 uppercase tracking-wider mb-2">Description</p>
-                <p className="text-sm text-[#F5F5DC]/70 bg-[#0D0D0D]/60 rounded-lg border border-[#2A2A2A] p-3 leading-relaxed">{ed.description}</p>
+                <p className="text-xs font-semibold text-[#F5F5DC]/40 uppercase tracking-wider mb-2">Event Content</p>
+                <div className="space-y-3 rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/60 p-3">
+                  {ed.description && (
+                    <div>
+                      <p className="text-xs text-[#F5F5DC]/45 mb-1">Short Description</p>
+                      <p className="text-sm text-[#F5F5DC]/80 leading-relaxed">{ed.description}</p>
+                    </div>
+                  )}
+                  {ed.fullDescription && (
+                    <div>
+                      <p className="text-xs text-[#F5F5DC]/45 mb-1">Full Description</p>
+                      <p className="text-sm text-[#F5F5DC]/80 leading-relaxed whitespace-pre-wrap">{ed.fullDescription}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Media Submitted */}
+            {(ed.image || (ed.mediaFiles && ed.mediaFiles.length > 0)) && (
+              <div>
+                <p className="text-xs font-semibold text-[#F5F5DC]/40 uppercase tracking-wider mb-2">Media Submitted</p>
+                <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/60 p-3 space-y-2">
+                  {ed.image && (
+                    <div className="text-sm text-[#F5F5DC]/80 break-all">
+                      <span className="text-[#F5F5DC]/50">Cover: </span>
+                      <a href={ed.image} target="_blank" rel="noreferrer" className="text-[#E5A823] hover:underline">
+                        {ed.image}
+                      </a>
+                    </div>
+                  )}
+                  {ed.mediaFiles && ed.mediaFiles.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-[#F5F5DC]/45">Additional Files ({ed.mediaFiles.length})</p>
+                      {ed.mediaFiles.map((file, idx) => (
+                        <div key={`${request.id}-media-${idx}`} className="text-sm break-all">
+                          <a href={file} target="_blank" rel="noreferrer" className="text-[#E5A823] hover:underline">
+                            {file}
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Rules Submitted */}
+            {Array.isArray(ed.rules) && ed.rules.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-[#F5F5DC]/40 uppercase tracking-wider mb-2">Rules Submitted</p>
+                <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/60 p-3">
+                  <ul className="list-disc pl-5 space-y-1 text-sm text-[#F5F5DC]/80">
+                    {ed.rules.map((rule, idx) => (
+                      <li key={`${request.id}-rule-${idx}`}>{rule}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Tagged Artists */}
+            {Array.isArray(ed.taggedArtists) && ed.taggedArtists.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-[#F5F5DC]/40 uppercase tracking-wider mb-2">Tagged Artists</p>
+                <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/60 p-3 space-y-1">
+                  {ed.taggedArtists.map((artist) => (
+                    <div key={`${request.id}-artist-${artist.id}`} className="text-sm text-[#F5F5DC]/80">
+                      {artist.name || 'Unknown Artist'}
+                      {artist.email ? <span className="text-[#F5F5DC]/45"> · {artist.email}</span> : null}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

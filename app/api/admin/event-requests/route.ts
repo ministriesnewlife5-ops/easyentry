@@ -199,7 +199,8 @@ export async function POST(request: NextRequest) {
     const newRequest = await createEventRequest(
       token.sub || '',
       outletName,
-      eventData
+      eventData,
+      typeof token.email === 'string' ? token.email : undefined
     );
 
     await upsertBrowseCategoryFromEvent(eventData.category, eventData.subcategory);
