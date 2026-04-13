@@ -1063,117 +1063,112 @@ export default function EventDetailsPage() {
           </div>
         </div>
 
-        {/* Ticket Success Modal with QR Code */}
+        {/* Ticket Success Modal with QR Code - BookMyShow Style */}
         <AnimatePresence>
           {showSuccessModal && bookingDetails && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0D0D0D]/95 p-4"
             >
               <motion.div
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="bg-[#1A1A1A] rounded-2xl border border-[#2A2A2A] max-w-md w-full max-h-[90vh] overflow-hidden"
+                className="w-full max-w-sm"
               >
                 {/* Header */}
-                <div className="bg-gradient-to-r from-[#E5A823] to-[#EB4D4B] p-6 rounded-t-2xl">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                        <CheckCircle className="w-7 h-7 text-[#0D0D0D]" />
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-3 h-3 rounded-full bg-[#25D366]" />
+                  <h2 className="text-xl font-semibold text-[#F5F5DC]">Booking Confirmed</h2>
+                  <button
+                    onClick={() => setShowSuccessModal(false)}
+                    className="ml-auto text-[#F5F5DC]/50 hover:text-[#F5F5DC] transition"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                {/* Ticket Card */}
+                <div 
+                  ref={ticketRef} 
+                  className="bg-[#1A1A1A] rounded-2xl overflow-hidden border border-[#2A2A2A]"
+                >
+                  {/* Event Title Section */}
+                  <div className="p-5 text-center border-b border-[#2A2A2A]">
+                    <h3 className="text-xl font-bold text-[#F5F5DC]">{bookingDetails.eventTitle}</h3>
+                    {event?.category && (
+                      <p className="text-sm text-[#F5F5DC]/50 mt-1">{event.category}</p>
+                    )}
+                  </div>
+
+                  {/* QR Code Section */}
+                  <div className="p-6 flex justify-center">
+                    <div className="bg-white p-4 rounded-xl">
+                      <QRCodeCanvas
+                        bookingId={bookingDetails.bookingId}
+                        eventTitle={bookingDetails.eventTitle}
+                        tickets={bookingDetails.tickets}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Ticket Info Row */}
+                  <div className="px-5 pb-5">
+                    <div className="flex gap-4">
+                      {/* Left: Details */}
+                      <div className="flex-1 space-y-2">
+                        <p className="text-sm text-[#F5F5DC]">
+                          {bookingDetails.eventDate}, {bookingDetails.eventTime}
+                        </p>
+                        <p className="text-sm text-[#F5F5DC]/60">
+                          {bookingDetails.tickets.reduce((sum, t) => sum + t.quantity, 0)} ticket
+                          {bookingDetails.tickets.reduce((sum, t) => sum + t.quantity, 0) > 1 ? 's' : ''}
+                        </p>
+                        {bookingDetails.tickets.map((ticket, idx) => (
+                          <p key={idx} className="text-sm font-semibold text-[#E5A823]">
+                            {ticket.name}
+                          </p>
+                        ))}
+                        <p className="text-sm text-[#F5F5DC]/80 font-medium">
+                          {bookingDetails.venue}
+                        </p>
                       </div>
-                      <div>
-                        <h2 className="text-xl font-bold text-[#0D0D0D]">Payment Successful!</h2>
-                        <p className="text-sm text-[#0D0D0D]/80">Your tickets are confirmed</p>
+
+                      {/* Right: Event Image */}
+                      <div className="w-20 h-28 flex-shrink-0">
+                        {event?.images?.[0] ? (
+                          <img 
+                            src={event.images[0]} 
+                            alt={event.title}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-[#2A2A2A] rounded-lg flex items-center justify-center">
+                            <Ticket className="w-8 h-8 text-[#F5F5DC]/30" />
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <button
-                      onClick={() => setShowSuccessModal(false)}
-                      className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
-                    >
-                      <X className="w-5 h-5 text-[#0D0D0D]" />
-                    </button>
+
+                    {/* Booking Code & ID */}
+                    <div className="mt-4 pt-4 border-t border-[#2A2A2A] text-center space-y-1">
+                      <p className="text-xs text-[#F5F5DC]/40">Booking code: {bookingDetails.bookingId.slice(0, 8).toUpperCase()}</p>
+                      <p className="text-xs text-[#F5F5DC]/40">Booking ID: {bookingDetails.paymentId}</p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Ticket Content - Scrollable */}
-                <div ref={ticketRef} className="p-6 space-y-6 overflow-y-auto scrollbar-hide" style={{ maxHeight: 'calc(90vh - 200px)' }}>
-                  {/* QR Code Section */}
-                  <div className="bg-[#0D0D0D] rounded-xl p-4 border border-[#2A2A2A]">
-                    <div className="text-center">
-                      <p className="text-xs text-[#F5F5DC]/60 mb-3">Scan at venue entry</p>
-                      <div className="bg-white p-3 rounded-lg inline-block">
-                        <QRCodeCanvas
-                          bookingId={bookingDetails.bookingId}
-                          eventTitle={bookingDetails.eventTitle}
-                          tickets={bookingDetails.tickets}
-                        />
-                      </div>
-                      <p className="text-xs text-[#F5F5DC]/40 mt-3 font-mono">{bookingDetails.bookingId}</p>
-                    </div>
-                  </div>
-
-                  {/* Event Details */}
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-bold text-[#F5F5DC]">{bookingDetails.eventTitle}</h3>
-                    <div className="flex items-center gap-2 text-sm text-[#F5F5DC]/70">
-                      <Calendar className="w-4 h-4 text-[#E5A823]" />
-                      <span>{bookingDetails.eventDate} • {bookingDetails.eventTime}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-[#F5F5DC]/70">
-                      <MapPin className="w-4 h-4 text-[#E5A823]" />
-                      <span>{bookingDetails.venue}</span>
-                    </div>
-                  </div>
-
-                  {/* Ticket Details */}
-                  <div className="bg-[#2A2A2A] rounded-lg p-4 space-y-3">
-                    <h4 className="text-sm font-semibold text-[#F5F5DC] flex items-center gap-2">
-                      <Ticket className="w-4 h-4 text-[#E5A823]" />
-                      Ticket Details
-                    </h4>
-                    {bookingDetails.tickets.map((ticket, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-sm">
-                        <span className="text-[#F5F5DC]/70">{ticket.name} x {ticket.quantity}</span>
-                        <span className="text-[#F5F5DC] font-semibold">₹{(ticket.price * ticket.quantity).toFixed(2)}</span>
-                      </div>
-                    ))}
-                    <div className="border-t border-[#3A3A3A] pt-3 mt-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[#F5F5DC]/60 text-sm">Total Paid</span>
-                        <span className="text-[#E5A823] font-bold text-lg">₹{bookingDetails.totalAmount.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Booking Info */}
-                  <div className="space-y-2 text-xs text-[#F5F5DC]/50">
-                    <p>Booked by: {bookingDetails.userName}</p>
-                    <p>Email: {bookingDetails.userEmail}</p>
-                    <p>Booking ID: {bookingDetails.bookingId}</p>
-                    <p>Payment ID: {bookingDetails.paymentId}</p>
-                    <p>Booked on: {new Date(bookingDetails.bookedAt).toLocaleString('en-IN')}</p>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-3 p-6 pt-0">
-                    <button
-                      onClick={downloadTicket}
-                      className="flex-1 py-3 bg-[#2A2A2A] text-[#F5F5DC] font-semibold rounded-lg hover:bg-[#3A3A3A] transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download Ticket
-                    </button>
-                    <button
-                      onClick={() => setShowSuccessModal(false)}
-                      className="flex-1 py-3 bg-gradient-to-r from-[#E5A823] to-[#EB4D4B] text-[#0D0D0D] font-semibold rounded-lg hover:from-[#F5C542] hover:to-[#FF6B6B] transition-colors"
-                    >
-                      Done
-                    </button>
-                  </div>
+                {/* Share Button */}
+                <div className="mt-6">
+                  <button
+                    onClick={downloadTicket}
+                    className="w-full py-4 bg-transparent border border-[#F5F5DC]/30 rounded-full text-[#F5F5DC] font-semibold flex items-center justify-center gap-2 hover:bg-[#F5F5DC]/5 transition"
+                  >
+                    <Download className="w-5 h-5" />
+                    Download Ticket
+                  </button>
                 </div>
               </motion.div>
             </motion.div>
