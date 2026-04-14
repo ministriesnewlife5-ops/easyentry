@@ -3,20 +3,12 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Mic2, 
-  Building2, 
-  Megaphone, 
   Shield,
   User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Briefcase, 
   FileText, 
   CheckCircle2,
   AlertCircle,
   Loader2,
-  ChevronDown,
   Sparkles,
   Eye,
   EyeOff
@@ -51,20 +43,6 @@ export default function AdminOnboardingSection() {
     password: '',
     socialMedia: '',
     bio: '',
-    // Artist specific
-    stageName: '',
-    genre: '',
-    experience: '',
-    portfolio: '',
-    // Promoter specific
-    companyName: '',
-    website: '',
-    experienceYears: '',
-    // Outlet specific
-    venueName: '',
-    venueType: '',
-    location: '',
-    capacity: '',
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -89,17 +67,6 @@ export default function AdminOnboardingSection() {
       password: '',
       socialMedia: '',
       bio: '',
-      stageName: '',
-      genre: '',
-      experience: '',
-      portfolio: '',
-      companyName: '',
-      website: '',
-      experienceYears: '',
-      venueName: '',
-      venueType: '',
-      location: '',
-      capacity: '',
     });
   };
 
@@ -108,20 +75,6 @@ export default function AdminOnboardingSection() {
     
     if (!formData.fullName || !formData.email || !formData.password) {
       setMessage({ type: 'error', text: 'Please fill in all required fields (Full Name, Email, Password)' });
-      return;
-    }
-
-    // Role-specific validation
-    if (selectedRole === 'artist' && !formData.stageName) {
-      setMessage({ type: 'error', text: 'Stage name is required for artists' });
-      return;
-    }
-    if (selectedRole === 'promoter' && !formData.companyName) {
-      setMessage({ type: 'error', text: 'Company name is required for promoters' });
-      return;
-    }
-    if (selectedRole === 'outlet' && (!formData.venueName || !formData.location)) {
-      setMessage({ type: 'error', text: 'Venue name and location are required for outlet providers' });
       return;
     }
     
@@ -337,250 +290,23 @@ export default function AdminOnboardingSection() {
               </div>
             </motion.div>
 
-            {/* Role-specific Fields */}
-            <AnimatePresence mode="wait">
-              {selectedRole === 'artist' && (
-                <motion.div 
-                  key="artist"
-                  className="bg-gradient-to-br from-[#1A1A1A] to-[#141414] rounded-2xl border border-[#2A2A2A] overflow-hidden"
-                  variants={sectionVariants}
-                  initial="hidden"
-                  animate="visible"
-                  exit={{ opacity: 0, y: -20 }}
-                >
-                  <div className="p-5 border-b border-[#2A2A2A] bg-[#1A1A1A]/50">
-                    <div className="flex items-center gap-2">
-                      <Mic2 className="w-5 h-5 text-[#E5A823]" />
-                      <h2 className="font-semibold text-[#F5F5DC]">Artist Information</h2>
-                    </div>
-                  </div>
-                  <div className="p-5 space-y-5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Stage Name *</label>
-                        <input
-                          type="text"
-                          name="stageName"
-                          value={formData.stageName}
-                          onChange={handleInputChange}
-                          required
-                          className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
-                          placeholder="Artist stage name"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Genre *</label>
-                        <div className="relative">
-                          <select
-                            name="genre"
-                            value={formData.genre}
-                            onChange={handleInputChange}
-                            required
-                            className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] appearance-none cursor-pointer transition-all"
-                          >
-                            <option value="">Select genre</option>
-                            <option value="Electronic">Electronic</option>
-                            <option value="Hip Hop">Hip Hop</option>
-                            <option value="Rock">Rock</option>
-                            <option value="Pop">Pop</option>
-                            <option value="Jazz">Jazz</option>
-                            <option value="Classical">Classical</option>
-                            <option value="Bollywood">Bollywood</option>
-                            <option value="Commercial">Commercial</option>
-                            <option value="EDM">EDM</option>
-                            <option value="Techno">Techno</option>
-                            <option value="House">House</option>
-                            <option value="Other">Other</option>
-                          </select>
-                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/40 pointer-events-none" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Years of Experience</label>
-                        <input
-                          type="number"
-                          name="experience"
-                          value={formData.experience}
-                          onChange={handleInputChange}
-                          className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
-                          placeholder="Years performing"
-                          min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Portfolio/Website</label>
-                        <input
-                          type="url"
-                          name="portfolio"
-                          value={formData.portfolio}
-                          onChange={handleInputChange}
-                          className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
-                          placeholder="https://artist-website.com"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {selectedRole === 'promoter' && (
-                <motion.div 
-                  key="promoter"
-                  className="bg-gradient-to-br from-[#1A1A1A] to-[#141414] rounded-2xl border border-[#2A2A2A] overflow-hidden"
-                  variants={sectionVariants}
-                  initial="hidden"
-                  animate="visible"
-                  exit={{ opacity: 0, y: -20 }}
-                >
-                  <div className="p-5 border-b border-[#2A2A2A] bg-[#1A1A1A]/50">
-                    <div className="flex items-center gap-2">
-                      <Megaphone className="w-5 h-5 text-[#EB4D4B]" />
-                      <h2 className="font-semibold text-[#F5F5DC]">Promoter Information</h2>
-                    </div>
-                  </div>
-                  <div className="p-5 space-y-5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Company/Organization Name *</label>
-                        <input
-                          type="text"
-                          name="companyName"
-                          value={formData.companyName}
-                          onChange={handleInputChange}
-                          required
-                          className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
-                          placeholder="Company name"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Website</label>
-                        <input
-                          type="url"
-                          name="website"
-                          value={formData.website}
-                          onChange={handleInputChange}
-                          className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
-                          placeholder="https://company-website.com"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Years of Experience</label>
-                        <input
-                          type="number"
-                          name="experienceYears"
-                          value={formData.experienceYears}
-                          onChange={handleInputChange}
-                          className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
-                          placeholder="Years in promotion"
-                          min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Notable Events/Past Work</label>
-                        <input
-                          type="text"
-                          name="portfolio"
-                          value={formData.portfolio}
-                          onChange={handleInputChange}
-                          className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
-                          placeholder="Major events promoted"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {selectedRole === 'outlet' && (
-                <motion.div 
-                  key="outlet"
-                  className="bg-gradient-to-br from-[#1A1A1A] to-[#141414] rounded-2xl border border-[#2A2A2A] overflow-hidden"
-                  variants={sectionVariants}
-                  initial="hidden"
-                  animate="visible"
-                  exit={{ opacity: 0, y: -20 }}
-                >
-                  <div className="p-5 border-b border-[#2A2A2A] bg-[#1A1A1A]/50">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-[#10B981]" />
-                      <h2 className="font-semibold text-[#F5F5DC]">Venue Information</h2>
-                    </div>
-                  </div>
-                  <div className="p-5 space-y-5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Venue Name *</label>
-                        <input
-                          type="text"
-                          name="venueName"
-                          value={formData.venueName}
-                          onChange={handleInputChange}
-                          required
-                          className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
-                          placeholder="Venue name"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Venue Type *</label>
-                        <input
-                          type="text"
-                          name="venueType"
-                          value={formData.venueType}
-                          onChange={handleInputChange}
-                          required
-                          className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
-                          placeholder="e.g. Nightclub, Bar, Theater, Arena"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Location/Address *</label>
-                      <div className="relative">
-                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#E5A823]" />
-                        <input
-                          type="text"
-                          name="location"
-                          value={formData.location}
-                          onChange={handleInputChange}
-                          required
-                          className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl pl-12 pr-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
-                          placeholder="Full address"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Capacity</label>
-                        <input
-                          type="number"
-                          name="capacity"
-                          value={formData.capacity}
-                          onChange={handleInputChange}
-                          className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
-                          placeholder="Maximum capacity"
-                          min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Website</label>
-                        <input
-                          type="url"
-                          name="website"
-                          value={formData.website}
-                          onChange={handleInputChange}
-                          className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
-                          placeholder="https://venue-website.com"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <motion.div 
+              className="bg-gradient-to-br from-[#1A1A1A] to-[#141414] rounded-2xl border border-[#2A2A2A] overflow-hidden"
+              variants={sectionVariants}
+              initial="hidden"
+              animate="visible"
+            >
+              <div className="p-5 border-b border-[#2A2A2A] bg-[#1A1A1A]/50">
+                <h2 className="font-semibold text-[#F5F5DC]">Sub-Admin Permissions</h2>
+              </div>
+              <div className="p-5">
+                <ul className="text-sm text-[#F5F5DC]/80 space-y-2 list-disc list-inside">
+                  <li>Approve events</li>
+                  <li>Edit and delete events</li>
+                  <li>Approve seller, artist, and influencer onboarding requests</li>
+                </ul>
+              </div>
+            </motion.div>
 
             {/* Bio Section */}
             <motion.div 
@@ -656,38 +382,6 @@ export default function AdminOnboardingSection() {
                       </span>
                       Password
                     </li>
-                    {selectedRole === 'artist' && (
-                      <li className="flex items-center gap-2">
-                        <span className={formData.stageName ? 'text-emerald-400' : 'text-[#E5A823]'}>
-                          {formData.stageName ? '✓' : '•'}
-                        </span>
-                        Stage Name
-                      </li>
-                    )}
-                    {selectedRole === 'promoter' && (
-                      <li className="flex items-center gap-2">
-                        <span className={formData.companyName ? 'text-emerald-400' : 'text-[#E5A823]'}>
-                          {formData.companyName ? '✓' : '•'}
-                        </span>
-                        Company Name
-                      </li>
-                    )}
-                    {selectedRole === 'outlet' && (
-                      <>
-                        <li className="flex items-center gap-2">
-                          <span className={formData.venueName ? 'text-emerald-400' : 'text-[#E5A823]'}>
-                            {formData.venueName ? '✓' : '•'}
-                          </span>
-                          Venue Name
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <span className={formData.location ? 'text-emerald-400' : 'text-[#E5A823]'}>
-                            {formData.location ? '✓' : '•'}
-                          </span>
-                          Location
-                        </li>
-                      </>
-                    )}
                   </ul>
                 </div>
 
