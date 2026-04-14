@@ -77,6 +77,7 @@ export default async function AdminPage({
     date: event.date,
     time: event.time,
     category: event.category,
+    subcategory: event.subcategory,
     price: event.price,
   }));
 

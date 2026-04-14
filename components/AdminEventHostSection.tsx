@@ -140,6 +140,16 @@ export default function AdminEventHostSection() {
   const [categories, setCategories] = useState<BrowseCategory[]>([]);
   
   const [ticketCategories, setTicketCategories] = useState<TicketCategory[]>([]);
+  const [promoForm, setPromoForm] = useState({
+    couponCode: '',
+    couponDiscountPercent: '',
+    sourceType: 'outlet' as 'outlet' | 'artist' | 'promoter' | 'influencer',
+    sourceRefId: '',
+    sourceRefName: '',
+    startsAt: '',
+    endsAt: '',
+    maxUses: '',
+  });
   const [rules, setRules] = useState<Array<{ id: string; text: string }>>([{ id: '1', text: '' }]);
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [coverImageUrl, setCoverImageUrl] = useState<string>('');
@@ -271,6 +281,18 @@ export default function AdminEventHostSection() {
     const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
     setFormData((prev) => ({ ...prev, googleMapsLink: mapsUrl }));
   };
+
+  const handlePromoInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setPromoForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const generateUniqueCode = () => {
+    const prefix = 'ADMIN';
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const code = `${prefix}${random}`;
+    setPromoForm((prev) => ({ ...prev, couponCode: code }));
+  };
   
   const addTicketCategory = () => {
     const newCategory: TicketCategory = {
@@ -315,6 +337,36 @@ export default function AdminEventHostSection() {
       });
       return;
     }
+
+    if (promoForm.couponCode && !promoForm.couponDiscountPercent) {
+      setMessage({ type: 'error', text: 'Please enter a discount percentage for the coupon code.' });
+      return;
+    }
+
+    if (promoForm.couponDiscountPercent) {
+      const parsedDiscount = Number(promoForm.couponDiscountPercent);
+      if (!Number.isFinite(parsedDiscount) || parsedDiscount <= 0 || parsedDiscount > 100) {
+        setMessage({ type: 'error', text: 'Coupon discount percentage must be between 1 and 100.' });
+        return;
+      }
+    }
+
+    if (promoForm.maxUses) {
+      const parsedMaxUses = Number(promoForm.maxUses);
+      if (!Number.isInteger(parsedMaxUses) || parsedMaxUses <= 0) {
+        setMessage({ type: 'error', text: 'Coupon max uses must be a positive whole number.' });
+        return;
+      }
+    }
+
+    if (promoForm.startsAt && promoForm.endsAt) {
+      const startAt = new Date(promoForm.startsAt).getTime();
+      const endAt = new Date(promoForm.endsAt).getTime();
+      if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
+        setMessage({ type: 'error', text: 'Coupon end time must be after start time.' });
+        return;
+      }
+    }
     
     setSubmitting(true);
     
@@ -345,6 +397,20 @@ export default function AdminEventHostSection() {
         layout: formData.layout,
         seating: formData.seating,
         rules: rules.filter(r => r.text.trim()).map(r => r.text),
+        couponRules: promoForm.couponCode
+          ? [
+              {
+                code: promoForm.couponCode.trim().toUpperCase(),
+                discountPercent: Number(promoForm.couponDiscountPercent || 0),
+                sourceType: promoForm.sourceType,
+                sourceId: promoForm.sourceRefId || undefined,
+                sourceName: promoForm.sourceRefName || undefined,
+                startsAt: promoForm.startsAt || undefined,
+                endsAt: promoForm.endsAt || undefined,
+                maxUses: promoForm.maxUses ? Number(promoForm.maxUses) : undefined,
+              },
+            ]
+          : undefined,
         ticketCategories: ticketCategories.map(cat => ({
           ...cat,
           availableFrom: cat.availableFromDate && cat.availableFromTime 
@@ -395,6 +461,16 @@ export default function AdminEventHostSection() {
         setCoverImageUrl('');
         setMediaFiles([]);
         setMediaFileUrls([]);
+        setPromoForm({
+          couponCode: '',
+          couponDiscountPercent: '',
+          sourceType: 'outlet',
+          sourceRefId: '',
+          sourceRefName: '',
+          startsAt: '',
+          endsAt: '',
+          maxUses: '',
+        });
       } else {
         const error = await response.json();
         setMessage({ type: 'error', text: error.error || 'Failed to create event' });
@@ -508,6 +584,14 @@ export default function AdminEventHostSection() {
                       setSelectedCompany(company || null);
                       if (company?.location) {
                         setFormData(prev => ({ ...prev, location: company.location! }));
+                      }
+                      if (company) {
+                        setPromoForm((prev) => ({
+                          ...prev,
+                          sourceType: company.type === 'promoter' ? 'promoter' : 'outlet',
+                          sourceRefId: company.ownerId || company.id,
+                          sourceRefName: company.name,
+                        }));
                       }
                     }}
                     className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] appearance-none cursor-pointer transition-all"
@@ -958,6 +1042,139 @@ export default function AdminEventHostSection() {
                     ))}
                   </div>
                 )}
+              </div>
+            </motion.div>
+
+            {/* Coupon Configuration Card */}
+            <motion.div
+              className="bg-gradient-to-br from-[#1A1A1A] to-[#141414] rounded-2xl border border-[#2A2A2A] overflow-hidden"
+              variants={sectionVariants}
+              initial="hidden"
+              animate="visible"
+              transition={{ delay: 0.35 }}
+            >
+              <div className="p-5 border-b border-[#2A2A2A] bg-[#1A1A1A]/50">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Tag className="w-5 h-5 text-[#E5A823]" />
+                    <h2 className="font-semibold text-[#F5F5DC]">Coupon Configuration</h2>
+                    <span className="text-xs text-[#F5F5DC]/45">Optional</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={generateUniqueCode}
+                    className="px-3 py-1.5 text-xs rounded-lg bg-[#E5A823]/20 text-[#E5A823] hover:bg-[#E5A823]/30 transition-colors"
+                  >
+                    Generate Code
+                  </button>
+                </div>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Coupon Code</label>
+                    <input
+                      type="text"
+                      name="couponCode"
+                      value={promoForm.couponCode}
+                      onChange={(e) =>
+                        setPromoForm((prev) => ({
+                          ...prev,
+                          couponCode: e.target.value.toUpperCase().replace(/\s+/g, ''),
+                        }))
+                      }
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all"
+                      placeholder="e.g. ADMIN20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Discount %</label>
+                    <input
+                      type="number"
+                      name="couponDiscountPercent"
+                      value={promoForm.couponDiscountPercent}
+                      onChange={handlePromoInputChange}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all"
+                      min={1}
+                      max={100}
+                      placeholder="e.g. 20"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Source Type</label>
+                    <select
+                      name="sourceType"
+                      value={promoForm.sourceType}
+                      onChange={handlePromoInputChange}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all"
+                    >
+                      <option value="outlet">Outlet</option>
+                      <option value="artist">Artist</option>
+                      <option value="promoter">Promoter</option>
+                      <option value="influencer">Influencer</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Source Ref ID</label>
+                    <input
+                      type="text"
+                      name="sourceRefId"
+                      value={promoForm.sourceRefId}
+                      onChange={handlePromoInputChange}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all"
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Source Name</label>
+                    <input
+                      type="text"
+                      name="sourceRefName"
+                      value={promoForm.sourceRefName}
+                      onChange={handlePromoInputChange}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all"
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Starts At</label>
+                    <input
+                      type="datetime-local"
+                      name="startsAt"
+                      value={promoForm.startsAt}
+                      onChange={handlePromoInputChange}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all [color-scheme:dark]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Ends At</label>
+                    <input
+                      type="datetime-local"
+                      name="endsAt"
+                      value={promoForm.endsAt}
+                      onChange={handlePromoInputChange}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all [color-scheme:dark]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Max Uses</label>
+                    <input
+                      type="number"
+                      name="maxUses"
+                      value={promoForm.maxUses}
+                      onChange={handlePromoInputChange}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all"
+                      min={1}
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
               </div>
             </motion.div>
 

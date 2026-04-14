@@ -54,8 +54,17 @@ type OutletEventEditForm = {
   time: string;
   venue: string;
   category: string;
+  subcategory: string;
   price: string;
   description: string;
+  couponCode: string;
+  couponDiscountPercent: string;
+  couponSourceType: 'outlet' | 'artist' | 'promoter' | 'influencer';
+  couponSourceId: string;
+  couponSourceName: string;
+  couponStartsAt: string;
+  couponEndsAt: string;
+  couponMaxUses: string;
 };
 
 function OutletProfileContent() {
@@ -77,8 +86,17 @@ function OutletProfileContent() {
     time: '',
     venue: '',
     category: '',
+    subcategory: '',
     price: '',
     description: '',
+    couponCode: '',
+    couponDiscountPercent: '',
+    couponSourceType: 'outlet',
+    couponSourceId: '',
+    couponSourceName: '',
+    couponStartsAt: '',
+    couponEndsAt: '',
+    couponMaxUses: '',
   });
   const [eventsData, setEventsData] = useState<OutletEventsResponse>({
     upcomingEvents: [],
@@ -391,7 +409,7 @@ function OutletProfileContent() {
     }
   };
 
-  const openEventEditModal = (event: OutletEventItem) => {
+  const openEventEditModal = async (event: OutletEventItem) => {
     if (!event.publicEventId) {
       setMessage({ type: 'error', text: 'This event is not published yet and cannot be edited.' });
       return;
@@ -405,9 +423,41 @@ function OutletProfileContent() {
       time: event.time || '',
       venue: event.venue || '',
       category: event.category || '',
+      subcategory: '',
       price: event.price || '',
       description: event.description || '',
+      couponCode: '',
+      couponDiscountPercent: '',
+      couponSourceType: 'outlet',
+      couponSourceId: '',
+      couponSourceName: '',
+      couponStartsAt: '',
+      couponEndsAt: '',
+      couponMaxUses: '',
     });
+
+    try {
+      const response = await fetch(`/api/events/${event.publicEventId}`);
+      if (!response.ok) return;
+      const payload = await response.json();
+      const eventData = payload?.event;
+      const firstRule = Array.isArray(eventData?.couponRules) ? eventData.couponRules[0] : null;
+
+      setEventEditForm((prev) => ({
+        ...prev,
+        subcategory: typeof eventData?.subcategory === 'string' ? eventData.subcategory : '',
+        couponCode: firstRule?.code || '',
+        couponDiscountPercent: firstRule?.discountPercent != null ? String(firstRule.discountPercent) : '',
+        couponSourceType: firstRule?.sourceType || 'outlet',
+        couponSourceId: firstRule?.sourceId || '',
+        couponSourceName: firstRule?.sourceName || '',
+        couponStartsAt: firstRule?.startsAt ? String(firstRule.startsAt).slice(0, 16) : '',
+        couponEndsAt: firstRule?.endsAt ? String(firstRule.endsAt).slice(0, 16) : '',
+        couponMaxUses: firstRule?.maxUses != null ? String(firstRule.maxUses) : '',
+      }));
+    } catch {
+      // no-op fallback
+    }
   };
 
   const saveEventEdit = async () => {
@@ -415,12 +465,30 @@ function OutletProfileContent() {
 
     setIsSavingEventEdit(true);
     try {
+      const payloadBody = {
+        ...eventEditForm,
+        couponRules: eventEditForm.couponCode
+          ? [
+              {
+                code: eventEditForm.couponCode.trim().toUpperCase(),
+                discountPercent: Number(eventEditForm.couponDiscountPercent || 0),
+                sourceType: eventEditForm.couponSourceType,
+                sourceId: eventEditForm.couponSourceId || undefined,
+                sourceName: eventEditForm.couponSourceName || undefined,
+                startsAt: eventEditForm.couponStartsAt || undefined,
+                endsAt: eventEditForm.couponEndsAt || undefined,
+                maxUses: eventEditForm.couponMaxUses ? Number(eventEditForm.couponMaxUses) : undefined,
+              },
+            ]
+          : [],
+      };
+
       const response = await fetch(`/api/events/${editingEvent.publicEventId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(eventEditForm),
+        body: JSON.stringify(payloadBody),
       });
 
       const payload = await response.json();
@@ -1105,12 +1173,75 @@ function OutletProfileContent() {
                 className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
               />
               <input
+                value={eventEditForm.subcategory}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, subcategory: e.target.value }))}
+                placeholder="Subcategory"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
+              <input
                 value={eventEditForm.price}
                 onChange={(e) => setEventEditForm((prev) => ({ ...prev, price: e.target.value }))}
                 placeholder="Price (e.g. ₹999)"
                 className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
               />
-              <div />
+
+              <input
+                value={eventEditForm.couponCode}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponCode: e.target.value.toUpperCase().replace(/\s+/g, '') }))}
+                placeholder="Coupon Code"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
+              <input
+                type="number"
+                value={eventEditForm.couponDiscountPercent}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponDiscountPercent: e.target.value }))}
+                placeholder="Coupon Discount %"
+                min={1}
+                max={100}
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
+              <select
+                value={eventEditForm.couponSourceType}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponSourceType: e.target.value as OutletEventEditForm['couponSourceType'] }))}
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              >
+                <option value="outlet">Outlet</option>
+                <option value="artist">Artist</option>
+                <option value="promoter">Promoter</option>
+                <option value="influencer">Influencer</option>
+              </select>
+              <input
+                value={eventEditForm.couponSourceId}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponSourceId: e.target.value }))}
+                placeholder="Coupon Source ID"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
+              <input
+                value={eventEditForm.couponSourceName}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponSourceName: e.target.value }))}
+                placeholder="Coupon Source Name"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
+              <input
+                type="datetime-local"
+                value={eventEditForm.couponStartsAt}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponStartsAt: e.target.value }))}
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2 [color-scheme:dark]"
+              />
+              <input
+                type="datetime-local"
+                value={eventEditForm.couponEndsAt}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponEndsAt: e.target.value }))}
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2 [color-scheme:dark]"
+              />
+              <input
+                type="number"
+                value={eventEditForm.couponMaxUses}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponMaxUses: e.target.value }))}
+                placeholder="Coupon Max Uses"
+                min={1}
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
               <textarea
                 value={eventEditForm.description}
                 onChange={(e) => setEventEditForm((prev) => ({ ...prev, description: e.target.value }))}

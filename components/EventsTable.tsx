@@ -12,8 +12,20 @@ interface Event {
   date: string;
   time?: string;
   category?: string;
+  subcategory?: string;
   price?: string;
 }
+
+type CouponRuleForm = {
+  code: string;
+  discountPercent: string;
+  sourceType: 'outlet' | 'artist' | 'promoter' | 'influencer';
+  sourceId: string;
+  sourceName: string;
+  startsAt: string;
+  endsAt: string;
+  maxUses: string;
+};
 
 interface EventsTableProps {
   events: Event[];
@@ -31,7 +43,18 @@ export default function EventsTable({ events }: EventsTableProps) {
     time: '',
     venue: '',
     category: '',
+    subcategory: '',
     price: '',
+  });
+  const [couponForm, setCouponForm] = useState<CouponRuleForm>({
+    code: '',
+    discountPercent: '',
+    sourceType: 'outlet',
+    sourceId: '',
+    sourceName: '',
+    startsAt: '',
+    endsAt: '',
+    maxUses: '',
   });
 
   const handleAction = async (id: string, action: 'archive' | 'delete') => {
@@ -56,7 +79,7 @@ export default function EventsTable({ events }: EventsTableProps) {
     }
   };
 
-  const openEditModal = (event: Event) => {
+  const openEditModal = async (event: Event) => {
     setEditingEvent(event);
     setEditForm({
       title: event.name || '',
@@ -64,8 +87,50 @@ export default function EventsTable({ events }: EventsTableProps) {
       time: event.time || '',
       venue: event.location || '',
       category: event.category || '',
+      subcategory: event.subcategory || '',
       price: event.price || '',
     });
+
+    setCouponForm({
+      code: '',
+      discountPercent: '',
+      sourceType: 'outlet',
+      sourceId: '',
+      sourceName: '',
+      startsAt: '',
+      endsAt: '',
+      maxUses: '',
+    });
+
+    try {
+      const response = await fetch(`/api/events/${event.id}`);
+      if (!response.ok) return;
+      const payload = await response.json();
+      const eventData = payload?.event;
+      if (!eventData) return;
+
+      const firstRule = Array.isArray(eventData.couponRules) ? eventData.couponRules[0] : null;
+
+      setEditForm((prev) => ({
+        ...prev,
+        subcategory: typeof eventData.subcategory === 'string' ? eventData.subcategory : prev.subcategory,
+      }));
+
+      if (firstRule) {
+        setCouponForm({
+          code: firstRule.code || '',
+          discountPercent: String(firstRule.discountPercent ?? ''),
+          sourceType: firstRule.sourceType || 'outlet',
+          sourceId: firstRule.sourceId || '',
+          sourceName: firstRule.sourceName || '',
+          startsAt: firstRule.startsAt ? String(firstRule.startsAt).slice(0, 16) : '',
+          endsAt: firstRule.endsAt ? String(firstRule.endsAt).slice(0, 16) : '',
+          maxUses: firstRule.maxUses != null ? String(firstRule.maxUses) : '',
+        });
+      }
+    } catch {
+      // No-op fallback to existing values
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -82,7 +147,22 @@ export default function EventsTable({ events }: EventsTableProps) {
           time: editForm.time,
           venue: editForm.venue,
           category: editForm.category,
+          subcategory: editForm.subcategory,
           price: editForm.price,
+          couponRules: couponForm.code
+            ? [
+                {
+                  code: couponForm.code.trim().toUpperCase(),
+                  discountPercent: Number(couponForm.discountPercent || 0),
+                  sourceType: couponForm.sourceType,
+                  sourceId: couponForm.sourceId || undefined,
+                  sourceName: couponForm.sourceName || undefined,
+                  startsAt: couponForm.startsAt || undefined,
+                  endsAt: couponForm.endsAt || undefined,
+                  maxUses: couponForm.maxUses ? Number(couponForm.maxUses) : undefined,
+                },
+              ]
+            : [],
         }),
       });
 
@@ -100,6 +180,7 @@ export default function EventsTable({ events }: EventsTableProps) {
                 time: editForm.time,
                 location: editForm.venue,
                 category: editForm.category,
+                subcategory: editForm.subcategory,
                 price: editForm.price,
               }
             : item
@@ -257,9 +338,73 @@ export default function EventsTable({ events }: EventsTableProps) {
                 className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
               />
               <input
+                value={editForm.subcategory}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, subcategory: e.target.value }))}
+                placeholder="Subcategory"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
+              />
+              <input
                 value={editForm.price}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, price: e.target.value }))}
                 placeholder="Price (e.g. ₹999)"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
+              />
+
+              <input
+                value={couponForm.code}
+                onChange={(e) => setCouponForm((prev) => ({ ...prev, code: e.target.value.toUpperCase().replace(/\s+/g, '') }))}
+                placeholder="Coupon Code"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
+              />
+              <input
+                type="number"
+                value={couponForm.discountPercent}
+                onChange={(e) => setCouponForm((prev) => ({ ...prev, discountPercent: e.target.value }))}
+                placeholder="Coupon Discount %"
+                min={1}
+                max={100}
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
+              />
+              <select
+                value={couponForm.sourceType}
+                onChange={(e) => setCouponForm((prev) => ({ ...prev, sourceType: e.target.value as CouponRuleForm['sourceType'] }))}
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
+              >
+                <option value="outlet">Outlet</option>
+                <option value="artist">Artist</option>
+                <option value="promoter">Promoter</option>
+                <option value="influencer">Influencer</option>
+              </select>
+              <input
+                value={couponForm.sourceId}
+                onChange={(e) => setCouponForm((prev) => ({ ...prev, sourceId: e.target.value }))}
+                placeholder="Coupon Source ID"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
+              />
+              <input
+                value={couponForm.sourceName}
+                onChange={(e) => setCouponForm((prev) => ({ ...prev, sourceName: e.target.value }))}
+                placeholder="Coupon Source Name"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
+              />
+              <input
+                type="datetime-local"
+                value={couponForm.startsAt}
+                onChange={(e) => setCouponForm((prev) => ({ ...prev, startsAt: e.target.value }))}
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2 [color-scheme:dark]"
+              />
+              <input
+                type="datetime-local"
+                value={couponForm.endsAt}
+                onChange={(e) => setCouponForm((prev) => ({ ...prev, endsAt: e.target.value }))}
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2 [color-scheme:dark]"
+              />
+              <input
+                type="number"
+                value={couponForm.maxUses}
+                onChange={(e) => setCouponForm((prev) => ({ ...prev, maxUses: e.target.value }))}
+                placeholder="Coupon Max Uses"
+                min={1}
                 className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
               />
             </div>

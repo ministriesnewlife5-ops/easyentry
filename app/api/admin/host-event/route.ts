@@ -40,6 +40,75 @@ type HostEventTicketCategory = {
   availableUntil?: string;
 };
 
+type HostEventCouponRule = {
+  code: string;
+  discountPercent: number;
+  sourceType: 'outlet' | 'artist' | 'promoter' | 'influencer';
+  sourceId?: string;
+  sourceName?: string;
+  startsAt?: string;
+  endsAt?: string;
+  maxUses?: number;
+};
+
+function normalizeCouponRules(value: unknown): { rules: HostEventCouponRule[]; error?: string } {
+  if (!Array.isArray(value)) {
+    return { rules: [] };
+  }
+
+  const normalized: HostEventCouponRule[] = [];
+
+  for (const rawRule of value as Array<Record<string, unknown>>) {
+    const code = normalizeText(rawRule.code).toUpperCase();
+    const discountPercent = Number(rawRule.discountPercent || 0);
+    const sourceType = normalizeText(rawRule.sourceType);
+    const startsAt = normalizeText(rawRule.startsAt);
+    const endsAt = normalizeText(rawRule.endsAt);
+    const maxUses = rawRule.maxUses == null ? undefined : Number(rawRule.maxUses);
+
+    if (!code) {
+      return { rules: [], error: 'Each coupon rule must have a coupon code.' };
+    }
+
+    if (!Number.isFinite(discountPercent) || discountPercent <= 0 || discountPercent > 100) {
+      return { rules: [], error: `Coupon ${code} must have discount percent between 1 and 100.` };
+    }
+
+    if (!['outlet', 'artist', 'promoter', 'influencer'].includes(sourceType)) {
+      return { rules: [], error: `Coupon ${code} has an invalid source type.` };
+    }
+
+    if (startsAt && Number.isNaN(new Date(startsAt).getTime())) {
+      return { rules: [], error: `Coupon ${code} has an invalid start time.` };
+    }
+
+    if (endsAt && Number.isNaN(new Date(endsAt).getTime())) {
+      return { rules: [], error: `Coupon ${code} has an invalid end time.` };
+    }
+
+    if (startsAt && endsAt && new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+      return { rules: [], error: `Coupon ${code} end time must be after start time.` };
+    }
+
+    if (maxUses != null && (!Number.isInteger(maxUses) || maxUses <= 0)) {
+      return { rules: [], error: `Coupon ${code} max uses must be a positive integer.` };
+    }
+
+    normalized.push({
+      code,
+      discountPercent,
+      sourceType: sourceType as HostEventCouponRule['sourceType'],
+      sourceId: normalizeText(rawRule.sourceId) || undefined,
+      sourceName: normalizeText(rawRule.sourceName) || undefined,
+      startsAt: startsAt || undefined,
+      endsAt: endsAt || undefined,
+      maxUses,
+    });
+  }
+
+  return { rules: normalized };
+}
+
 async function upsertBrowseCategoryFromEvent(categoryRaw?: string, subcategoryRaw?: string) {
   const category = normalizeText(categoryRaw);
   const subcategory = normalizeText(subcategoryRaw);
@@ -144,6 +213,11 @@ export async function POST(request: NextRequest) {
     const hostCompanyId = normalizeText(eventData.hostCompanyId);
     const hostCompanyOwnerId = normalizeText(eventData.hostCompanyOwnerId);
     const hostCompanyName = normalizeText(eventData.hostCompanyName) || 'Easy Entry';
+    const { rules: couponRules, error: couponError } = normalizeCouponRules(eventData.couponRules);
+
+    if (couponError) {
+      return NextResponse.json({ error: couponError }, { status: 400 });
+    }
 
     const outletUserId =
       hostCompanyType === 'outlet'
@@ -202,6 +276,7 @@ export async function POST(request: NextRequest) {
         entryAge: normalizeText(eventData.entryAge) || '18+',
         layout: normalizeText(eventData.layout) || 'Standing',
         seating: normalizeText(eventData.seating) || 'General Admission',
+        couponRules: couponRules.length > 0 ? couponRules : undefined,
       }
     );
 

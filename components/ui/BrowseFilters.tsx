@@ -170,7 +170,7 @@ export default function BrowseFilters({
   // ── Dynamic categories from events ───────────────────────────────────────
   useEffect(() => {
     if (events.length === 0) return;
-    const categoryMap = new Map<string, { icon: string; subFilters: Set<string> }>();
+    const categoryMap = new Map<string, { name: string; icon: string; subFilters: Set<string> }>();
     events.forEach(event => {
       if (event.category) {
         const norm = event.category.trim();
@@ -185,7 +185,7 @@ export default function BrowseFilters({
 
           const key = norm.toLowerCase();
           const existing = categoryMap.get(key);
-          const next = existing || { icon, subFilters: new Set<string>() };
+          const next = existing || { name: norm, icon, subFilters: new Set<string>() };
           if (event.subcategory) {
             const sub = event.subcategory.trim();
             if (sub) next.subFilters.add(sub);
@@ -196,7 +196,7 @@ export default function BrowseFilters({
       }
     });
     setDynamicCategories(Array.from(categoryMap.entries()).map(([name, value]) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1),
+      name: value.name,
       icon: value.icon,
       subFilters: Array.from(value.subFilters),
     })));
@@ -206,8 +206,25 @@ export default function BrowseFilters({
 
   // ── Computed ──────────────────────────────────────────────────────────────
   const allCategories = [...filters.categories];
-  dynamicCategories.forEach(d => {
-    if (!allCategories.some(c => c.name.toLowerCase() === d.name.toLowerCase())) allCategories.push(d);
+  dynamicCategories.forEach((dynamicCategory) => {
+    const existingIndex = allCategories.findIndex(
+      (category) => category.name.toLowerCase() === dynamicCategory.name.toLowerCase()
+    );
+
+    if (existingIndex === -1) {
+      allCategories.push(dynamicCategory);
+      return;
+    }
+
+    const existing = allCategories[existingIndex];
+    const mergedSubFilters = Array.from(
+      new Set([...(existing.subFilters || []), ...(dynamicCategory.subFilters || [])])
+    );
+
+    allCategories[existingIndex] = {
+      ...existing,
+      subFilters: mergedSubFilters,
+    };
   });
 
   const hasActiveFilters = activeCategory !== null || activeSubFilters.length > 0 ||
