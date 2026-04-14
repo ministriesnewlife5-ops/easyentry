@@ -351,10 +351,39 @@ export async function updateEventRequest(
   if (input.reviewedAt !== undefined) updateData.reviewed_at = new Date(input.reviewedAt).toISOString();
   if (input.reviewedBy !== undefined) updateData.reviewed_by = input.reviewedBy;
   if (input.rejectionReason !== undefined) updateData.notes = input.rejectionReason;
-  if (input.eventData?.title !== undefined) updateData.title = input.eventData.title;
-  if (input.eventData?.date !== undefined) updateData.date = input.eventData.date;
-  if (input.eventData?.description !== undefined) updateData.description = input.eventData.description;
-  if (input.eventData?.category !== undefined) updateData.event_type = input.eventData.category;
+  if (input.eventData) {
+    const ticketCategories = input.eventData.ticketCategories || [];
+    const commissionPercent = input.eventData.commissionPercent ?? 0;
+    const estimatedTotalRevenue = ticketCategories.reduce(
+      (sum, t) => sum + (t.price * (t.quantity ?? 1)),
+      0
+    );
+    const estimatedTotalCommission = ticketCategories.reduce(
+      (sum, t) => sum + ((t.commissionAmount ?? (t.price * commissionPercent / 100)) * (t.quantity ?? 1)),
+      0
+    );
+
+    updateData.event_data = {
+      ...input.eventData,
+      ticketCategories,
+      commissionPercent,
+      estimatedTotalRevenue,
+      estimatedTotalCommission,
+    };
+
+    updateData.title = input.eventData.title;
+    updateData.date = input.eventData.date;
+    updateData.description = input.eventData.description || input.eventData.fullDescription || null;
+    updateData.event_type = input.eventData.category || null;
+    updateData.budget = input.eventData.price
+      ? parseFloat(String(input.eventData.price).replace(/[^0-9.]/g, '')) || null
+      : null;
+    updateData.attachments = input.eventData.mediaFiles || null;
+    updateData.ticket_categories = ticketCategories.length > 0 ? ticketCategories : null;
+    updateData.commission_percent = commissionPercent;
+    updateData.estimated_total_revenue = estimatedTotalRevenue || null;
+    updateData.estimated_total_commission = estimatedTotalCommission || null;
+  }
 
   const { data, error } = await supabase
     .from('event_requests')

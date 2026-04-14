@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
+  Mic2,
+  Building2,
+  Megaphone,
   Shield,
   User, 
   FileText, 
@@ -14,10 +17,13 @@ import {
   EyeOff
 } from 'lucide-react';
 
-type Role = 'sub_admin';
+type Role = 'sub_admin' | 'artist' | 'promoter' | 'outlet';
 
 const roles = [
   { id: 'sub_admin' as Role, label: 'Sub Admin', icon: Shield, desc: 'Manage approved admin operations', color: '#6366F1' },
+  { id: 'artist' as Role, label: 'Artist', icon: Mic2, desc: 'Performer account for hosting and promotions', color: '#E5A823' },
+  { id: 'promoter' as Role, label: 'Promoter', icon: Megaphone, desc: 'Promoter account for campaigns and events', color: '#EB4D4B' },
+  { id: 'outlet' as Role, label: 'Outlet', icon: Building2, desc: 'Venue/outlet account for hosting events', color: '#10B981' },
 ];
 
 const sectionVariants = {
@@ -125,8 +131,8 @@ export default function AdminOnboardingSection() {
             <Sparkles className="w-6 h-6 text-[#0D0D0D]" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#F5F5DC]">Onboard Sub-Admins</h1>
-            <p className="text-sm text-[#F5F5DC]/50">Create accounts for limited-permission admin operators only</p>
+            <h1 className="text-2xl font-bold text-[#F5F5DC]">Onboard Users</h1>
+            <p className="text-sm text-[#F5F5DC]/50">Create sub-admin, artist, promoter, and outlet accounts</p>
           </div>
         </div>
       </motion.div>
@@ -297,14 +303,28 @@ export default function AdminOnboardingSection() {
               animate="visible"
             >
               <div className="p-5 border-b border-[#2A2A2A] bg-[#1A1A1A]/50">
-                <h2 className="font-semibold text-[#F5F5DC]">Sub-Admin Permissions</h2>
+                <h2 className="font-semibold text-[#F5F5DC]">Role Permissions</h2>
               </div>
               <div className="p-5">
-                <ul className="text-sm text-[#F5F5DC]/80 space-y-2 list-disc list-inside">
-                  <li>Approve events</li>
-                  <li>Edit and delete events</li>
-                  <li>Approve seller, artist, and influencer onboarding requests</li>
-                </ul>
+                {selectedRole === 'sub_admin' ? (
+                  <ul className="text-sm text-[#F5F5DC]/80 space-y-2 list-disc list-inside">
+                    <li>Approve events</li>
+                    <li>Edit and delete events</li>
+                    <li>Approve seller, artist, and influencer onboarding requests</li>
+                  </ul>
+                ) : selectedRole === 'artist' ? (
+                  <p className="text-sm text-[#F5F5DC]/80">
+                    Artist accounts can manage artist profile information and participate in hosted event flows.
+                  </p>
+                ) : selectedRole === 'promoter' ? (
+                  <p className="text-sm text-[#F5F5DC]/80">
+                    Promoter accounts can manage promoter profile information and run promotions for hosted events.
+                  </p>
+                ) : (
+                  <p className="text-sm text-[#F5F5DC]/80">
+                    Outlet accounts can manage venue profile and host events through the outlet workflow.
+                  </p>
+                )}
               </div>
             </motion.div>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Archive, Trash2, ExternalLink, AlertCircle } from 'lucide-react';
+import { Archive, Trash2, ExternalLink, AlertCircle, Pencil } from 'lucide-react';
 import Link from 'next/link';
 
 interface Event {
@@ -10,6 +10,9 @@ interface Event {
   provider: string;
   location: string;
   date: string;
+  time?: string;
+  category?: string;
+  price?: string;
 }
 
 interface EventsTableProps {
@@ -20,6 +23,16 @@ export default function EventsTable({ events }: EventsTableProps) {
   const [data, setData] = useState(events);
   const [loading, setLoading] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: 'archive' | 'delete' } | null>(null);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    date: '',
+    time: '',
+    venue: '',
+    category: '',
+    price: '',
+  });
 
   const handleAction = async (id: string, action: 'archive' | 'delete') => {
     setLoading(id);
@@ -40,6 +53,64 @@ export default function EventsTable({ events }: EventsTableProps) {
     } finally {
       setLoading(null);
       setConfirmAction(null);
+    }
+  };
+
+  const openEditModal = (event: Event) => {
+    setEditingEvent(event);
+    setEditForm({
+      title: event.name || '',
+      date: event.date || '',
+      time: event.time || '',
+      venue: event.location || '',
+      category: event.category || '',
+      price: event.price || '',
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingEvent) return;
+
+    setIsSavingEdit(true);
+    try {
+      const response = await fetch(`/api/events/${editingEvent.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editForm.title,
+          date: editForm.date,
+          time: editForm.time,
+          venue: editForm.venue,
+          category: editForm.category,
+          price: editForm.price,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update event');
+      }
+
+      setData((prev) =>
+        prev.map((item) =>
+          item.id === editingEvent.id
+            ? {
+                ...item,
+                name: editForm.title,
+                date: editForm.date,
+                time: editForm.time,
+                location: editForm.venue,
+                category: editForm.category,
+                price: editForm.price,
+              }
+            : item
+        )
+      );
+
+      setEditingEvent(null);
+    } catch (error) {
+      console.error('Failed to update event:', error);
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -72,6 +143,13 @@ export default function EventsTable({ events }: EventsTableProps) {
                       <ExternalLink className="w-3 h-3" />
                       View
                     </Link>
+                    <button
+                      onClick={() => openEditModal(event)}
+                      className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-[#2A2A2A] rounded-lg hover:bg-blue-600 hover:text-white transition-colors"
+                    >
+                      <Pencil className="w-3 h-3" />
+                      Edit
+                    </button>
                     <button
                       onClick={() => setConfirmAction({ id: event.id, action: 'archive' })}
                       disabled={loading === event.id}
@@ -137,6 +215,67 @@ export default function EventsTable({ events }: EventsTableProps) {
                 }`}
               >
                 {confirmAction.action === 'delete' ? 'Delete' : 'Archive'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="rounded-2xl border border-[#2A2A2A] bg-[#1A1A1A] p-6 max-w-xl w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Edit Hosted Event</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input
+                value={editForm.title}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="Title"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
+              />
+              <input
+                value={editForm.venue}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, venue: e.target.value }))}
+                placeholder="Venue"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
+              />
+              <input
+                type="date"
+                value={editForm.date}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, date: e.target.value }))}
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
+              />
+              <input
+                type="time"
+                value={editForm.time}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, time: e.target.value }))}
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
+              />
+              <input
+                value={editForm.category}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, category: e.target.value }))}
+                placeholder="Category"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
+              />
+              <input
+                value={editForm.price}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, price: e.target.value }))}
+                placeholder="Price (e.g. ₹999)"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2"
+              />
+            </div>
+            <div className="flex gap-3 justify-end mt-5">
+              <button
+                onClick={() => setEditingEvent(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-[#2A2A2A] hover:bg-[#3A3A3A] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-[#E5A823] hover:bg-[#F5C542] text-[#0D0D0D] transition-colors disabled:opacity-50"
+              >
+                {isSavingEdit ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>

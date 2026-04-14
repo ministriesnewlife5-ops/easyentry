@@ -75,6 +75,9 @@ export default async function AdminPage({
     provider: event.promoterName || 'Easy Entry',
     location: event.venue,
     date: event.date,
+    time: event.time,
+    category: event.category,
+    price: event.price,
   }));
 
   // Map artists to the format used in the admin dashboard

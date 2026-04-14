@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { createUser } from '@/lib/auth-store';
+import { createUser, type AppRole } from '@/lib/auth-store';
 import bcrypt from 'bcryptjs';
 
 // POST /api/admin/onboard - Admin creates users with specific roles
@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
       email,
       phone,
       password,
+      role: requestedRole,
     } = body;
 
     // Validation
@@ -33,7 +34,8 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const role = 'sub_admin';
+    const allowedRoles: AppRole[] = ['sub_admin', 'artist', 'promoter', 'outlet'];
+    const role: AppRole = allowedRoles.includes(requestedRole) ? requestedRole : 'sub_admin';
 
     const supabase = getSupabaseServerClient();
 
@@ -51,8 +53,8 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = bcrypt.hashSync(password, 10);
 
-    // Create sub-admin user
-    const user = await createUser(email, hashedPassword, role as any, fullName);
+    // Create user by selected role
+    const user = await createUser(email, hashedPassword, role, fullName);
 
     // Verify user immediately since admin is creating
     await supabase
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Sub-admin onboarded successfully',
+      message: `${role.replace('_', ' ')} onboarded successfully`,
       user: {
         id: user.id,
         email: user.email,

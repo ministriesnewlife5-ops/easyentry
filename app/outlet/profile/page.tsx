@@ -47,6 +47,17 @@ type OutletEventsResponse = {
   waitingApprovalEvents: OutletEventItem[];
 };
 
+type OutletEventEditForm = {
+  title: string;
+  subtitle: string;
+  date: string;
+  time: string;
+  venue: string;
+  category: string;
+  price: string;
+  description: string;
+};
+
 function OutletProfileContent() {
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
@@ -56,7 +67,19 @@ function OutletProfileContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEventsLoading, setIsEventsLoading] = useState(false);
+  const [isSavingEventEdit, setIsSavingEventEdit] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [editingEvent, setEditingEvent] = useState<OutletEventItem | null>(null);
+  const [eventEditForm, setEventEditForm] = useState<OutletEventEditForm>({
+    title: '',
+    subtitle: '',
+    date: '',
+    time: '',
+    venue: '',
+    category: '',
+    price: '',
+    description: '',
+  });
   const [eventsData, setEventsData] = useState<OutletEventsResponse>({
     upcomingEvents: [],
     completedEvents: [],
@@ -365,6 +388,53 @@ function OutletProfileContent() {
       setMessage({ type: 'error', text: 'An unexpected error occurred' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const openEventEditModal = (event: OutletEventItem) => {
+    if (!event.publicEventId) {
+      setMessage({ type: 'error', text: 'This event is not published yet and cannot be edited.' });
+      return;
+    }
+
+    setEditingEvent(event);
+    setEventEditForm({
+      title: event.title || '',
+      subtitle: event.subtitle || '',
+      date: event.date || '',
+      time: event.time || '',
+      venue: event.venue || '',
+      category: event.category || '',
+      price: event.price || '',
+      description: event.description || '',
+    });
+  };
+
+  const saveEventEdit = async () => {
+    if (!editingEvent?.publicEventId) return;
+
+    setIsSavingEventEdit(true);
+    try {
+      const response = await fetch(`/api/events/${editingEvent.publicEventId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventEditForm),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to update event');
+      }
+
+      setMessage({ type: 'success', text: 'Hosted event updated successfully.' });
+      setEditingEvent(null);
+      await fetchOutletEvents();
+    } catch (error) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to update event' });
+    } finally {
+      setIsSavingEventEdit(false);
     }
   };
 
@@ -910,16 +980,19 @@ function OutletProfileContent() {
                     title="Waiting for Approval"
                     description="These requests are sent by you and are still waiting for admin action."
                     events={eventsData.waitingApprovalEvents}
+                    onEdit={openEventEditModal}
                   />
                   <EventsSection
                     title="Upcoming Events"
                     description="These events are approved and scheduled for today or later."
                     events={eventsData.upcomingEvents}
+                    onEdit={openEventEditModal}
                   />
                   <EventsSection
                     title="Completed Events"
                     description="These approved events already happened."
                     events={eventsData.completedEvents}
+                    onEdit={openEventEditModal}
                   />
                 </>
               )}
@@ -987,6 +1060,86 @@ function OutletProfileContent() {
           {activeTab === 'events' && null}
         </div>
       </form>
+
+      {editingEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-[#2A2A2A] bg-[#1A1A1A] p-6">
+            <h3 className="text-xl font-semibold text-[#F5F5DC]">Edit Hosted Event</h3>
+            <p className="mt-1 text-sm text-[#F5F5DC]/60">Changes are visible to both the host and admins.</p>
+
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input
+                value={eventEditForm.title}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="Title"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
+              <input
+                value={eventEditForm.subtitle}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, subtitle: e.target.value }))}
+                placeholder="Subtitle"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
+              <input
+                type="date"
+                value={eventEditForm.date}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, date: e.target.value }))}
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
+              <input
+                type="time"
+                value={eventEditForm.time}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, time: e.target.value }))}
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
+              <input
+                value={eventEditForm.venue}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, venue: e.target.value }))}
+                placeholder="Venue"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
+              <input
+                value={eventEditForm.category}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, category: e.target.value }))}
+                placeholder="Category"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
+              <input
+                value={eventEditForm.price}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, price: e.target.value }))}
+                placeholder="Price (e.g. ₹999)"
+                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
+              <div />
+              <textarea
+                value={eventEditForm.description}
+                onChange={(e) => setEventEditForm((prev) => ({ ...prev, description: e.target.value }))}
+                placeholder="Description"
+                rows={4}
+                className="md:col-span-2 w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
+              />
+            </div>
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setEditingEvent(null)}
+                className="rounded-lg bg-[#2A2A2A] px-4 py-2 text-sm font-medium hover:bg-[#3A3A3A]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveEventEdit}
+                disabled={isSavingEventEdit}
+                className="rounded-lg bg-[#E5A823] px-4 py-2 text-sm font-bold text-[#0D0D0D] hover:bg-[#F5C542] disabled:opacity-50"
+              >
+                {isSavingEventEdit ? 'Saving...' : 'Save Event'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -995,10 +1148,12 @@ function EventsSection({
   title,
   description,
   events,
+  onEdit,
 }: {
   title: string;
   description: string;
   events: OutletEventItem[];
+  onEdit?: (event: OutletEventItem) => void;
 }) {
   return (
     <section className="rounded-2xl border border-[#2A2A2A] bg-[#1A1A1A] p-6">
@@ -1042,13 +1197,25 @@ function EventsSection({
                     </div>
 
                     {event.publicEventUrl && (
-                      <Link
-                        href={event.publicEventUrl}
-                        className="inline-flex items-center gap-2 rounded-lg border border-[#E5A823]/40 bg-[#E5A823]/10 px-3 py-2 text-sm font-medium text-[#E5A823] hover:bg-[#E5A823]/20"
-                      >
-                        View live event
-                        <ExternalLink className="w-4 h-4" />
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        {onEdit && event.publicEventId && (
+                          <button
+                            type="button"
+                            onClick={() => onEdit(event)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-blue-400/40 bg-blue-500/10 px-3 py-2 text-sm font-medium text-blue-300 hover:bg-blue-500/20"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                            Edit
+                          </button>
+                        )}
+                        <Link
+                          href={event.publicEventUrl}
+                          className="inline-flex items-center gap-2 rounded-lg border border-[#E5A823]/40 bg-[#E5A823]/10 px-3 py-2 text-sm font-medium text-[#E5A823] hover:bg-[#E5A823]/20"
+                        >
+                          View live event
+                          <ExternalLink className="w-4 h-4" />
+                        </Link>
+                      </div>
                     )}
                   </div>
 

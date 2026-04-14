@@ -737,22 +737,21 @@ export async function updatePublishedEvent(
   id: string,
   updates: Partial<PublicEvent>
 ): Promise<PublicEvent | undefined> {
-  const dbData: Record<string, unknown> = {};
+  const existing = await getPublishedEventById(id);
+  if (!existing) {
+    return undefined;
+  }
 
-  if (updates.title !== undefined) dbData.title = updates.title;
-  if (updates.date !== undefined) dbData.date = updates.date;
-  if (updates.time !== undefined) dbData.time = updates.time;
-  if (updates.description !== undefined) dbData.description = updates.description;
-  if (updates.image !== undefined) dbData.image_url = updates.image;
-  if (updates.images !== undefined) dbData.gallery_images = updates.images;
-  if (updates.category !== undefined) {
-    dbData.category = updates.category;
-    dbData.event_type = updates.category;
-  }
-  if (updates.subcategory !== undefined) {
-    dbData.tags = updates.subcategory ? [updates.subcategory] : null;
-  }
-  if (updates.price !== undefined) dbData.ticket_price = parseFloat(updates.price) || null;
+  const merged: PublicEvent = {
+    ...existing,
+    ...updates,
+    sourceRequestId: updates.sourceRequestId ?? existing.sourceRequestId,
+  };
+
+  const dbData = mapEventToDb({
+    ...merged,
+    sourceRequestId: merged.sourceRequestId,
+  });
 
   const { data, error } = await supabase
     .from('published_events')
