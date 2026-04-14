@@ -42,6 +42,9 @@ export type EventRequest = {
     locationArea?: string;
     category: string;
     subcategory?: string;
+    price: string;
+    image: string;
+    googleMapsLink?: string;
     couponRules?: EventCouponRule[];
     mediaFiles?: string[];
     numberOfTickets?: string;
