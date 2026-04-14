@@ -50,6 +50,16 @@ type EventRequestEmailInput = {
     time: string;
     endTime?: string;
     venue: string;
+    couponRules?: Array<{
+      code: string;
+      discountPercent: number;
+      sourceType: 'outlet' | 'artist' | 'promoter' | 'influencer';
+      sourceId?: string;
+      sourceName?: string;
+      startsAt?: string;
+      endsAt?: string;
+      maxUses?: number;
+    }>;
     locationState?: string;
     locationDistrict?: string;
     locationArea?: string;
