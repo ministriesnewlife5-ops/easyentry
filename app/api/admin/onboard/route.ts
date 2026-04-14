@@ -3,7 +3,6 @@ import { getSupabaseServerClient } from '@/lib/supabase';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { createUser } from '@/lib/auth-store';
-import { createVenue } from '@/lib/venue-store';
 import bcrypt from 'bcryptjs';
 
 // POST /api/admin/onboard - Admin creates users with specific roles
@@ -21,52 +20,20 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
-      role,
       fullName,
       email,
       phone,
       password,
-      socialMedia,
-      bio,
-      // Artist specific
-      stageName,
-      genre,
-      experience,
-      portfolio,
-      // Promoter specific
-      companyName,
-      website,
-      experienceYears,
-      // Outlet specific
-      venueName,
-      venueType,
-      location,
-      capacity,
     } = body;
 
     // Validation
-    if (!role || !fullName || !email || !password) {
-      return NextResponse.json({ 
-        error: 'Missing required fields: role, fullName, email, password' 
+    if (!fullName || !email || !password) {
+      return NextResponse.json({
+        error: 'Missing required fields: fullName, email, password'
       }, { status: 400 });
     }
 
-    // Role-specific validation
-    if (role === 'artist' && !stageName) {
-      return NextResponse.json({ error: 'Stage name is required for artists' }, { status: 400 });
-    }
-    if (role === 'promoter' && !companyName) {
-      return NextResponse.json({ error: 'Company name is required for promoters' }, { status: 400 });
-    }
-    if (role === 'outlet' && (!venueName || !location)) {
-      return NextResponse.json({ error: 'Venue name and location are required for outlet providers' }, { status: 400 });
-    }
-
-    // Validate role
-    const validRoles = ['artist', 'promoter', 'outlet', 'admin'];
-    if (!validRoles.includes(role)) {
-      return NextResponse.json({ error: 'Invalid role. Must be artist, promoter, outlet, or admin' }, { status: 400 });
-    }
+    const role = 'sub_admin';
 
     const supabase = getSupabaseServerClient();
 
@@ -84,7 +51,7 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = bcrypt.hashSync(password, 10);
 
-    // Create user based on role
+    // Create sub-admin user
     const user = await createUser(email, hashedPassword, role as any, fullName);
 
     // Verify user immediately since admin is creating
@@ -93,76 +60,13 @@ export async function POST(request: NextRequest) {
       .update({ is_verified: true })
       .eq('id', user.id);
 
-    // Create role-specific profile
-    if (role === 'artist') {
-      const { error: artistError } = await supabase
-        .from('artist_profiles')
-        .insert({
-          user_id: user.id,
-          stage_name: stageName,
-          genre: genre || null,
-          experience_years: experience ? parseInt(experience) : null,
-          portfolio_url: portfolio || null,
-          bio: bio || null,
-          social_media: socialMedia || null,
-          phone: phone || null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-
-      if (artistError) {
-        console.error('Error creating artist profile:', artistError);
-      }
-    } else if (role === 'promoter') {
-      const { error: promoterError } = await supabase
-        .from('promoter_profiles')
-        .insert({
-          user_id: user.id,
-          company_name: companyName,
-          website: website || null,
-          experience_years: experienceYears ? parseInt(experienceYears) : null,
-          notable_events: portfolio || null,
-          bio: bio || null,
-          social_media: socialMedia || null,
-          phone: phone || null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-
-      if (promoterError) {
-        console.error('Error creating promoter profile:', promoterError);
-      }
-    } else if (role === 'outlet') {
-      try {
-        await createVenue({
-          userId: user.id,
-          venueName: venueName,
-          venueType: venueType || '',
-          email: email,
-          phone: phone || '',
-          location: location,
-          capacity: capacity || '',
-          bio: bio || '',
-          website: website || '',
-          instagram: socialMedia || '',
-          twitter: '',
-          facebook: '',
-          imageUrl: null,
-          coverImage: null,
-          venueImages: [],
-        });
-      } catch (venueError) {
-        console.error('Error creating venue profile:', venueError);
-      }
-    }
-
     return NextResponse.json({
       success: true,
-      message: `${role === 'outlet' ? 'Outlet provider' : role} onboarded successfully`,
+      message: 'Sub-admin onboarded successfully',
       user: {
         id: user.id,
         email: user.email,
-        role: role,
+        role,
         name: fullName,
       }
     });

@@ -320,6 +320,12 @@ CREATE TABLE IF NOT EXISTS ticket_bookings (
   ticket_categories JSONB NOT NULL DEFAULT '[]'::jsonb,
   total_tickets INTEGER NOT NULL DEFAULT 0,
   amount_paid NUMERIC(10, 2) NOT NULL,
+  coupon_code TEXT,
+  coupon_source_type TEXT,
+  coupon_source_id TEXT,
+  coupon_source_name TEXT,
+  coupon_discount_percent NUMERIC(5,2),
+  coupon_discount_amount NUMERIC(10,2),
   payment_id TEXT NOT NULL UNIQUE,
   order_id TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'confirmed',
@@ -329,6 +335,15 @@ CREATE TABLE IF NOT EXISTS ticket_bookings (
 
 CREATE INDEX IF NOT EXISTS idx_ticket_bookings_user_booked_at ON ticket_bookings(user_id, booked_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ticket_bookings_event_id ON ticket_bookings(event_id);
+CREATE INDEX IF NOT EXISTS idx_ticket_bookings_coupon_code ON ticket_bookings(coupon_code);
+
+ALTER TABLE ticket_bookings
+  ADD COLUMN IF NOT EXISTS coupon_code TEXT,
+  ADD COLUMN IF NOT EXISTS coupon_source_type TEXT,
+  ADD COLUMN IF NOT EXISTS coupon_source_id TEXT,
+  ADD COLUMN IF NOT EXISTS coupon_source_name TEXT,
+  ADD COLUMN IF NOT EXISTS coupon_discount_percent NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS coupon_discount_amount NUMERIC(10,2);
 
 -- Add archive columns to published_events if they don't exist
 ALTER TABLE published_events 

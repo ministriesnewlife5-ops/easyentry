@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (session.user.role !== 'admin') {
+    if (session.user.role !== 'admin' && session.user.role !== 'sub_admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
 
     // Build date filter
     let dateFilter = '';
+    let bookingStartDate: string | undefined;
+    let bookingEndDate: string | undefined;
     if (month && year) {
       const startDate = `${year}-${month.padStart(2, '0')}-01`;
       const endMonth = parseInt(month) + 1;
@@ -31,8 +33,12 @@ export async function GET(request: NextRequest) {
       const endMonthStr = (endMonth > 12 ? 1 : endMonth).toString().padStart(2, '0');
       const endDate = `${endYear}-${endMonthStr}-01`;
       dateFilter = `date.gte.${startDate},date.lt.${endDate}`;
+      bookingStartDate = `${startDate}T00:00:00.000Z`;
+      bookingEndDate = `${endDate}T00:00:00.000Z`;
     } else if (year) {
       dateFilter = `date.gte.${year}-01-01,date.lt.${parseInt(year) + 1}-01-01`;
+      bookingStartDate = `${year}-01-01T00:00:00.000Z`;
+      bookingEndDate = `${parseInt(year) + 1}-01-01T00:00:00.000Z`;
     }
 
     // 1. Total Events Count
@@ -149,6 +155,74 @@ export async function GET(request: NextRequest) {
       .map(([month, count]) => ({ month, count }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
+    // 6. Coupon Analytics
+    let couponBookingsQuery = supabase
+      .from('ticket_bookings')
+      .select('event_id, event_title, total_tickets, amount_paid, coupon_code, coupon_source_type, coupon_source_name, coupon_discount_amount');
+
+    if (bookingStartDate) {
+      couponBookingsQuery = couponBookingsQuery.gte('booked_at', bookingStartDate);
+    }
+    if (bookingEndDate) {
+      couponBookingsQuery = couponBookingsQuery.lt('booked_at', bookingEndDate);
+    }
+
+    const { data: couponBookings, error: couponError } = await couponBookingsQuery;
+
+    if (couponError) {
+      console.error('Error fetching coupon analytics data:', couponError);
+    }
+
+    const allBookings = couponBookings || [];
+    const bookingsWithCoupons = allBookings.filter((booking: any) => Boolean(booking.coupon_code));
+
+    const couponMetrics = {
+      totalBookings: allBookings.length,
+      couponBookings: bookingsWithCoupons.length,
+      couponConversionRate: allBookings.length > 0
+        ? Number(((bookingsWithCoupons.length / allBookings.length) * 100).toFixed(2))
+        : 0,
+      totalCouponDiscount: bookingsWithCoupons.reduce((sum: number, booking: any) => sum + Number(booking.coupon_discount_amount || 0), 0),
+    };
+
+    const byCode: Record<string, { code: string; uses: number; tickets: number; revenue: number; discount: number; sourceType?: string; sourceName?: string }> = {};
+    for (const booking of bookingsWithCoupons as any[]) {
+      const code = String(booking.coupon_code || '').toUpperCase();
+      if (!code) continue;
+      if (!byCode[code]) {
+        byCode[code] = {
+          code,
+          uses: 0,
+          tickets: 0,
+          revenue: 0,
+          discount: 0,
+          sourceType: booking.coupon_source_type || undefined,
+          sourceName: booking.coupon_source_name || undefined,
+        };
+      }
+      byCode[code].uses += 1;
+      byCode[code].tickets += Number(booking.total_tickets || 0);
+      byCode[code].revenue += Number(booking.amount_paid || 0);
+      byCode[code].discount += Number(booking.coupon_discount_amount || 0);
+    }
+
+    const couponTopCodes = Object.values(byCode)
+      .sort((a, b) => b.uses - a.uses)
+      .slice(0, 10);
+
+    const bySource: Record<string, { source: string; uses: number; discount: number; revenue: number }> = {};
+    for (const booking of bookingsWithCoupons as any[]) {
+      const sourceType = String(booking.coupon_source_type || 'unknown');
+      if (!bySource[sourceType]) {
+        bySource[sourceType] = { source: sourceType, uses: 0, discount: 0, revenue: 0 };
+      }
+      bySource[sourceType].uses += 1;
+      bySource[sourceType].discount += Number(booking.coupon_discount_amount || 0);
+      bySource[sourceType].revenue += Number(booking.amount_paid || 0);
+    }
+
+    const couponBySource = Object.values(bySource).sort((a, b) => b.uses - a.uses);
+
     return NextResponse.json({
       totalEvents: totalEvents || 0,
       eventsByPromoter: Object.entries(promoterCounts).map(([name, count]) => ({ name, count })),
@@ -159,6 +233,11 @@ export async function GET(request: NextRequest) {
         topSellingEvents,
       },
       eventsByMonth,
+      couponAnalytics: {
+        ...couponMetrics,
+        topCodes: couponTopCodes,
+        bySource: couponBySource,
+      },
     });
   } catch (error) {
     console.error('Error in analytics GET:', error);

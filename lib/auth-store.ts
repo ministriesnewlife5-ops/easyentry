@@ -1,7 +1,7 @@
 import { supabase, type AppUser, type OtpRecord } from './supabase';
 import { randomInt } from 'crypto';
 
-export type AppRole = 'artist' | 'promoter' | 'outlet' | 'user' | 'admin' | 'outlet_provider';
+export type AppRole = 'artist' | 'promoter' | 'outlet' | 'user' | 'admin' | 'sub_admin' | 'outlet_provider';
 
 /**
  * Find a user by their email address

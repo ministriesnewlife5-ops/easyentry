@@ -14,6 +14,17 @@ export type TicketCategory = {
   availableUntil?: string;
 };
 
+export type EventCouponRule = {
+  code: string;
+  discountPercent: number;
+  sourceType: 'outlet' | 'artist' | 'promoter' | 'influencer';
+  sourceId?: string;
+  sourceName?: string;
+  startsAt?: string;
+  endsAt?: string;
+  maxUses?: number;
+};
+
 export type EventRequest = {
   id: string;
   outletUserId: string;
@@ -31,9 +42,7 @@ export type EventRequest = {
     locationArea?: string;
     category: string;
     subcategory?: string;
-    googleMapsLink?: string;
-    price: string;
-    image: string;
+    couponRules?: EventCouponRule[];
     mediaFiles?: string[];
     numberOfTickets?: string;
     rules?: string[];
@@ -84,8 +93,8 @@ export type UpdateEventRequestInput = Partial<Omit<CreateEventRequestInput, 'use
   rejectionReason?: string;
 };
 
-// Map legacy EventRequest to database schema
-function mapLegacyToDb(request: Partial<EventRequest> & {
+// Map EventRequest to database schema
+function mapRequestToDb(request: Partial<EventRequest> & {
   outletUserId?: string;
   outletName?: string;
   outletEmail?: string;
@@ -150,8 +159,8 @@ function normalizeStoredEventData(raw: unknown): EventRequest['eventData'] | nul
   return null;
 }
 
-// Map database record to legacy EventRequest
-function mapDbToLegacy(record: Record<string, unknown>): EventRequest {
+// Map database record to EventRequest
+function mapDbToRequest(record: Record<string, unknown>): EventRequest {
   // Prefer the full event_data JSONB if present
   const storedEventData = normalizeStoredEventData(record.event_data);
   const ticketCategories = (record.ticket_categories as TicketCategory[]) || storedEventData?.ticketCategories || [];
@@ -203,7 +212,7 @@ export async function getAllEventRequests(): Promise<EventRequest[]> {
     throw new Error(`Failed to get event requests: ${error.message}`);
   }
 
-  return (data as Record<string, unknown>[])?.map(mapDbToLegacy) || [];
+  return (data as Record<string, unknown>[])?.map(mapDbToRequest) || [];
 }
 
 /**
@@ -220,7 +229,7 @@ export async function getEventRequestsByOutlet(outletUserId: string): Promise<Ev
     throw new Error(`Failed to get outlet event requests: ${error.message}`);
   }
 
-  return (data as Record<string, unknown>[])?.map(mapDbToLegacy) || [];
+  return (data as Record<string, unknown>[])?.map(mapDbToRequest) || [];
 }
 
 /**
@@ -240,7 +249,7 @@ export async function getEventRequestById(id: string): Promise<EventRequest | un
     throw new Error(`Failed to get event request: ${error.message}`);
   }
 
-  return mapDbToLegacy(data as Record<string, unknown>);
+  return mapDbToRequest(data as Record<string, unknown>);
 }
 
 /**
@@ -252,7 +261,7 @@ export async function createEventRequest(
   eventData: EventRequest['eventData'],
   outletEmail?: string,
 ): Promise<EventRequest> {
-  const dbData = mapLegacyToDb({
+  const dbData = mapRequestToDb({
     outletUserId,
     outletName,
     outletEmail,
@@ -270,7 +279,7 @@ export async function createEventRequest(
     throw new Error(`Failed to create event request: ${error.message}`);
   }
 
-  return mapDbToLegacy(data as Record<string, unknown>);
+  return mapDbToRequest(data as Record<string, unknown>);
 }
 
 /**
@@ -306,7 +315,7 @@ export async function updateEventRequestStatus(
     throw new Error(`Failed to update event request: ${error.message}`);
   }
 
-  return mapDbToLegacy(data as Record<string, unknown>);
+  return mapDbToRequest(data as Record<string, unknown>);
 }
 
 /**
@@ -327,7 +336,7 @@ export async function deleteEventRequest(id: string): Promise<boolean> {
 }
 
 /**
- * Update an event request (legacy compatibility)
+ * Update an event request
  */
 export async function updateEventRequest(
   id: string,
@@ -358,7 +367,7 @@ export async function updateEventRequest(
     throw new Error(`Failed to update event request: ${error.message}`);
   }
 
-  return mapDbToLegacy(data as Record<string, unknown>);
+  return mapDbToRequest(data as Record<string, unknown>);
 }
 
 /**

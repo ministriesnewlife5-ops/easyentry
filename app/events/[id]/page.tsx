@@ -48,6 +48,8 @@ export default function EventDetailsPage() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showInstagramModal, setShowInstagramModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [couponMessage, setCouponMessage] = useState<string | null>(null);
   const [event, setEvent] = useState<PublicEvent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMediaType, setSelectedMediaType] = useState<'image' | 'video'>('image');
@@ -349,13 +351,59 @@ export default function EventDetailsPage() {
     const subtotal = ticketTypes.reduce((sum, t) => sum + (t.price * (quantities[t.id] || 0)), 0);
     const totalTickets = Object.values(quantities).reduce((a, b) => a + b, 0);
     const convenienceFees = totalTickets > 0 ? convenienceFee * totalTickets : 0;
+    const enteredCoupon = couponCode.trim().toUpperCase();
+    const matchedRule = event?.couponRules?.find((rule) => rule.code?.trim().toUpperCase() === enteredCoupon);
+    const now = Date.now();
+    const startsAt = matchedRule?.startsAt ? new Date(matchedRule.startsAt).getTime() : undefined;
+    const endsAt = matchedRule?.endsAt ? new Date(matchedRule.endsAt).getTime() : undefined;
+    const isActiveByTime = !matchedRule
+      ? false
+      : (!Number.isFinite(startsAt as number) || now >= (startsAt as number))
+      && (!Number.isFinite(endsAt as number) || now <= (endsAt as number));
+    const discountPercent = matchedRule && isActiveByTime
+      ? Number(matchedRule.discountPercent || 0)
+      : 0;
+    const discountAmount = Math.min(subtotal * (discountPercent / 100), subtotal);
     return {
       subtotal,
       convenienceFees,
-      total: subtotal + convenienceFees,
+      discountAmount,
+      total: subtotal - discountAmount + convenienceFees,
       totalTickets,
     };
-  }, [ticketTypes, quantities, convenienceFee]);
+  }, [ticketTypes, quantities, convenienceFee, couponCode, event?.couponRules]);
+
+  const handleApplyCoupon = () => {
+    const enteredCoupon = couponCode.trim().toUpperCase();
+
+    if (!enteredCoupon) {
+      setCouponMessage('Enter a coupon code first.');
+      return;
+    }
+
+    const matchedRule = event?.couponRules?.find((rule) => rule.code?.trim().toUpperCase() === enteredCoupon);
+
+    if (matchedRule) {
+      const now = Date.now();
+      const startsAt = matchedRule.startsAt ? new Date(matchedRule.startsAt).getTime() : undefined;
+      const endsAt = matchedRule.endsAt ? new Date(matchedRule.endsAt).getTime() : undefined;
+
+      if (Number.isFinite(startsAt as number) && now < (startsAt as number)) {
+        setCouponMessage('Coupon is not active yet.');
+        return;
+      }
+
+      if (Number.isFinite(endsAt as number) && now > (endsAt as number)) {
+        setCouponMessage('Coupon has expired.');
+        return;
+      }
+
+      setCouponMessage(`Coupon applied: ${matchedRule.discountPercent || 0}% off ticket subtotal.`);
+      return;
+    }
+
+    setCouponMessage('Invalid coupon code.');
+  };
 
   // Handle payment
   const handleProceedToPayment = useCallback(async () => {
@@ -411,10 +459,10 @@ export default function EventDetailsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: total,
           eventId: event.id,
           eventTitle: event.title,
           ticketCategories: selectedCategories,
+          couponCode: couponCode.trim(),
         }),
       });
 
@@ -449,6 +497,8 @@ export default function EventDetailsPage() {
                 eventId: event.id,
                 ticketCategories: selectedCategories,
                 amount: orderData.amount,
+                couponCode: couponCode.trim(),
+                couponAudit: orderData.couponAudit || null,
                 eventSnapshot: {
                   title: event.title,
                   date: event.date,
@@ -1030,12 +1080,42 @@ export default function EventDetailsPage() {
                     ))}
                   </div>
 
+                  {/* Coupon Code */}
+                  <div className="mt-4 rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/70 p-3">
+                    <p className="text-xs font-semibold text-[#F5F5DC]/60 mb-2">Coupon Code</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponCode}
+                        onChange={(e) => {
+                          setCouponCode(e.target.value.toUpperCase());
+                          setCouponMessage(null);
+                        }}
+                        placeholder="ENTER CODE"
+                        className="flex-1 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2 text-sm uppercase tracking-wider text-[#F5F5DC] placeholder:text-[#F5F5DC]/30 focus:border-[#E5A823] focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyCoupon}
+                        className="rounded-lg bg-[#E5A823] px-3 py-2 text-xs font-semibold text-[#0D0D0D] transition hover:bg-[#F5C542]"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                    {couponMessage && (
+                      <p className="mt-2 text-xs text-[#F5F5DC]/60">{couponMessage}</p>
+                    )}
+                  </div>
+
                   {/* Total Summary Bar */}
                   <div className="mt-4 bg-[#EB4D4B]/10 rounded-lg p-3 border border-[#EB4D4B]/20">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-semibold text-[#F5F5DC]">₹{calculateTotal().total.toFixed(2)}</p>
                         <p className="text-xs text-[#F5F5DC]/60">{calculateTotal().totalTickets} Tickets (₹{calculateTotal().subtotal.toFixed(2)} + ₹{calculateTotal().convenienceFees.toFixed(2)} fees)</p>
+                        {calculateTotal().discountAmount > 0 && (
+                          <p className="text-xs text-emerald-400">Coupon discount: -₹{calculateTotal().discountAmount.toFixed(2)}</p>
+                        )}
                       </div>
                       <motion.button
                         whileHover={{ scale: 1.02 }}

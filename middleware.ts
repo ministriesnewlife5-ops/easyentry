@@ -11,7 +11,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (token.role !== "admin") {
+  if (token.role !== "admin" && token.role !== "sub_admin") {
     return NextResponse.redirect(new URL("/events", request.url));
   }
 

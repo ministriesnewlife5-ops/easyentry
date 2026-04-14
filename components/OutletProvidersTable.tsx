@@ -22,6 +22,27 @@ export default function OutletProvidersTable({ outletProviders }: OutletProvider
   const [loading, setLoading] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: 'archive' | 'delete'; name: string } | null>(null);
 
+  const handleApprove = async (id: string) => {
+    setLoading(id);
+    try {
+      const response = await fetch('/api/admin/approve-user', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+
+      if (response.ok) {
+        setData(prev => prev.map(item => item.id === id ? { ...item, isVerified: true } : item));
+      } else {
+        console.error('Failed to approve outlet provider');
+      }
+    } catch (error) {
+      console.error('Error approving outlet provider:', error);
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const handleAction = async (id: string, action: 'archive' | 'delete') => {
     setLoading(id);
     try {
@@ -101,6 +122,16 @@ export default function OutletProvidersTable({ outletProviders }: OutletProvider
                       <ExternalLink className="w-3 h-3" />
                       View
                     </Link>
+                    {!provider.isVerified && (
+                      <button
+                        onClick={() => handleApprove(provider.id)}
+                        disabled={loading === provider.id}
+                        className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-emerald-500/20 rounded-lg hover:bg-emerald-500 hover:text-white transition-colors disabled:opacity-50"
+                      >
+                        <CheckCircle className="w-3 h-3" />
+                        Approve
+                      </button>
+                    )}
                     <button
                       onClick={() => setConfirmAction({ id: provider.id, action: 'archive', name: provider.name })}
                       disabled={loading === provider.id}

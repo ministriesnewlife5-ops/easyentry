@@ -110,7 +110,7 @@ export type PublishedEvent = {
   is_featured: boolean;
   is_public: boolean;
   status: string;
-  social_links: Record<string, string> | null;
+  social_links: Record<string, unknown> | null;
   request_id: string | null;
   published_at: string;
   created_at: string;

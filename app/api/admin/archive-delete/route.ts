@@ -5,7 +5,7 @@ import { getSupabaseServerClient } from '@/lib/supabase';
 export async function PUT(req: NextRequest) {
   try {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    if (!token || token.role !== 'admin') {
+    if (!token || (token.role !== 'admin' && token.role !== 'sub_admin')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

@@ -22,3 +22,18 @@ CREATE INDEX IF NOT EXISTS idx_event_requests_user_id
 -- Optional: index for status filtering
 CREATE INDEX IF NOT EXISTS idx_event_requests_status
   ON event_requests (status);
+
+-- ============================================================
+-- Coupon attribution + analytics support on ticket_bookings
+-- ============================================================
+
+ALTER TABLE ticket_bookings
+  ADD COLUMN IF NOT EXISTS coupon_code            TEXT,
+  ADD COLUMN IF NOT EXISTS coupon_source_type     TEXT,
+  ADD COLUMN IF NOT EXISTS coupon_source_id       TEXT,
+  ADD COLUMN IF NOT EXISTS coupon_source_name     TEXT,
+  ADD COLUMN IF NOT EXISTS coupon_discount_percent NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS coupon_discount_amount  NUMERIC(10,2);
+
+CREATE INDEX IF NOT EXISTS idx_ticket_bookings_coupon_code
+  ON ticket_bookings (coupon_code);

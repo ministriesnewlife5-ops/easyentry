@@ -20,6 +20,17 @@ type PublicEventTaggedArtist = {
   imageUrl?: string;
 };
 
+export type PublicEventCouponRule = {
+  code: string;
+  discountPercent: number;
+  sourceType: 'outlet' | 'artist' | 'promoter' | 'influencer';
+  sourceId?: string;
+  sourceName?: string;
+  startsAt?: string;
+  endsAt?: string;
+  maxUses?: number;
+};
+
 export type PublicEventHighlight = {
   iconKey: 'star' | 'zap';
   title: string;
@@ -61,6 +72,7 @@ export type PublicEvent = {
   date: string;
   time: string;
   venue: string;
+  couponRules?: PublicEventCouponRule[];
   locationState?: string;
   locationDistrict?: string;
   locationArea?: string;
@@ -106,8 +118,8 @@ export type PublicEventCard = {
   createdAt: number;
 };
 
-// Map legacy PublicEvent to database schema
-function mapLegacyToDb(event: Partial<PublicEvent> & { sourceRequestId?: string }): Record<string, unknown> {
+// Map PublicEvent to database schema
+function mapEventToDb(event: Partial<PublicEvent> & { sourceRequestId?: string }): Record<string, unknown> {
   const allMediaRaw = Array.from(
     new Set([...(event.images || []), ...(event.mediaFiles || [])].filter(Boolean))
   );
@@ -118,7 +130,7 @@ function mapLegacyToDb(event: Partial<PublicEvent> & { sourceRequestId?: string 
       ? event.image
       : allImages[0] || null;
   const parsedTicketPrice = Number(String(event.price || '').replace(/[^\d.]/g, ''));
-  const socialLinks: Record<string, string> = {};
+  const socialLinks: Record<string, unknown> = {};
 
   if (event.googleMapsLink) socialLinks.googleMapsLink = event.googleMapsLink;
   if (event.venue) socialLinks.venue = event.venue;
@@ -130,6 +142,9 @@ function mapLegacyToDb(event: Partial<PublicEvent> & { sourceRequestId?: string 
   if (event.promoterName) socialLinks.promoterName = event.promoterName;
   if (event.promoterLabel) socialLinks.promoterLabel = event.promoterLabel;
   if (event.subtitle) socialLinks.subtitle = event.subtitle;
+  if (Array.isArray(event.couponRules) && event.couponRules.length > 0) {
+    socialLinks.couponRules = event.couponRules;
+  }
   if (event.locationState) socialLinks.locationState = event.locationState;
   if (event.locationDistrict) socialLinks.locationDistrict = event.locationDistrict;
   if (event.locationArea) socialLinks.locationArea = event.locationArea;
@@ -177,8 +192,8 @@ function splitMediaFiles(media: string[]): { images: string[]; videos: string[] 
   return { images, videos };
 }
 
-// Map database record to legacy PublicEvent
-function mapDbToLegacy(
+// Map database record to PublicEvent
+function mapDbToEvent(
   record: Record<string, unknown>,
   ticketCategoriesOverride?: PublicEventTicketCategory[],
   taggedArtistsOverride?: PublicEventTaggedArtist[]
@@ -205,6 +220,20 @@ function mapDbToLegacy(
   const locationState = socialLinks && typeof socialLinks.locationState === 'string' ? socialLinks.locationState : undefined;
   const locationDistrict = socialLinks && typeof socialLinks.locationDistrict === 'string' ? socialLinks.locationDistrict : undefined;
   const locationArea = socialLinks && typeof socialLinks.locationArea === 'string' ? socialLinks.locationArea : undefined;
+  const couponRules = socialLinks && Array.isArray((socialLinks as Record<string, unknown>).couponRules)
+    ? ((socialLinks as Record<string, unknown>).couponRules as Array<Record<string, unknown>>)
+        .map((rule) => ({
+          code: typeof rule.code === 'string' ? rule.code.trim().toUpperCase() : '',
+          discountPercent: Number(rule.discountPercent || 0),
+          sourceType: (typeof rule.sourceType === 'string' ? rule.sourceType : 'outlet') as PublicEventCouponRule['sourceType'],
+          sourceId: typeof rule.sourceId === 'string' ? rule.sourceId : undefined,
+          sourceName: typeof rule.sourceName === 'string' ? rule.sourceName : undefined,
+          startsAt: typeof rule.startsAt === 'string' ? rule.startsAt : undefined,
+          endsAt: typeof rule.endsAt === 'string' ? rule.endsAt : undefined,
+          maxUses: Number.isFinite(Number(rule.maxUses)) ? Number(rule.maxUses) : undefined,
+        }))
+        .filter((rule) => Boolean(rule.code) && rule.discountPercent > 0 && rule.discountPercent <= 100)
+    : undefined;
   const venue = socialLinks && typeof socialLinks.venue === 'string' ? socialLinks.venue : '';
   const distance = socialLinks && typeof socialLinks.distance === 'string' ? socialLinks.distance : 'Newly published event';
   const gatesOpen = socialLinks && typeof socialLinks.gatesOpen === 'string' ? socialLinks.gatesOpen : '';
@@ -225,6 +254,7 @@ function mapDbToLegacy(
     date: (record.date as string) || '',
     time: (record.time as string) || '',
     venue,
+    couponRules,
     locationState,
     locationDistrict,
     locationArea,
@@ -474,6 +504,7 @@ function createApprovedEvent(request: EventRequest): Partial<PublicEvent> {
     date: request.eventData.date,
     time: request.eventData.time,
     venue: request.eventData.venue,
+    couponRules: request.eventData.couponRules,
     locationState: request.eventData.locationState,
     locationDistrict: request.eventData.locationDistrict,
     locationArea: request.eventData.locationArea,
@@ -527,7 +558,7 @@ export async function getAllPublishedEvents(): Promise<PublicEvent[]> {
     throw new Error(`Failed to get published events: ${error.message}`);
   }
 
-  return (data as Record<string, unknown>[])?.map((record) => mapDbToLegacy(record)) || [];
+  return (data as Record<string, unknown>[])?.map((record) => mapDbToEvent(record)) || [];
 }
 
 /**
@@ -566,7 +597,7 @@ export async function getPublishedEventById(id: string): Promise<PublicEvent | u
     taggedArtists = await getTaggedArtistsFromSourceRequest(requestId);
   }
 
-  return mapDbToLegacy(data as Record<string, unknown>, ticketCategories, taggedArtists);
+  return mapDbToEvent(data as Record<string, unknown>, ticketCategories, taggedArtists);
 }
 
 /**
@@ -596,7 +627,7 @@ export async function getPublishedEventCards(): Promise<PublicEventCard[]> {
  */
 export async function publishEventFromRequest(request: EventRequest): Promise<PublicEvent> {
   const eventData = createApprovedEvent(request);
-  const dbData = mapLegacyToDb({ ...eventData, sourceRequestId: request.id });
+  const dbData = mapEventToDb({ ...eventData, sourceRequestId: request.id });
 
   // Check if already published
   const { data: existing } = await supabase
@@ -660,7 +691,7 @@ export async function publishEventFromRequest(request: EventRequest): Promise<Pu
   }
 
   const ticketCategories = await getTicketCategoriesByEventId(publishedEventId);
-  return mapDbToLegacy(result as Record<string, unknown>, ticketCategories);
+  return mapDbToEvent(result as Record<string, unknown>, ticketCategories);
 }
 
 /**
@@ -684,7 +715,7 @@ export async function unpublishEventByRequestId(requestId: string): Promise<bool
  * Create a new published event (direct creation)
  */
 export async function createPublishedEvent(event: Partial<PublicEvent>): Promise<PublicEvent> {
-  const dbData = mapLegacyToDb(event);
+  const dbData = mapEventToDb(event);
 
   const { data, error } = await supabase
     .from('published_events')
@@ -696,7 +727,7 @@ export async function createPublishedEvent(event: Partial<PublicEvent>): Promise
     throw new Error(`Failed to create published event: ${error.message}`);
   }
 
-  return mapDbToLegacy(data as Record<string, unknown>);
+  return mapDbToEvent(data as Record<string, unknown>);
 }
 
 /**
@@ -737,7 +768,7 @@ export async function updatePublishedEvent(
     throw new Error(`Failed to update published event: ${error.message}`);
   }
 
-  return mapDbToLegacy(data as Record<string, unknown>);
+  return mapDbToEvent(data as Record<string, unknown>);
 }
 
 /**
@@ -772,7 +803,7 @@ export async function getPublishedEventsByStatus(status: string): Promise<Public
     throw new Error(`Failed to get events by status: ${error.message}`);
   }
 
-  return (data as Record<string, unknown>[])?.map((record) => mapDbToLegacy(record)) || [];
+  return (data as Record<string, unknown>[])?.map((record) => mapDbToEvent(record)) || [];
 }
 
 /**
@@ -790,5 +821,5 @@ export async function getFeaturedEvents(): Promise<PublicEvent[]> {
     throw new Error(`Failed to get featured events: ${error.message}`);
   }
 
-  return (data as Record<string, unknown>[])?.map((record) => mapDbToLegacy(record)) || [];
+  return (data as Record<string, unknown>[])?.map((record) => mapDbToEvent(record)) || [];
 }

@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
       eventId,
       ticketCategories,
       amount,
+      couponCode,
+      couponAudit,
       eventSnapshot,
     } = body;
 
@@ -82,6 +84,12 @@ export async function POST(request: NextRequest) {
       ticket_categories: ticketCategories,
       total_tickets: totalTickets,
       amount_paid: amount / 100, // Convert paise to rupees
+      coupon_code: typeof couponCode === 'string' && couponCode.trim() ? couponCode.trim().toUpperCase() : null,
+      coupon_source_type: typeof couponAudit?.sourceType === 'string' ? couponAudit.sourceType : null,
+      coupon_source_id: typeof couponAudit?.sourceId === 'string' ? couponAudit.sourceId : null,
+      coupon_source_name: typeof couponAudit?.sourceName === 'string' ? couponAudit.sourceName : null,
+      coupon_discount_percent: Number.isFinite(Number(couponAudit?.discountPercent)) ? Number(couponAudit.discountPercent) : null,
+      coupon_discount_amount: Number.isFinite(Number(couponAudit?.discountAmount)) ? Number(couponAudit.discountAmount) / 100 : null,
       payment_id: razorpay_payment_id,
       order_id: razorpay_order_id,
       status: 'confirmed',

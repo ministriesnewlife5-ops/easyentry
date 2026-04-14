@@ -18,6 +18,17 @@ type TicketCategory = {
   availableUntil?: string;
 };
 
+type CouponRule = {
+  code: string;
+  discountPercent: number;
+  sourceType: 'outlet' | 'artist' | 'promoter' | 'influencer';
+  sourceId?: string;
+  sourceName?: string;
+  startsAt?: string;
+  endsAt?: string;
+  maxUses?: number;
+};
+
 type EventRequest = {
   id: string;
   outletUserId: string;
@@ -30,6 +41,7 @@ type EventRequest = {
     time: string;
     endTime?: string;
     venue: string;
+    couponRules?: CouponRule[];
     googleMapsLink?: string;
     locationState?: string;
     locationDistrict?: string;
@@ -257,6 +269,27 @@ export default function EventRequestsSection() {
                 <DetailRow label="Submitted" value={new Date(request.submittedAt).toLocaleString('en-IN')} />
               </div>
             </div>
+
+            {Array.isArray(ed.couponRules) && ed.couponRules.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-[#F5F5DC]/40 uppercase tracking-wider mb-2">Coupon Rules</p>
+                <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/60 p-3 space-y-2">
+                  {ed.couponRules.map((rule, idx) => (
+                    <div key={`${request.id}-coupon-${idx}`} className="rounded-lg border border-[#2A2A2A] bg-[#101018] p-3 text-xs text-[#F5F5DC]/80">
+                      <p><span className="text-[#F5F5DC]/50">Code:</span> {rule.code}</p>
+                      <p><span className="text-[#F5F5DC]/50">Discount:</span> {rule.discountPercent}%</p>
+                      <p><span className="text-[#F5F5DC]/50">Source:</span> {rule.sourceType}{rule.sourceName ? ` · ${rule.sourceName}` : ''}</p>
+                      {(rule.startsAt || rule.endsAt) && (
+                        <p><span className="text-[#F5F5DC]/50">Window:</span> {rule.startsAt || '—'} to {rule.endsAt || '—'}</p>
+                      )}
+                      {rule.maxUses ? (
+                        <p><span className="text-[#F5F5DC]/50">Max Uses:</span> {rule.maxUses}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Event Content */}
             {(ed.description || ed.fullDescription) && (

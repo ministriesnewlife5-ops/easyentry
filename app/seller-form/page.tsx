@@ -137,8 +137,14 @@ export default function SellerFormPage() {
   const [events, setEvents] = useState<Array<{ id: number; title: string; venue: string; date: string }>>([]);
   const [promoForm, setPromoForm] = useState({
     eventId: '',
-    promoCode: '',
-    discountPercent: ''
+    couponCode: '',
+    couponDiscountPercent: '',
+    sourceType: 'outlet' as 'outlet' | 'artist' | 'promoter' | 'influencer',
+    sourceRefId: '',
+    sourceRefName: '',
+    startsAt: '',
+    endsAt: '',
+    maxUses: '',
   });
   const [promoRequests, setPromoRequests] = useState<Array<{ id: number; eventTitle: string; code: string; status: string }>>([]);
   const [showNotification, setShowNotification] = useState(false);
@@ -459,7 +465,7 @@ export default function SellerFormPage() {
     const prefix = 'SELLER';
     const random = Math.random().toString(36).substring(2, 6).toUpperCase();
     const code = `${prefix}${random}`;
-    setPromoForm(prev => ({ ...prev, promoCode: code }));
+    setPromoForm(prev => ({ ...prev, couponCode: code }));
   };
 
   const handleSendEventRequest = async (e: React.FormEvent) => {
@@ -509,6 +515,44 @@ export default function SellerFormPage() {
       setTimeout(() => setShowNotification(false), 5000);
       return;
     }
+
+    if (promoForm.couponCode && !promoForm.couponDiscountPercent) {
+      setNotificationMessage('Please enter a discount percentage for the promo code.');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 5000);
+      return;
+    }
+
+    if (promoForm.couponDiscountPercent) {
+      const parsedDiscount = Number(promoForm.couponDiscountPercent);
+      if (!Number.isFinite(parsedDiscount) || parsedDiscount <= 0 || parsedDiscount > 100) {
+        setNotificationMessage('Discount percentage must be between 1 and 100.');
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 5000);
+        return;
+      }
+    }
+
+    if (promoForm.maxUses) {
+      const parsedMaxUses = Number(promoForm.maxUses);
+      if (!Number.isInteger(parsedMaxUses) || parsedMaxUses <= 0) {
+        setNotificationMessage('Max uses must be a positive whole number.');
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 5000);
+        return;
+      }
+    }
+
+    if (promoForm.startsAt && promoForm.endsAt) {
+      const startAt = new Date(promoForm.startsAt).getTime();
+      const endAt = new Date(promoForm.endsAt).getTime();
+      if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
+        setNotificationMessage('Coupon end time must be after start time.');
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 5000);
+        return;
+      }
+    }
     
     setIsSubmitting(true);
     
@@ -551,6 +595,18 @@ export default function SellerFormPage() {
         seating: 'General Admission',
         rules: rules.filter(r => r.text.trim()).map(r => r.text),
         taggedArtists: selectedArtists.map(a => ({ id: a.id, name: a.name, email: a.email })),
+        couponRules: promoForm.couponCode ? [
+          {
+            code: promoForm.couponCode.trim().toUpperCase(),
+            discountPercent: Number(promoForm.couponDiscountPercent || 0),
+            sourceType: promoForm.sourceType,
+            sourceId: promoForm.sourceRefId || undefined,
+            sourceName: promoForm.sourceRefName || undefined,
+            startsAt: promoForm.startsAt || undefined,
+            endsAt: promoForm.endsAt || undefined,
+            maxUses: promoForm.maxUses ? Number(promoForm.maxUses) : undefined,
+          }
+        ] : undefined,
         ticketCategories: ticketCategories.map(cat => ({
           ...cat,
           tagline: (cat.tagline || '').trim() || undefined,
@@ -631,15 +687,26 @@ export default function SellerFormPage() {
         setArtistSearchQuery('');
         
         // Also handle promo code if entered
-        if (promoForm.promoCode) {
+        if (promoForm.couponCode) {
           const newRequest = {
             id: Date.now(),
             eventTitle: formData.title,
-            code: promoForm.promoCode,
+            code: promoForm.couponCode,
+            discountPercent: promoForm.couponDiscountPercent,
             status: 'Pending'
           };
           setPromoRequests(prev => [newRequest, ...prev]);
-          setPromoForm({ eventId: '', promoCode: '', discountPercent: '' });
+          setPromoForm({
+            eventId: '',
+            couponCode: '',
+            couponDiscountPercent: '',
+            sourceType: 'outlet',
+            sourceRefId: '',
+            sourceRefName: '',
+            startsAt: '',
+            endsAt: '',
+            maxUses: '',
+          });
         }
         
         // Redirect to outlet profile events page after 2 seconds to see the notification
@@ -1802,8 +1869,8 @@ export default function SellerFormPage() {
                       <div className="flex gap-3">
                         <input 
                           type="text" 
-                          name="promoCode"
-                          value={promoForm.promoCode}
+                          name="couponCode"
+                          value={promoForm.couponCode}
                           onChange={handlePromoInputChange}
                           className="flex-1 bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] uppercase tracking-wider"
                           placeholder="e.g. SELLER2024"
@@ -1823,14 +1890,91 @@ export default function SellerFormPage() {
                       <label className="block text-sm font-medium mb-3">Discount Percentage (Optional)</label>
                       <input 
                         type="number" 
-                        name="discountPercent"
-                        value={promoForm.discountPercent}
+                        name="couponDiscountPercent"
+                        value={promoForm.couponDiscountPercent}
                         onChange={handlePromoInputChange}
                         className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                         placeholder="e.g. 15"
                         min="1"
                         max="100"
                       />
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="block text-sm font-medium mb-3">Coupon Source Type</label>
+                        <select
+                          name="sourceType"
+                          value={promoForm.sourceType}
+                          onChange={handlePromoInputChange}
+                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                        >
+                          <option value="outlet">Outlet</option>
+                          <option value="artist">Artist</option>
+                          <option value="promoter">Promoter</option>
+                          <option value="influencer">Influencer</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-3">Max Uses (Optional)</label>
+                        <input
+                          type="number"
+                          name="maxUses"
+                          value={promoForm.maxUses}
+                          onChange={handlePromoInputChange}
+                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                          placeholder="e.g. 100"
+                          min="1"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="block text-sm font-medium mb-3">Source Ref ID (Optional)</label>
+                        <input
+                          type="text"
+                          name="sourceRefId"
+                          value={promoForm.sourceRefId}
+                          onChange={handlePromoInputChange}
+                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                          placeholder="User UUID or internal reference"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-3">Source Name (Optional)</label>
+                        <input
+                          type="text"
+                          name="sourceRefName"
+                          value={promoForm.sourceRefName}
+                          onChange={handlePromoInputChange}
+                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                          placeholder="Artist/Influencer display name"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="block text-sm font-medium mb-3">Coupon Starts At (Optional)</label>
+                        <input
+                          type="datetime-local"
+                          name="startsAt"
+                          value={promoForm.startsAt}
+                          onChange={handlePromoInputChange}
+                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-3">Coupon Ends At (Optional)</label>
+                        <input
+                          type="datetime-local"
+                          name="endsAt"
+                          value={promoForm.endsAt}
+                          onChange={handlePromoInputChange}
+                          className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                        />
+                      </div>
                     </div>
 
                     <div className="rounded-xl border border-[#E5A823]/20 bg-[#E5A823]/10 p-4">

@@ -29,9 +29,13 @@ export default async function AdminPage({
     redirect('/login');
   }
 
-  if (session.user.role !== 'admin') {
+  if (session.user.role !== 'admin' && session.user.role !== 'sub_admin') {
     redirect('/events');
   }
+
+  const isSuperAdmin = session.user.role === 'admin';
+  const restrictedSections = ['ads', 'browse-filters', 'host-event', 'onboarding', 'settings'];
+  const currentSection = !isSuperAdmin && restrictedSections.includes(activeSection) ? 'overview' : activeSection;
 
   // Fetch real data from the database
   const publishedEvents = await getAllPublishedEvents();
@@ -82,6 +86,7 @@ export default async function AdminPage({
     completedEvents: 0,
     upcomingEvents: 0,
     ticketsSoldByCode: 0,
+    isVerified: Boolean((artist as any).is_verified),
   }));
 
   // Map influencers to the format used in the admin dashboard
@@ -91,6 +96,7 @@ export default async function AdminPage({
     image: `https://ui-avatars.com/api/?name=${encodeURIComponent(influencer.name || 'Unknown')}&background=random&color=fff&size=200`,
     location: 'Chennai, Tamil Nadu',
     ticketsSoldByCode: 0,
+    isVerified: Boolean((influencer as any).is_verified),
   }));
 
   // Map outlet providers to the format used in the admin dashboard
@@ -207,26 +213,36 @@ export default async function AdminPage({
               <FileText className="h-4 w-4" />
               Event Requests
             </Link>
-            <Link href="/admin?section=host-event" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'host-event' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
-              <Plus className="h-4 w-4" />
-              Host Event
-            </Link>
-            <Link href="/admin?section=onboarding" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'onboarding' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
-              <UserPlus className="h-4 w-4" />
-              Onboard Users
-            </Link>
-            <Link href="/admin?section=settings" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'settings' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
-              <Settings className="h-4 w-4" />
-              Settings
-            </Link>
-            <Link href="/admin?section=ads" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'ads' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
-              <ImageIcon className="h-4 w-4" />
-              Ads Banner
-            </Link>
-            <Link href="/admin?section=browse-filters" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'browse-filters' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
-              <Settings className="h-4 w-4" />
-              Browse Filters
-            </Link>
+            {isSuperAdmin && (
+              <Link href="/admin?section=host-event" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'host-event' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
+                <Plus className="h-4 w-4" />
+                Host Event
+              </Link>
+            )}
+            {isSuperAdmin && (
+              <Link href="/admin?section=onboarding" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'onboarding' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
+                <UserPlus className="h-4 w-4" />
+                Onboard Users
+              </Link>
+            )}
+            {isSuperAdmin && (
+              <Link href="/admin?section=settings" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'settings' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
+                <Settings className="h-4 w-4" />
+                Settings
+              </Link>
+            )}
+            {isSuperAdmin && (
+              <Link href="/admin?section=ads" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'ads' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
+                <ImageIcon className="h-4 w-4" />
+                Ads Banner
+              </Link>
+            )}
+            {isSuperAdmin && (
+              <Link href="/admin?section=browse-filters" className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 ${activeSection === 'browse-filters' ? 'bg-[#E5A823]/15 text-[#E5A823]' : 'text-[#F5F5DC]/70 transition hover:bg-[#2A2A2A] hover:text-[#F5F5DC]'}`}>
+                <Settings className="h-4 w-4" />
+                Browse Filters
+              </Link>
+            )}
           </nav>
         </aside>
 
@@ -235,57 +251,57 @@ export default async function AdminPage({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">
-                  {activeSection === 'ads' ? 'Advertisement Banners' : 
-                   activeSection === 'browse-filters' ? 'Browse Filters' :
-                   activeSection === 'events' ? 'All Platform Events' : 
-                   activeSection === 'artists' ? 'All Enrolled Artists' :
-                   activeSection === 'influencers' ? 'All Influencers' :
-                   activeSection === 'outlet-providers' ? 'All Outlet Providers' :
-                   activeSection === 'requests' ? 'Event Requests' :
-                   activeSection === 'host-event' ? 'Host New Event' :
-                   activeSection === 'onboarding' ? 'Onboard Users' :
-                   activeSection === 'settings' ? 'Settings' :
+                  {currentSection === 'ads' ? 'Advertisement Banners' :
+                   currentSection === 'browse-filters' ? 'Browse Filters' :
+                   currentSection === 'events' ? 'All Platform Events' :
+                   currentSection === 'artists' ? 'All Enrolled Artists' :
+                   currentSection === 'influencers' ? 'All Influencers' :
+                   currentSection === 'outlet-providers' ? 'All Outlet Providers' :
+                   currentSection === 'requests' ? 'Event Requests' :
+                   currentSection === 'host-event' ? 'Host New Event' :
+                   currentSection === 'onboarding' ? 'Onboard Sub-Admins' :
+                   currentSection === 'settings' ? 'Settings' :
                    'Admin Dashboard'}
                 </h1>
                 <p className="mt-1 text-sm text-[#F5F5DC]/65">
-                  {activeSection === 'ads' ? 'Create and manage promotion banners from promo data presets' : 
-                   activeSection === 'browse-filters' ? 'Manage main filters and category filters for browsing events' :
-                   activeSection === 'events' ? `Manage and view all ${allWebsiteEvents.length} events across the platform` : 
-                   activeSection === 'artists' ? `Manage and view all ${allEnrolledArtists.length} artists enrolled on the platform` :
-                   activeSection === 'influencers' ? `Manage and view all ${allInfluencers.length} influencers collaborating on the platform` :
-                   activeSection === 'outlet-providers' ? `Manage and view all outlet providers on the platform` :
-                   activeSection === 'requests' ? 'Review and approve event requests from outlet providers' :
-                   activeSection === 'host-event' ? 'Create and publish events directly for outlets and promoters' :
-                   activeSection === 'onboarding' ? 'Create accounts for artists, influencers, and outlet providers' :
-                   activeSection === 'settings' ? 'Manage your account settings and security' :
+                  {currentSection === 'ads' ? 'Create and manage promotion banners from promo data presets' :
+                   currentSection === 'browse-filters' ? 'Manage main filters and category filters for browsing events' :
+                   currentSection === 'events' ? `Manage and view all ${allWebsiteEvents.length} events across the platform` :
+                   currentSection === 'artists' ? `Manage and view all ${allEnrolledArtists.length} artists enrolled on the platform` :
+                   currentSection === 'influencers' ? `Manage and view all ${allInfluencers.length} influencers collaborating on the platform` :
+                   currentSection === 'outlet-providers' ? `Manage and view all outlet providers on the platform` :
+                   currentSection === 'requests' ? 'Review and approve event requests from outlet providers' :
+                   currentSection === 'host-event' ? 'Create and publish events directly for outlets and promoters' :
+                   currentSection === 'onboarding' ? 'Create sub-admin accounts with limited permissions' :
+                   currentSection === 'settings' ? 'Manage your account settings and security' :
                    `${upcomingEvents.length} upcoming events · ${allUsers.length} total users`}
                 </p>
               </div>
-              {activeSection === 'ads' && (
+              {currentSection === 'ads' && (
                 <span className="rounded-full bg-[#E5A823]/10 px-4 py-2 text-xs font-semibold text-[#E5A823]">Promo Banner Data</span>
               )}
             </div>
           </header>
 
-          {activeSection === 'events' ? (
+          {currentSection === 'events' ? (
             <EventsTable events={allWebsiteEvents} />
-          ) : activeSection === 'artists' ? (
+          ) : currentSection === 'artists' ? (
             <ArtistsTable artists={allEnrolledArtists} />
-          ) : activeSection === 'influencers' ? (
+          ) : currentSection === 'influencers' ? (
             <InfluencersTable influencers={allInfluencers} />
-          ) : activeSection === 'outlet-providers' ? (
+          ) : currentSection === 'outlet-providers' ? (
             <OutletProvidersTable outletProviders={allOutletProviders} />
-          ) : activeSection === 'ads' ? (
+          ) : currentSection === 'ads' ? (
             <AdsBannerManager />
-          ) : activeSection === 'browse-filters' ? (
+          ) : currentSection === 'browse-filters' ? (
             <BrowseFiltersManager />
-          ) : activeSection === 'requests' ? (
+          ) : currentSection === 'requests' ? (
             <EventRequestsSection />
-          ) : activeSection === 'host-event' ? (
+          ) : currentSection === 'host-event' ? (
             <AdminEventHostSection />
-          ) : activeSection === 'onboarding' ? (
+          ) : currentSection === 'onboarding' ? (
             <AdminOnboardingSection />
-          ) : activeSection === 'settings' ? (
+          ) : currentSection === 'settings' ? (
             <SettingsContent userEmail={session?.user?.email} />
           ) : (
             <>

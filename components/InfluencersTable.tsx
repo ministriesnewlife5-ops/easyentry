@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Archive, Trash2, ExternalLink, AlertCircle } from 'lucide-react';
+import { Archive, Trash2, ExternalLink, AlertCircle, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
 interface Influencer {
@@ -10,6 +10,7 @@ interface Influencer {
   image: string;
   location: string;
   ticketsSoldByCode: number;
+  isVerified: boolean;
 }
 
 interface InfluencersTableProps {
@@ -20,6 +21,27 @@ export default function InfluencersTable({ influencers }: InfluencersTableProps)
   const [data, setData] = useState(influencers);
   const [loading, setLoading] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: 'archive' | 'delete' } | null>(null);
+
+  const handleApprove = async (id: string) => {
+    setLoading(id);
+    try {
+      const response = await fetch('/api/admin/approve-user', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+
+      if (response.ok) {
+        setData(prev => prev.map(item => item.id === id ? { ...item, isVerified: true } : item));
+      } else {
+        console.error('Failed to approve influencer');
+      }
+    } catch (error) {
+      console.error('Error approving influencer:', error);
+    } finally {
+      setLoading(null);
+    }
+  };
 
   const handleAction = async (id: string, action: 'archive' | 'delete') => {
     setLoading(id);
@@ -76,6 +98,16 @@ export default function InfluencersTable({ influencers }: InfluencersTableProps)
                       <ExternalLink className="w-3 h-3" />
                       View
                     </Link>
+                    {!inf.isVerified && (
+                      <button
+                        onClick={() => handleApprove(inf.id)}
+                        disabled={loading === inf.id}
+                        className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-emerald-500/20 rounded-lg hover:bg-emerald-500 hover:text-white transition-colors disabled:opacity-50"
+                      >
+                        <CheckCircle className="w-3 h-3" />
+                        Approve
+                      </button>
+                    )}
                     <button
                       onClick={() => setConfirmAction({ id: inf.id, action: 'archive' })}
                       disabled={loading === inf.id}

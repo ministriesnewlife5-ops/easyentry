@@ -22,13 +22,10 @@ import {
   EyeOff
 } from 'lucide-react';
 
-type Role = 'artist' | 'promoter' | 'outlet' | 'admin';
+type Role = 'sub_admin';
 
 const roles = [
-  { id: 'artist' as Role, label: 'Artist', icon: Mic2, desc: 'Perform & grow their audience', color: '#E5A823' },
-  { id: 'promoter' as Role, label: 'Influencer/Promoter', icon: Megaphone, desc: 'Sell tickets & promote events', color: '#EB4D4B' },
-  { id: 'outlet' as Role, label: 'Outlet Provider', icon: Building2, desc: 'Host events at their venue', color: '#10B981' },
-  { id: 'admin' as Role, label: 'Admin', icon: Shield, desc: 'Manage platform operations', color: '#6366F1' },
+  { id: 'sub_admin' as Role, label: 'Sub Admin', icon: Shield, desc: 'Manage approved admin operations', color: '#6366F1' },
 ];
 
 const sectionVariants = {
@@ -41,7 +38,7 @@ const sectionVariants = {
 };
 
 export default function AdminOnboardingSection() {
-  const [selectedRole, setSelectedRole] = useState<Role>('artist');
+  const [selectedRole, setSelectedRole] = useState<Role>('sub_admin');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -175,8 +172,8 @@ export default function AdminOnboardingSection() {
             <Sparkles className="w-6 h-6 text-[#0D0D0D]" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#F5F5DC]">Onboard Users</h1>
-            <p className="text-sm text-[#F5F5DC]/50">Create accounts for artists, influencers, outlet providers, and admins</p>
+            <h1 className="text-2xl font-bold text-[#F5F5DC]">Onboard Sub-Admins</h1>
+            <p className="text-sm text-[#F5F5DC]/50">Create accounts for limited-permission admin operators only</p>
           </div>
         </div>
       </motion.div>

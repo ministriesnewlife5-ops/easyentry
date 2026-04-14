@@ -11,6 +11,10 @@ import { getSupabaseServerClient } from '@/lib/supabase';
 
 const BROWSE_FILTERS_SETTINGS_KEY = 'browse_filters';
 
+function normalizeText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 function parseDateTime(dateValue?: string, timeValue?: string): Date | null {
   if (!dateValue) return null;
   const parsed = new Date(`${dateValue}T${timeValue || '00:00'}`);
@@ -79,6 +83,51 @@ function validateEventDateTimes(eventData: Record<string, unknown>): string {
       if (until < from) {
         return `Ticket category ${String(category.name || 'Unnamed')} must end after it starts.`;
       }
+    }
+  }
+
+  return '';
+}
+
+function validateCouponRules(eventData: Record<string, unknown>): string {
+  if (!Array.isArray(eventData.couponRules)) {
+    return '';
+  }
+
+  for (const rawRule of eventData.couponRules as Array<Record<string, unknown>>) {
+    const code = normalizeText(rawRule.code).toUpperCase();
+    const percent = Number(rawRule.discountPercent || 0);
+    const sourceType = normalizeText(rawRule.sourceType);
+    const startsAt = normalizeText(rawRule.startsAt);
+    const endsAt = normalizeText(rawRule.endsAt);
+    const maxUses = rawRule.maxUses == null ? undefined : Number(rawRule.maxUses);
+
+    if (!code) {
+      return 'Each coupon rule must have a coupon code.';
+    }
+
+    if (!Number.isFinite(percent) || percent <= 0 || percent > 100) {
+      return `Coupon ${code} must have discount percent between 1 and 100.`;
+    }
+
+    if (sourceType && !['outlet', 'artist', 'promoter', 'influencer'].includes(sourceType)) {
+      return `Coupon ${code} has an invalid source type.`;
+    }
+
+    if (startsAt && Number.isNaN(new Date(startsAt).getTime())) {
+      return `Coupon ${code} has an invalid start time.`;
+    }
+
+    if (endsAt && Number.isNaN(new Date(endsAt).getTime())) {
+      return `Coupon ${code} has an invalid end time.`;
+    }
+
+    if (startsAt && endsAt && new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+      return `Coupon ${code} end time must be after start time.`;
+    }
+
+    if (maxUses != null && (!Number.isInteger(maxUses) || maxUses <= 0)) {
+      return `Coupon ${code} max uses must be a positive integer.`;
     }
   }
 
@@ -156,7 +205,7 @@ export async function GET(request: NextRequest) {
   try {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
     
-    if (!token || token.role !== 'admin') {
+    if (!token || (token.role !== 'admin' && token.role !== 'sub_admin')) {
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
     }
 
@@ -190,6 +239,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required event data' }, { status: 400 });
     }
 
+    const couponError = validateCouponRules(eventData as Record<string, unknown>);
+    if (couponError) {
+      return NextResponse.json({ error: couponError }, { status: 400 });
+    }
+
     const dateTimeError = validateEventDateTimes(eventData);
     if (dateTimeError) {
       return NextResponse.json({ error: dateTimeError }, { status: 400 });
@@ -221,6 +275,7 @@ export async function POST(request: NextRequest) {
           time: eventData.time,
           endTime: eventData.endTime,
           venue: eventData.venue,
+          couponRules: eventData.couponRules,
           locationState: eventData.locationState,
           locationDistrict: eventData.locationDistrict,
           locationArea: eventData.locationArea,
@@ -248,7 +303,7 @@ export async function PUT(request: NextRequest) {
   try {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
 
-    if (!token || token.role !== 'admin') {
+    if (!token || (token.role !== 'admin' && token.role !== 'sub_admin')) {
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
     }
 
