@@ -199,9 +199,27 @@ export default function PromoBanner() {
               x: { type: "spring", stiffness: 300, damping: 30 },
               opacity: { duration: 0.2 }
             }}
-            className="relative z-10 w-full h-full p-8 md:p-12 flex flex-col lg:flex-row items-center justify-between gap-8"
+            className="absolute inset-0 w-full h-full"
           >
-            <div className="flex flex-col items-start max-w-xl text-left">
+            {/* Background Image */}
+            {promoSlides[currentIndex].image ? (
+              <Image 
+                src={promoSlides[currentIndex].image} 
+                alt={promoSlides[currentIndex].title} 
+                fill 
+                className="object-cover" 
+                sizes="100vw" 
+                priority 
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-[#1A1A1A] to-[#0D0D0D]" />
+            )}
+            
+            {/* Dark Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-black/30" />
+            
+            {/* Content on top */}
+            <div className="relative z-10 w-full h-full p-8 md:p-12 flex flex-col items-start justify-center">
               <motion.span 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -214,7 +232,7 @@ export default function PromoBanner() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="text-3xl md:text-5xl font-black text-[#F5F5DC] mb-4 leading-tight"
+                className="text-3xl md:text-5xl font-black text-[#F5F5DC] mb-4 leading-tight max-w-2xl"
               >
                 {promoSlides[currentIndex].title}
               </motion.h2>
@@ -222,7 +240,7 @@ export default function PromoBanner() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="text-[#F5F5DC]/70 text-lg mb-8"
+                className="text-[#F5F5DC]/80 text-lg mb-8 max-w-xl"
               >
                 {promoSlides[currentIndex].description}
               </motion.p>
@@ -240,28 +258,6 @@ export default function PromoBanner() {
                 </a>
               </motion.div>
             </div>
-
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.4, duration: 0.5 }}
-              className="relative w-full lg:w-[450px] h-[280px] lg:h-[320px] flex-shrink-0"
-            >
-              {promoSlides[currentIndex].image ? (
-                <Image 
-                  src={promoSlides[currentIndex].image} 
-                  alt={promoSlides[currentIndex].title} 
-                  fill 
-                  className="object-cover rounded-2xl shadow-2xl border border-[#2A2A2A]" 
-                  sizes="(max-width: 1024px) 100vw, 600px" 
-                  priority 
-                />
-              ) : (
-                <div className="w-full h-full rounded-2xl border border-[#2A2A2A] bg-gradient-to-br from-[#1A1A1A] to-[#0D0D0D] flex items-center justify-center">
-                  <Sparkles className="w-10 h-10 text-[#E5A823]/50" />
-                </div>
-              )}
-            </motion.div>
           </motion.div>
         </AnimatePresence>
 

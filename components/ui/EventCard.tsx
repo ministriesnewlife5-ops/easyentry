@@ -3,7 +3,8 @@
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import Link from 'next/link';
 import { useState, MouseEvent, useRef, useEffect } from 'react';
-import { Heart, Share2, Calendar, MapPin, Clock, Sparkles, Zap, Instagram, MessageCircle, X } from 'lucide-react';
+import { Heart, Calendar, MapPin, Clock, Sparkles, Zap, Instagram, X } from 'lucide-react';
+import { BsWhatsapp } from 'react-icons/bs';
 import { toggleWishlist, isInWishlist, type WishlistEvent } from '@/lib/wishlist-store';
 
 interface EventCardProps {
@@ -23,7 +24,6 @@ interface EventCardProps {
 export default function EventCard({ id, title, date, venue, price, imageColor, imageUrl, category, subcategory, layout = 'horizontal', index = 0 }: EventCardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [showShareMenu, setShowShareMenu] = useState(false);
   const [showInstagramModal, setShowInstagramModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -316,8 +316,17 @@ export default function EventCard({ id, title, date, venue, price, imageColor, i
               </motion.div>
             </motion.button>
 
-            {/* Instagram and WhatsApp Share Buttons - Below Heart */}
-            <div className="absolute bottom-3 right-16 flex flex-col gap-2 z-20">
+            {/* Instagram and WhatsApp Share Buttons - Side by side */}
+            <div className="absolute bottom-3 right-16 flex flex-row gap-2 z-20">
+              <motion.button
+                onClick={shareToWhatsApp}
+                whileHover={{ scale: 1.15 }}
+                whileTap={{ scale: 0.9 }}
+                className="w-11 h-11 rounded-full bg-[#25D366] backdrop-blur-md flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-shadow"
+                title="Share to WhatsApp"
+              >
+                <BsWhatsapp className="w-5 h-5" />
+              </motion.button>
               <motion.button
                 onClick={shareToInstagram}
                 whileHover={{ scale: 1.15 }}
@@ -326,15 +335,6 @@ export default function EventCard({ id, title, date, venue, price, imageColor, i
                 title="Share to Instagram"
               >
                 <Instagram className="w-5 h-5" />
-              </motion.button>
-              <motion.button
-                onClick={shareToWhatsApp}
-                whileHover={{ scale: 1.15 }}
-                whileTap={{ scale: 0.9 }}
-                className="w-11 h-11 rounded-full bg-[#25D366] backdrop-blur-md flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-shadow"
-                title="Share to WhatsApp"
-              >
-                <MessageCircle className="w-5 h-5" />
               </motion.button>
             </div>
 
@@ -448,41 +448,6 @@ export default function EventCard({ id, title, date, venue, price, imageColor, i
               )}
             </AnimatePresence>
             
-            {/* Share Menu */}
-            <div className="absolute bottom-16 right-3 flex items-center gap-2 z-20">
-              <AnimatePresence>
-                {showShareMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, x: 20, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    exit={{ opacity: 0, x: 20, scale: 0.8 }}
-                    className="flex flex-col items-center gap-2 pb-2"
-                  >
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Share Button with pulse */}
-              <motion.button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setShowShareMenu(!showShareMenu);
-                }}
-                whileHover={{ scale: 1.15 }}
-                whileTap={{ scale: 0.9 }}
-                className="w-11 h-11 rounded-full bg-gradient-to-br from-[#E5A823] via-[#E5A823] to-[#EB4D4B] backdrop-blur-md border border-[#F5F5DC]/30 flex items-center justify-center text-white shadow-lg shadow-[#E5A823]/50 relative"
-              >
-                <motion.div
-                  animate={{ 
-                    boxShadow: ["0 0 0 0 rgba(229, 168, 35, 0.4)", "0 0 0 10px rgba(229, 168, 35, 0)"]
-                  }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  className="absolute inset-0 rounded-full"
-                />
-                <Share2 className="w-4 h-4 text-white relative z-10" />
-              </motion.button>
-            </div>
 
             {/* Category Badge with neon effect */}
             <motion.div 

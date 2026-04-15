@@ -1,12 +1,12 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
   MapPin, Languages, Award, Music, Star, 
   CheckCircle2, Play, Calendar, Briefcase, Globe, 
-  Heart, Share2, MessageCircle, Instagram, Youtube, 
+  Heart, MessageCircle, Instagram, Youtube, 
   Twitter, Facebook, ArrowLeft, X
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -48,7 +48,6 @@ export default function ArtistViewProfile() {
   const params = useParams();
   const artistId = params.id as string;
   const [showContactModal, setShowContactModal] = useState(false);
-  const [showShareMenu, setShowShareMenu] = useState(false);
   const [fetchedArtist, setFetchedArtist] = useState<ArtistData | null>(null);
   const [artistLoading, setArtistLoading] = useState(true);
 
@@ -151,7 +150,6 @@ export default function ArtistViewProfile() {
     if (!artist) return;
     const url = window.location.href;
     window.open(`https://wa.me/?text=${encodeURIComponent(`Check out ${artist.name}'s profile! ` + url)}`, '_blank');
-    setShowShareMenu(false);
   };
 
   const shareToInstagram = () => {
@@ -160,7 +158,6 @@ export default function ArtistViewProfile() {
     navigator.clipboard.writeText(`Check out ${artist.name}'s profile! ${url}`);
     alert("Link copied! You can now paste it in Instagram.");
     window.open('https://instagram.com', '_blank');
-    setShowShareMenu(false);
   };
 
   if (artistLoading && !artist) {
@@ -217,35 +214,20 @@ export default function ArtistViewProfile() {
             <Heart className="w-5 h-5" />
           </button>
           
-          <div className="relative flex items-center">
-            <AnimatePresence>
-              {showShareMenu && (
-                <motion.div
-                  initial={{ opacity: 0, x: 20, scale: 0.8 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: 20, scale: 0.8 }}
-                  className="flex items-center gap-2 pr-2"
-                >
-                  <button
-                    onClick={shareToWhatsApp}
-                    className="p-2 bg-[#25D366] backdrop-blur-md rounded-full hover:scale-110 transition-transform shadow-lg text-white"
-                    title="Share to WhatsApp"
-                  >
-                    <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.888-.788-1.489-1.761-1.663-2.06-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-                  </button>
-                  <button
-                    onClick={shareToInstagram}
-                    className="p-2 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 backdrop-blur-md rounded-full hover:scale-110 transition-transform shadow-lg text-white"
-                    title="Share to Instagram"
-                  >
-                    <Instagram className="w-5 h-5" />
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <button onClick={() => setShowShareMenu(!showShareMenu)} className="p-2 bg-[#0D0D0D]/60 backdrop-blur-md rounded-full hover:bg-[#E5A823] transition-colors relative z-10">
-              <Share2 className="w-5 h-5" />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={shareToWhatsApp}
+              className="p-2 bg-[#25D366] backdrop-blur-md rounded-full hover:scale-110 transition-transform shadow-lg text-white"
+              title="Share to WhatsApp"
+            >
+              <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.888-.788-1.489-1.761-1.663-2.06-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+            </button>
+            <button
+              onClick={shareToInstagram}
+              className="p-2 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 backdrop-blur-md rounded-full hover:scale-110 transition-transform shadow-lg text-white"
+              title="Share to Instagram"
+            >
+              <Instagram className="w-5 h-5" />
             </button>
           </div>
         </div>

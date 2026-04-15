@@ -552,22 +552,23 @@ export default function BrowseFilters({
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden mb-4"
             >
-              <div className="mb-3 flex items-center gap-2 rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2">
-                <Search className="h-4 w-4 text-[#F5F5DC]/40" />
-                <input
-                  value={areaSearch}
-                  onChange={(e) => setAreaSearch(e.target.value)}
-                  placeholder={`Search area in ${selectedCity.name}`}
-                  className="w-full bg-transparent text-sm text-[#F5F5DC] placeholder:text-[#F5F5DC]/35 outline-none"
-                />
-                {areaSearch && (
-                  <button onClick={() => setAreaSearch('')}>
-                    <X className="h-3.5 w-3.5 text-[#F5F5DC]/50" />
-                  </button>
-                )}
-              </div>
-
               <div className="flex items-center gap-2">
+                {/* Search Input */}
+                <div className="flex-shrink-0 flex items-center gap-2 rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2 w-48">
+                  <Search className="h-4 w-4 text-[#F5F5DC]/40" />
+                  <input
+                    value={areaSearch}
+                    onChange={(e) => setAreaSearch(e.target.value)}
+                    placeholder={`Search area in ${selectedCity.name}`}
+                    className="w-full bg-transparent text-sm text-[#F5F5DC] placeholder:text-[#F5F5DC]/35 outline-none"
+                  />
+                  {areaSearch && (
+                    <button onClick={() => setAreaSearch('')}>
+                      <X className="h-3.5 w-3.5 text-[#F5F5DC]/50" />
+                    </button>
+                  )}
+                </div>
+
                 {/* Left Arrow */}
                 <motion.button
                   whileHover={{ scale: 1.1 }}
