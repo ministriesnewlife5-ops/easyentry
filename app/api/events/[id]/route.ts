@@ -35,6 +35,8 @@ type EventTaggedArtist = {
   id: string;
   name: string;
   email?: string;
+  profileUrl: string;
+  imageUrl?: string;
 };
 
 function normalizeText(value: unknown): string {
@@ -103,11 +105,18 @@ function parseTaggedArtists(value: unknown): EventTaggedArtist[] | undefined {
   if (!Array.isArray(value)) return undefined;
 
   const artists = (value as Array<Record<string, unknown>>)
-    .map((artist) => ({
-      id: normalizeText(artist.id),
-      name: normalizeText(artist.name),
-      email: normalizeText(artist.email) || undefined,
-    }))
+    .map((artist) => {
+      const id = normalizeText(artist.id);
+      const profileUrlRaw = normalizeText(artist.profileUrl);
+
+      return {
+        id,
+        name: normalizeText(artist.name),
+        email: normalizeText(artist.email) || undefined,
+        profileUrl: profileUrlRaw || (id ? `/artist/${id}` : ''),
+        imageUrl: normalizeText(artist.imageUrl) || undefined,
+      };
+    })
     .filter((artist) => Boolean(artist.id));
 
   return artists;
