@@ -251,11 +251,7 @@ export async function PUT(
     const startTime = typeof body.startTime === 'string' ? body.startTime : undefined;
     const endTime = typeof body.endTime === 'string' ? body.endTime : undefined;
     const timeFromBody = typeof body.time === 'string' ? body.time : undefined;
-    const resolvedTime = startTime
-      ? endTime
-        ? `${startTime} - ${endTime}`
-        : startTime
-      : timeFromBody;
+    const resolvedTime = startTime || timeFromBody;
 
     const parsedRules = parseTextArray(body.rules);
     const parsedMediaFiles = parseTextArray(body.mediaFiles);
