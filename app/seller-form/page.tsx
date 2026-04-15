@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
   Calendar, 
@@ -95,6 +95,10 @@ async function compressImageForUpload(file: File): Promise<File> {
 
 export default function SellerFormPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editEventId = (searchParams.get('editEventId') || '').trim();
+  const returnToParam = (searchParams.get('returnTo') || '').trim();
+  const isEditMode = Boolean(editEventId);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -250,6 +254,50 @@ export default function SellerFormPage() {
       .filter((item): item is BrowseLocationState => item !== null);
   };
 
+  const parseTimeRange = (value?: string): { startTime: string; endTime: string } => {
+    if (!value) return { startTime: '', endTime: '' };
+    const segments = value
+      .split(/\s*-\s*/)
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+    return {
+      startTime: segments[0] || value,
+      endTime: segments[1] || '',
+    };
+  };
+
+  const splitDateAndTime = (value?: string): { date?: string; time?: string } => {
+    if (!value) return {};
+    const normalized = String(value).trim();
+    if (!normalized) return {};
+
+    const directMatch = normalized.match(/^(\d{4}-\d{2}-\d{2})[T\s](\d{2}:\d{2})/);
+    if (directMatch) {
+      return { date: directMatch[1], time: directMatch[2] };
+    }
+
+    const dateOnlyMatch = normalized.match(/^(\d{4}-\d{2}-\d{2})$/);
+    if (dateOnlyMatch) {
+      return { date: dateOnlyMatch[1] };
+    }
+
+    const parsed = new Date(normalized);
+    if (Number.isNaN(parsed.getTime())) return {};
+
+    const iso = parsed.toISOString();
+    return {
+      date: iso.slice(0, 10),
+      time: iso.slice(11, 16),
+    };
+  };
+
+  const getMediaTypeFromUrl = (url: string): string => {
+    if (/\.(mp4|webm|ogg|mov|m4v|avi)(\?|#|$)/i.test(url)) {
+      return 'video/mp4';
+    }
+    return 'image/jpeg';
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       // Load hosted events from API
@@ -312,6 +360,155 @@ export default function SellerFormPage() {
       fetchArtists();
     }
   }, []);
+
+  useEffect(() => {
+    if (!isEditMode || !editEventId) return;
+
+    let isCancelled = false;
+
+    const loadEventForEdit = async () => {
+      try {
+        const response = await fetch(`/api/events/${encodeURIComponent(editEventId)}`, {
+          cache: 'no-store',
+        });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload?.error || 'Failed to load event for editing.');
+        }
+
+        const event = payload?.event as Record<string, unknown> | undefined;
+        if (!event || isCancelled) return;
+
+        const eventTime = parseTimeRange(typeof event.time === 'string' ? event.time : '');
+
+        setFormData((prev) => ({
+          ...prev,
+          title: typeof event.title === 'string' ? event.title : '',
+          description: typeof event.subtitle === 'string' ? event.subtitle : '',
+          price: typeof event.price === 'string' ? event.price : '',
+          organizer: typeof event.promoterName === 'string' ? event.promoterName : '',
+          location: typeof event.venue === 'string' ? event.venue : '',
+          locationState: typeof event.locationState === 'string' ? event.locationState : '',
+          locationDistrict: typeof event.locationDistrict === 'string' ? event.locationDistrict : '',
+          locationArea: typeof event.locationArea === 'string' ? event.locationArea : '',
+          date: typeof event.date === 'string' ? event.date : '',
+          startTime: eventTime.startTime,
+          endTime: eventTime.endTime,
+          about:
+            (typeof event.fullDescription === 'string' && event.fullDescription) ||
+            (typeof event.description === 'string' ? event.description : ''),
+          category: typeof event.category === 'string' ? event.category : '',
+          subcategory: typeof event.subcategory === 'string' ? event.subcategory : '',
+        }));
+
+        const eventRules = Array.isArray(event.rules)
+          ? (event.rules as unknown[])
+              .filter((rule): rule is string => typeof rule === 'string')
+              .map((rule, index) => ({ id: `${index + 1}-${Math.random().toString(36).slice(2, 7)}`, text: rule }))
+          : [];
+        setRules(eventRules.length > 0 ? eventRules : [{ id: '1', text: '' }]);
+
+        const taggedArtistsRaw = Array.isArray(event.taggedArtists)
+          ? (event.taggedArtists as Array<Record<string, unknown>>)
+          : [];
+        setSelectedArtists(
+          taggedArtistsRaw
+            .map((artist) => ({
+              id: typeof artist.id === 'string' ? artist.id : '',
+              email: typeof artist.email === 'string' ? artist.email : '',
+              name: typeof artist.name === 'string' ? artist.name : null,
+            }))
+            .filter((artist) => Boolean(artist.id))
+        );
+
+        const imageList = Array.isArray(event.images)
+          ? (event.images as unknown[]).filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+          : [];
+        const mediaList = Array.isArray(event.mediaFiles)
+          ? (event.mediaFiles as unknown[]).filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+          : [];
+        const mergedMedia = Array.from(new Set([...imageList, ...mediaList]));
+        setMediaFileUrls(
+          mergedMedia.map((url, index) => ({
+            url,
+            type: getMediaTypeFromUrl(url),
+            name: `existing-${index + 1}`,
+          }))
+        );
+        setCoverImageUrl(typeof event.image === 'string' ? event.image : imageList[0] || '');
+        setCoverImage(null);
+        setMediaFiles([]);
+
+        const firstRule = Array.isArray(event.couponRules)
+          ? (event.couponRules as Array<Record<string, unknown>>)[0]
+          : null;
+
+        setPromoForm((prev) => ({
+          ...prev,
+          couponCode: typeof firstRule?.code === 'string' ? firstRule.code : '',
+          couponDiscountPercent:
+            firstRule?.discountPercent != null ? String(firstRule.discountPercent) : '',
+          sourceType:
+            firstRule?.sourceType === 'artist' ||
+            firstRule?.sourceType === 'promoter' ||
+            firstRule?.sourceType === 'influencer'
+              ? firstRule.sourceType
+              : 'outlet',
+          sourceRefId: typeof firstRule?.sourceId === 'string' ? firstRule.sourceId : '',
+          sourceRefName: typeof firstRule?.sourceName === 'string' ? firstRule.sourceName : '',
+          startsAt: typeof firstRule?.startsAt === 'string' ? firstRule.startsAt.slice(0, 16) : '',
+          endsAt: typeof firstRule?.endsAt === 'string' ? firstRule.endsAt.slice(0, 16) : '',
+          maxUses: firstRule?.maxUses != null ? String(firstRule.maxUses) : '',
+        }));
+
+        const mappedTicketCategories = Array.isArray(event.ticketCategories)
+          ? (event.ticketCategories as Array<Record<string, unknown>>).map((cat, index) => {
+              const availableFrom = splitDateAndTime(
+                typeof cat.availableFrom === 'string' ? cat.availableFrom : undefined
+              );
+              const availableUntil = splitDateAndTime(
+                typeof cat.availableUntil === 'string' ? cat.availableUntil : undefined
+              );
+
+              return {
+                id: typeof cat.id === 'string' && cat.id ? cat.id : `ticket-${index + 1}`,
+                name: typeof cat.name === 'string' ? cat.name : `CATEGORY-${index + 1}`,
+                tagline: typeof cat.tagline === 'string' ? cat.tagline : '',
+                price: Number(cat.price || 0),
+                originalPrice:
+                  cat.originalPrice != null && Number.isFinite(Number(cat.originalPrice))
+                    ? Number(cat.originalPrice)
+                    : Number(cat.price || 0),
+                quantity: Number(cat.quantity || 0),
+                availableFromDate: availableFrom.date,
+                availableFromTime: availableFrom.time,
+                availableUntilDate: availableUntil.date,
+                availableUntilTime: availableUntil.time,
+                discount: Number(cat.discount || 0),
+                platformFee: Number(cat.platformFee || 5),
+                artistShare: Number(cat.artistShare || 0),
+                influencerShare: Number(cat.influencerShare || 0),
+              };
+            })
+          : [];
+
+        if (mappedTicketCategories.length > 0) {
+          setTicketCategories(mappedTicketCategories);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load event for editing.';
+        setNotificationMessage(message);
+        setShowNotification(true);
+      }
+    };
+
+    loadEventForEdit();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isEditMode, editEventId]);
 
   // Close artist dropdown when clicking outside
   useEffect(() => {
@@ -553,100 +750,106 @@ export default function SellerFormPage() {
         }))
       };
 
-      const response = await fetch('/api/admin/event-requests', {
-        method: 'POST',
+      const requestUrl = isEditMode && editEventId ? `/api/events/${encodeURIComponent(editEventId)}` : '/api/admin/event-requests';
+      const requestMethod = isEditMode ? 'PUT' : 'POST';
+      const requestBody = isEditMode ? eventData : { eventData };
+
+      const response = await fetch(requestUrl, {
+        method: requestMethod,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ eventData }),
+        body: JSON.stringify(requestBody),
       });
 
+      const responseBody = await response.json().catch(() => ({}));
+
       if (response.ok) {
-        const data = await response.json();
-        setNotificationMessage('Your request has been sent to admin for approval.');
+        const successMessage = isEditMode
+          ? 'Hosted event updated successfully.'
+          : 'Your request has been sent to admin for approval.';
+        setNotificationMessage(successMessage);
         setShowNotification(true);
-        
-        // Hide notification after 5 seconds
+
         setTimeout(() => {
           setShowNotification(false);
         }, 5000);
-        
-        // Also save to hosted events via API for immediate display
-        const { saveHostedEvent } = await import('@/lib/hosted-events');
-        await saveHostedEvent({
-          id: Date.now(),
-          title: formData.title,
-          date: formData.date,
-          venue: formData.location,
-          locationState: formData.locationState || undefined,
-          locationDistrict: formData.locationDistrict || undefined,
-          locationArea: formData.locationArea || undefined,
-          price: `₹${minPrice}`,
-          imageColor: 'bg-blue-900',
-          category: resolvedSubcategory ? `${resolvedCategory} • ${resolvedSubcategory}` : resolvedCategory,
-          imageUrl: coverImageUrlToUse,
-          createdAt: Date.now()
-        });
-        
-        // Reset form
-        setFormData({
-          title: '',
-          description: '',
-          price: '',
-          organizer: '',
-          location: '',
-          locationState: '',
-          locationDistrict: '',
-          locationArea: '',
-          date: '',
-          startTime: '',
-          endTime: '',
-          about: '',
-          rules: '',
-          category: '',
-          subcategory: '',
-        });
-        // Reset form and uploaded files
-        setImages([]);
-        setCoverImage(null);
-        setMediaFiles([]);
-        setCoverImageUrl('');
-        setMediaFileUrls([]);
-        setTicketCategories([]);
-        setRules([{ id: '1', text: '' }]);
-        setSelectedArtists([]);
-        setArtistSearchQuery('');
-        
-        // Also handle promo code if entered
-        if (promoForm.couponCode) {
-          const newRequest = {
+
+        if (!isEditMode) {
+          const { saveHostedEvent } = await import('@/lib/hosted-events');
+          await saveHostedEvent({
             id: Date.now(),
-            eventTitle: formData.title,
-            code: promoForm.couponCode,
-            discountPercent: promoForm.couponDiscountPercent,
-            status: 'Pending'
-          };
-          setPromoRequests(prev => [newRequest, ...prev]);
-          setPromoForm({
-            eventId: '',
-            couponCode: '',
-            couponDiscountPercent: '',
-            sourceType: 'outlet',
-            sourceRefId: '',
-            sourceRefName: '',
-            startsAt: '',
-            endsAt: '',
-            maxUses: '',
+            title: formData.title,
+            date: formData.date,
+            venue: formData.location,
+            locationState: formData.locationState || undefined,
+            locationDistrict: formData.locationDistrict || undefined,
+            locationArea: formData.locationArea || undefined,
+            price: `₹${minPrice}`,
+            imageColor: 'bg-blue-900',
+            category: resolvedSubcategory ? `${resolvedCategory} • ${resolvedSubcategory}` : resolvedCategory,
+            imageUrl: coverImageUrlToUse,
+            createdAt: Date.now()
           });
+
+          setFormData({
+            title: '',
+            description: '',
+            price: '',
+            organizer: '',
+            location: '',
+            locationState: '',
+            locationDistrict: '',
+            locationArea: '',
+            date: '',
+            startTime: '',
+            endTime: '',
+            about: '',
+            rules: '',
+            category: '',
+            subcategory: '',
+          });
+          setImages([]);
+          setCoverImage(null);
+          setMediaFiles([]);
+          setCoverImageUrl('');
+          setMediaFileUrls([]);
+          setTicketCategories([]);
+          setRules([{ id: '1', text: '' }]);
+          setSelectedArtists([]);
+          setArtistSearchQuery('');
+
+          if (promoForm.couponCode) {
+            const newRequest = {
+              id: Date.now(),
+              eventTitle: formData.title,
+              code: promoForm.couponCode,
+              discountPercent: promoForm.couponDiscountPercent,
+              status: 'Pending'
+            };
+            setPromoRequests(prev => [newRequest, ...prev]);
+            setPromoForm({
+              eventId: '',
+              couponCode: '',
+              couponDiscountPercent: '',
+              sourceType: 'outlet',
+              sourceRefId: '',
+              sourceRefName: '',
+              startsAt: '',
+              endsAt: '',
+              maxUses: '',
+            });
+          }
         }
-        
-        // Redirect to outlet profile events page after 2 seconds to see the notification
+
+        const fallbackReturn = isEditMode ? '/outlet/profile?tab=events' : '/outlet/profile?tab=events';
+        const resolvedReturnTo = returnToParam.startsWith('/') ? returnToParam : fallbackReturn;
+
         setTimeout(() => {
-          router.push('/outlet/profile?tab=events');
+          router.push(resolvedReturnTo);
         }, 2000);
       } else {
-        const error = await response.json();
-        setNotificationMessage(error.error || 'Failed to submit event request.');
+        setNotificationMessage(responseBody?.error || 'Failed to submit event request.');
         setShowNotification(true);
       }
     } catch (error) {
@@ -729,7 +932,6 @@ export default function SellerFormPage() {
   };
 
   const removeMediaFile = async (index: number) => {
-    const file = mediaFiles[index];
     setMediaFiles(prev => prev.filter((_, i) => i !== index));
     setMediaFileUrls(prev => prev.filter((_, i) => i !== index));
   };
@@ -763,7 +965,9 @@ export default function SellerFormPage() {
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-bold text-[#E5A823]">Seller Dashboard</h1>
             <span className="text-[#F5F5DC]/50">|</span>
-            <span className="text-[#F5F5DC]/70">Create and manage your events</span>
+            <span className="text-[#F5F5DC]/70">
+              {isEditMode ? 'Edit your hosted event' : 'Create and manage your events'}
+            </span>
           </div>
         </div>
       </div>
@@ -771,13 +975,19 @@ export default function SellerFormPage() {
       {/* Notification Toast - Glass Morphism Theme */}
       {showNotification && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] max-w-md w-full mx-4">
+          {(() => {
+            const isSuccessMessage =
+              notificationMessage.includes('sent to admin') ||
+              notificationMessage.toLowerCase().includes('updated successfully');
+
+            return (
           <div className={`p-4 rounded-xl backdrop-blur-md border shadow-2xl ${
-            notificationMessage.includes('sent to admin') 
+            isSuccessMessage
               ? 'bg-[#E5A823]/90 border-[#F5C542] text-[#0D0D0D]' 
               : 'bg-[#EB4D4B]/90 border-[#FF6B6B] text-white'
           }`}>
             <div className="flex items-center gap-3">
-              {notificationMessage.includes('sent to admin') ? (
+              {isSuccessMessage ? (
                 <>
                   <div className="w-10 h-10 rounded-full bg-[#0D0D0D]/20 flex items-center justify-center flex-shrink-0">
                     <CheckCircle2 className="w-6 h-6 text-[#0D0D0D]" />
@@ -800,6 +1010,8 @@ export default function SellerFormPage() {
               )}
             </div>
           </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1646,11 +1858,11 @@ export default function SellerFormPage() {
                       label="Drop cover image here"
                     />
                     
-                    {coverImage && (
+                    {(coverImage || coverImageUrl) && (
                       <div className="mt-6">
                         <div className="relative aspect-video rounded-xl overflow-hidden border border-[#E5A823]/30">
                           <img 
-                            src={coverImageUrl || URL.createObjectURL(coverImage)} 
+                            src={coverImageUrl || (coverImage ? URL.createObjectURL(coverImage) : '')}
                             alt="Cover Preview" 
                             className="object-cover w-full h-full"
                           />
@@ -1677,7 +1889,7 @@ export default function SellerFormPage() {
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
                   <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
                     <Camera className="w-5 h-5 text-[#E5A823]" />
-                    Event Images & Videos ({mediaFiles.length} selected)
+                    Event Images & Videos ({mediaFileUrls.length} selected)
                   </h3>
                   <p className="text-sm text-[#F5F5DC]/60 mb-6">
                     Upload additional images and videos to showcase your event. Drag & drop or click to browse.
@@ -1692,9 +1904,9 @@ export default function SellerFormPage() {
                       label="Drop images or videos here"
                     />
                     
-                    {mediaFiles.length > 0 && (
+                    {mediaFileUrls.length > 0 && (
                       <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {mediaFiles.map((file, index) => (
+                        {mediaFileUrls.map((file, index) => (
                           <motion.div 
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
@@ -1704,7 +1916,7 @@ export default function SellerFormPage() {
                             {file.type.startsWith('video/') ? (
                               <div className="w-full h-full bg-[#0D0D0D] flex items-center justify-center">
                                 <video className="w-full h-full object-cover">
-                                  <source src={mediaFileUrls[index]?.url || URL.createObjectURL(file)} type={file.type} />
+                                  <source src={file.url} type={file.type} />
                                 </video>
                                 <div className="absolute inset-0 flex items-center justify-center bg-[#0D0D0D]/50">
                                   <Video className="w-8 h-8 text-[#E5A823]" />
@@ -1712,7 +1924,7 @@ export default function SellerFormPage() {
                               </div>
                             ) : (
                               <img 
-                                src={mediaFileUrls[index]?.url || URL.createObjectURL(file)} 
+                                src={file.url}
                                 alt={`Media ${index}`} 
                                 className="object-cover w-full h-full hover:scale-105 transition-transform duration-500"
                               />
@@ -1743,7 +1955,7 @@ export default function SellerFormPage() {
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
                   <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                     <Ticket className="w-5 h-5 text-[#E5A823]" />
-                    Submit Event Request
+                    {isEditMode ? 'Update Hosted Event' : 'Submit Event Request'}
                   </h3>
                   
                   <div className="space-y-6">
@@ -1862,7 +2074,10 @@ export default function SellerFormPage() {
 
                     <div className="rounded-xl border border-[#E5A823]/20 bg-[#E5A823]/10 p-4">
                       <p className="text-sm text-[#F5F5DC]/80">
-                        <strong className="text-[#E5A823]">Review your event:</strong> Make sure all details are correct in the Basic Details and Media tabs before submitting.
+                        <strong className="text-[#E5A823]">Review your event:</strong>{' '}
+                        {isEditMode
+                          ? 'Make sure all details are correct before updating your hosted event.'
+                          : 'Make sure all details are correct in the Basic Details and Media tabs before submitting.'}
                       </p>
                     </div>
 
@@ -1894,7 +2109,7 @@ export default function SellerFormPage() {
                         ) : (
                           <>
                             <Send className="w-5 h-5" />
-                            Send Request
+                            {isEditMode ? 'Update Event' : 'Send Request'}
                           </>
                         )}
                       </span>
@@ -1999,7 +2214,9 @@ export default function SellerFormPage() {
 
               <div className="p-4 bg-[#E5A823]/10 border border-[#E5A823]/20 rounded-xl">
                 <p className="text-sm text-[#E5A823]">
-                  Complete all sections, then go to the Promo Codes tab and click "Send Request" to submit your event for admin approval.
+                  {isEditMode
+                    ? 'Complete all sections, then go to the Promo Codes tab and click "Update Event" to save changes.'
+                    : 'Complete all sections, then go to the Promo Codes tab and click "Send Request" to submit your event for admin approval.'}
                 </p>
               </div>
 

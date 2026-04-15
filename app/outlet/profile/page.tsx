@@ -13,7 +13,7 @@ import {
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import DragDropUpload from '@/components/ui/DragDropUpload';
 import { uploadFileDirectToSupabase } from '@/lib/browser-storage';
 
@@ -47,27 +47,8 @@ type OutletEventsResponse = {
   waitingApprovalEvents: OutletEventItem[];
 };
 
-type OutletEventEditForm = {
-  title: string;
-  subtitle: string;
-  date: string;
-  time: string;
-  venue: string;
-  category: string;
-  subcategory: string;
-  price: string;
-  description: string;
-  couponCode: string;
-  couponDiscountPercent: string;
-  couponSourceType: 'outlet' | 'artist' | 'promoter' | 'influencer';
-  couponSourceId: string;
-  couponSourceName: string;
-  couponStartsAt: string;
-  couponEndsAt: string;
-  couponMaxUses: string;
-};
-
 function OutletProfileContent() {
+  const router = useRouter();
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<ActiveTab>('details');
@@ -76,28 +57,7 @@ function OutletProfileContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEventsLoading, setIsEventsLoading] = useState(false);
-  const [isSavingEventEdit, setIsSavingEventEdit] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [editingEvent, setEditingEvent] = useState<OutletEventItem | null>(null);
-  const [eventEditForm, setEventEditForm] = useState<OutletEventEditForm>({
-    title: '',
-    subtitle: '',
-    date: '',
-    time: '',
-    venue: '',
-    category: '',
-    subcategory: '',
-    price: '',
-    description: '',
-    couponCode: '',
-    couponDiscountPercent: '',
-    couponSourceType: 'outlet',
-    couponSourceId: '',
-    couponSourceName: '',
-    couponStartsAt: '',
-    couponEndsAt: '',
-    couponMaxUses: '',
-  });
   const [eventsData, setEventsData] = useState<OutletEventsResponse>({
     upcomingEvents: [],
     completedEvents: [],
@@ -409,101 +369,20 @@ function OutletProfileContent() {
     }
   };
 
-  const openEventEditModal = async (event: OutletEventItem) => {
+  const openEventEditForm = (event: OutletEventItem) => {
     if (!event.publicEventId) {
       setMessage({ type: 'error', text: 'This event is not published yet and cannot be edited.' });
       return;
     }
 
-    setEditingEvent(event);
-    setEventEditForm({
-      title: event.title || '',
-      subtitle: event.subtitle || '',
-      date: event.date || '',
-      time: event.time || '',
-      venue: event.venue || '',
-      category: event.category || '',
-      subcategory: '',
-      price: event.price || '',
-      description: event.description || '',
-      couponCode: '',
-      couponDiscountPercent: '',
-      couponSourceType: 'outlet',
-      couponSourceId: '',
-      couponSourceName: '',
-      couponStartsAt: '',
-      couponEndsAt: '',
-      couponMaxUses: '',
-    });
+    const returnTo =
+      typeof window !== 'undefined'
+        ? `${window.location.pathname}${window.location.search || '?tab=events'}`
+        : '/outlet/profile?tab=events';
 
-    try {
-      const response = await fetch(`/api/events/${event.publicEventId}`);
-      if (!response.ok) return;
-      const payload = await response.json();
-      const eventData = payload?.event;
-      const firstRule = Array.isArray(eventData?.couponRules) ? eventData.couponRules[0] : null;
-
-      setEventEditForm((prev) => ({
-        ...prev,
-        subcategory: typeof eventData?.subcategory === 'string' ? eventData.subcategory : '',
-        couponCode: firstRule?.code || '',
-        couponDiscountPercent: firstRule?.discountPercent != null ? String(firstRule.discountPercent) : '',
-        couponSourceType: firstRule?.sourceType || 'outlet',
-        couponSourceId: firstRule?.sourceId || '',
-        couponSourceName: firstRule?.sourceName || '',
-        couponStartsAt: firstRule?.startsAt ? String(firstRule.startsAt).slice(0, 16) : '',
-        couponEndsAt: firstRule?.endsAt ? String(firstRule.endsAt).slice(0, 16) : '',
-        couponMaxUses: firstRule?.maxUses != null ? String(firstRule.maxUses) : '',
-      }));
-    } catch {
-      // no-op fallback
-    }
-  };
-
-  const saveEventEdit = async () => {
-    if (!editingEvent?.publicEventId) return;
-
-    setIsSavingEventEdit(true);
-    try {
-      const payloadBody = {
-        ...eventEditForm,
-        couponRules: eventEditForm.couponCode
-          ? [
-              {
-                code: eventEditForm.couponCode.trim().toUpperCase(),
-                discountPercent: Number(eventEditForm.couponDiscountPercent || 0),
-                sourceType: eventEditForm.couponSourceType,
-                sourceId: eventEditForm.couponSourceId || undefined,
-                sourceName: eventEditForm.couponSourceName || undefined,
-                startsAt: eventEditForm.couponStartsAt || undefined,
-                endsAt: eventEditForm.couponEndsAt || undefined,
-                maxUses: eventEditForm.couponMaxUses ? Number(eventEditForm.couponMaxUses) : undefined,
-              },
-            ]
-          : [],
-      };
-
-      const response = await fetch(`/api/events/${editingEvent.publicEventId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payloadBody),
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || 'Failed to update event');
-      }
-
-      setMessage({ type: 'success', text: 'Hosted event updated successfully.' });
-      setEditingEvent(null);
-      await fetchOutletEvents();
-    } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to update event' });
-    } finally {
-      setIsSavingEventEdit(false);
-    }
+    router.push(
+      `/seller-form?editEventId=${encodeURIComponent(event.publicEventId)}&returnTo=${encodeURIComponent(returnTo)}`
+    );
   };
 
   if (status === 'loading' || isLoading) {
@@ -1048,19 +927,19 @@ function OutletProfileContent() {
                     title="Waiting for Approval"
                     description="These requests are sent by you and are still waiting for admin action."
                     events={eventsData.waitingApprovalEvents}
-                    onEdit={openEventEditModal}
+                    onEdit={openEventEditForm}
                   />
                   <EventsSection
                     title="Upcoming Events"
                     description="These events are approved and scheduled for today or later."
                     events={eventsData.upcomingEvents}
-                    onEdit={openEventEditModal}
+                    onEdit={openEventEditForm}
                   />
                   <EventsSection
                     title="Completed Events"
                     description="These approved events already happened."
                     events={eventsData.completedEvents}
-                    onEdit={openEventEditModal}
+                    onEdit={openEventEditForm}
                   />
                 </>
               )}
@@ -1129,148 +1008,6 @@ function OutletProfileContent() {
         </div>
       </form>
 
-      {editingEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-[#2A2A2A] bg-[#1A1A1A] p-6">
-            <h3 className="text-xl font-semibold text-[#F5F5DC]">Edit Hosted Event</h3>
-            <p className="mt-1 text-sm text-[#F5F5DC]/60">Changes are visible to both the host and admins.</p>
-
-            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3">
-              <input
-                value={eventEditForm.title}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, title: e.target.value }))}
-                placeholder="Title"
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-              <input
-                value={eventEditForm.subtitle}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, subtitle: e.target.value }))}
-                placeholder="Subtitle"
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-              <input
-                type="date"
-                value={eventEditForm.date}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, date: e.target.value }))}
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-              <input
-                type="time"
-                value={eventEditForm.time}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, time: e.target.value }))}
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-              <input
-                value={eventEditForm.venue}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, venue: e.target.value }))}
-                placeholder="Venue"
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-              <input
-                value={eventEditForm.category}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, category: e.target.value }))}
-                placeholder="Category"
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-              <input
-                value={eventEditForm.subcategory}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, subcategory: e.target.value }))}
-                placeholder="Subcategory"
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-              <input
-                value={eventEditForm.price}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, price: e.target.value }))}
-                placeholder="Price (e.g. ₹999)"
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-
-              <input
-                value={eventEditForm.couponCode}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponCode: e.target.value.toUpperCase().replace(/\s+/g, '') }))}
-                placeholder="Coupon Code"
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-              <input
-                type="number"
-                value={eventEditForm.couponDiscountPercent}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponDiscountPercent: e.target.value }))}
-                placeholder="Coupon Discount %"
-                min={1}
-                max={100}
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-              <select
-                value={eventEditForm.couponSourceType}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponSourceType: e.target.value as OutletEventEditForm['couponSourceType'] }))}
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              >
-                <option value="outlet">Outlet</option>
-                <option value="artist">Artist</option>
-                <option value="promoter">Promoter</option>
-                <option value="influencer">Influencer</option>
-              </select>
-              <input
-                value={eventEditForm.couponSourceId}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponSourceId: e.target.value }))}
-                placeholder="Coupon Source ID"
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-              <input
-                value={eventEditForm.couponSourceName}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponSourceName: e.target.value }))}
-                placeholder="Coupon Source Name"
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-              <input
-                type="datetime-local"
-                value={eventEditForm.couponStartsAt}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponStartsAt: e.target.value }))}
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2 [color-scheme:dark]"
-              />
-              <input
-                type="datetime-local"
-                value={eventEditForm.couponEndsAt}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponEndsAt: e.target.value }))}
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2 [color-scheme:dark]"
-              />
-              <input
-                type="number"
-                value={eventEditForm.couponMaxUses}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, couponMaxUses: e.target.value }))}
-                placeholder="Coupon Max Uses"
-                min={1}
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-              <textarea
-                value={eventEditForm.description}
-                onChange={(e) => setEventEditForm((prev) => ({ ...prev, description: e.target.value }))}
-                placeholder="Description"
-                rows={4}
-                className="md:col-span-2 w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-4 py-2"
-              />
-            </div>
-
-            <div className="mt-5 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setEditingEvent(null)}
-                className="rounded-lg bg-[#2A2A2A] px-4 py-2 text-sm font-medium hover:bg-[#3A3A3A]"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={saveEventEdit}
-                disabled={isSavingEventEdit}
-                className="rounded-lg bg-[#E5A823] px-4 py-2 text-sm font-bold text-[#0D0D0D] hover:bg-[#F5C542] disabled:opacity-50"
-              >
-                {isSavingEventEdit ? 'Saving...' : 'Save Event'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
