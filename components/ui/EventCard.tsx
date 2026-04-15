@@ -3,7 +3,7 @@
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import Link from 'next/link';
 import { useState, MouseEvent, useRef, useEffect } from 'react';
-import { Heart, Calendar, MapPin, Clock, Sparkles, Zap, Instagram, X } from 'lucide-react';
+import { Heart, Calendar, MapPin, Clock, Sparkles, Zap, Instagram, MessageCircle, X } from 'lucide-react';
 import { BsWhatsapp } from 'react-icons/bs';
 import { toggleWishlist, isInWishlist, type WishlistEvent } from '@/lib/wishlist-store';
 
