@@ -492,6 +492,70 @@ function getImageColor(category: string): string {
   return 'bg-gradient-to-br from-emerald-500 to-teal-500';
 }
 
+function getEventEndTimestamp(dateValue: string, timeValue?: string): number {
+  if (!dateValue) return Number.POSITIVE_INFINITY;
+
+  const normalizedTime = (timeValue || '').trim();
+  const endTime = normalizedTime.includes('-')
+    ? normalizedTime.split('-').pop()?.trim() || ''
+    : normalizedTime;
+
+  if (endTime) {
+    const parsedWithTime = new Date(`${dateValue}T${endTime}`);
+    if (!Number.isNaN(parsedWithTime.getTime())) {
+      return parsedWithTime.getTime();
+    }
+  }
+
+  const parsedEndOfDay = new Date(`${dateValue}T23:59:59`);
+  if (!Number.isNaN(parsedEndOfDay.getTime())) {
+    return parsedEndOfDay.getTime();
+  }
+
+  const fallback = new Date(dateValue);
+  return Number.isNaN(fallback.getTime()) ? Number.POSITIVE_INFINITY : fallback.getTime();
+}
+
+async function purgeEndedPublishedEvents(): Promise<number> {
+  const { data, error } = await supabase
+    .from('published_events')
+    .select('id, date, time')
+    .eq('is_public', true);
+
+  if (error || !data) {
+    if (error) {
+      console.error('Failed to scan published events for expiry:', error.message);
+    }
+    return 0;
+  }
+
+  const now = Date.now();
+  const endedEventIds = (data as Array<Record<string, unknown>>)
+    .filter((record) => {
+      const dateValue = typeof record.date === 'string' ? record.date : '';
+      const timeValue = typeof record.time === 'string' ? record.time : undefined;
+      return getEventEndTimestamp(dateValue, timeValue) < now;
+    })
+    .map((record) => String(record.id || ''))
+    .filter(Boolean);
+
+  if (endedEventIds.length === 0) {
+    return 0;
+  }
+
+  const { error: deleteError } = await supabase
+    .from('published_events')
+    .delete()
+    .in('id', endedEventIds);
+
+  if (deleteError) {
+    console.error('Failed to delete ended published events:', deleteError.message);
+    return 0;
+  }
+
+  return endedEventIds.length;
+}
+
 function createApprovedEvent(request: EventRequest): Partial<PublicEvent> {
   const allImages = [request.eventData.image];
   if (request.eventData.mediaFiles && request.eventData.mediaFiles.length > 0) {
@@ -548,6 +612,8 @@ function createApprovedEvent(request: EventRequest): Partial<PublicEvent> {
  * Get all published events
  */
 export async function getAllPublishedEvents(): Promise<PublicEvent[]> {
+  await purgeEndedPublishedEvents();
+
   const { data, error } = await supabase
     .from('published_events')
     .select('*')
@@ -565,6 +631,8 @@ export async function getAllPublishedEvents(): Promise<PublicEvent[]> {
  * Get published event by ID
  */
 export async function getPublishedEventById(id: string): Promise<PublicEvent | undefined> {
+  await purgeEndedPublishedEvents();
+
   const { data, error } = await supabase
     .from('published_events')
     .select('*')
@@ -604,6 +672,8 @@ export async function getPublishedEventById(id: string): Promise<PublicEvent | u
  * Get published event cards (for listings)
  */
 export async function getPublishedEventCards(): Promise<PublicEventCard[]> {
+  await purgeEndedPublishedEvents();
+
   const events = await getAllPublishedEvents();
   return events.map((event) => ({
     id: event.id,
@@ -791,6 +861,8 @@ export async function deletePublishedEvent(id: string): Promise<boolean> {
  * Get events by status
  */
 export async function getPublishedEventsByStatus(status: string): Promise<PublicEvent[]> {
+  await purgeEndedPublishedEvents();
+
   const { data, error } = await supabase
     .from('published_events')
     .select('*')
@@ -809,6 +881,8 @@ export async function getPublishedEventsByStatus(status: string): Promise<Public
  * Get featured events
  */
 export async function getFeaturedEvents(): Promise<PublicEvent[]> {
+  await purgeEndedPublishedEvents();
+
   const { data, error } = await supabase
     .from('published_events')
     .select('*')

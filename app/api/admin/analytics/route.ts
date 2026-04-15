@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { getAllPublishedEvents } from '@/lib/public-events-store';
 
 // GET /api/admin/analytics?month=1&year=2026
 export async function GET(request: NextRequest) {
@@ -21,6 +22,7 @@ export async function GET(request: NextRequest) {
     const year = searchParams.get('year');
 
     const supabase = getSupabaseServerClient();
+    await getAllPublishedEvents();
 
     // Build date filter
     let dateFilter = '';

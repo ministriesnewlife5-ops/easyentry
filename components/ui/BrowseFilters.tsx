@@ -105,7 +105,6 @@ export default function BrowseFilters({
   const [activeCategory, setActiveCategory] = useState<string | null>(selectedCategory || null);
   const [activeSubFilters, setActiveSubFilters] = useState<string[]>([]);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
-  const [dynamicCategories, setDynamicCategories] = useState<Category[]>([]);
 
   // Date picker
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -167,65 +166,10 @@ export default function BrowseFilters({
     }
   }, [filters.locationFilters, modalActiveState]);
 
-  // ── Dynamic categories from events ───────────────────────────────────────
-  useEffect(() => {
-    if (events.length === 0) return;
-    const categoryMap = new Map<string, { name: string; icon: string; subFilters: Set<string> }>();
-    events.forEach(event => {
-      if (event.category) {
-        const norm = event.category.trim();
-        if (norm) {
-          const lower = norm.toLowerCase();
-          let icon = 'Mic';
-          if (lower.includes('dj') || lower.includes('disc')) icon = 'Disc';
-          else if (lower.includes('party')) icon = 'PartyPopper';
-          else if (lower.includes('comedy')) icon = 'Smile';
-          else if (lower.includes('theatre') || lower.includes('drama')) icon = 'Drama';
-          else if (lower.includes('art') || lower.includes('paint')) icon = 'Palette';
-
-          const key = norm.toLowerCase();
-          const existing = categoryMap.get(key);
-          const next = existing || { name: norm, icon, subFilters: new Set<string>() };
-          if (event.subcategory) {
-            const sub = event.subcategory.trim();
-            if (sub) next.subFilters.add(sub);
-          }
-          next.icon = next.icon || icon;
-          categoryMap.set(key, next);
-        }
-      }
-    });
-    setDynamicCategories(Array.from(categoryMap.entries()).map(([name, value]) => ({
-      name: value.name,
-      icon: value.icon,
-      subFilters: Array.from(value.subFilters),
-    })));
-  }, [events]);
-
   useEffect(() => { setActiveCategory(selectedCategory || null); }, [selectedCategory]);
 
   // ── Computed ──────────────────────────────────────────────────────────────
-  const allCategories = [...filters.categories];
-  dynamicCategories.forEach((dynamicCategory) => {
-    const existingIndex = allCategories.findIndex(
-      (category) => category.name.toLowerCase() === dynamicCategory.name.toLowerCase()
-    );
-
-    if (existingIndex === -1) {
-      allCategories.push(dynamicCategory);
-      return;
-    }
-
-    const existing = allCategories[existingIndex];
-    const mergedSubFilters = Array.from(
-      new Set([...(existing.subFilters || []), ...(dynamicCategory.subFilters || [])])
-    );
-
-    allCategories[existingIndex] = {
-      ...existing,
-      subFilters: mergedSubFilters,
-    };
-  });
+  const allCategories = filters.categories;
 
   const hasActiveFilters = activeCategory !== null || activeSubFilters.length > 0 ||
     hasSelectedLocation || selectedAreas.length > 0 || !!dateLabel || !!priceLabel;
