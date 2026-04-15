@@ -309,44 +309,51 @@ export async function PUT(
     }
 
     if (updated.sourceRequestId) {
-      const sourceRequest = await getEventRequestById(updated.sourceRequestId);
-      if (sourceRequest) {
-        await updateEventRequest(sourceRequest.id, {
-          eventData: {
-            ...sourceRequest.eventData,
-            title: updates.title ?? sourceRequest.eventData.title,
-            subtitle: updates.subtitle ?? sourceRequest.eventData.subtitle,
-            date: updates.date ?? sourceRequest.eventData.date,
-            time: startTime ?? updates.time ?? sourceRequest.eventData.time,
-            endTime: endTime ?? sourceRequest.eventData.endTime,
-            venue: updates.venue ?? sourceRequest.eventData.venue,
-            locationState: updates.locationState ?? sourceRequest.eventData.locationState,
-            locationDistrict: updates.locationDistrict ?? sourceRequest.eventData.locationDistrict,
-            locationArea: updates.locationArea ?? sourceRequest.eventData.locationArea,
-            googleMapsLink: updates.googleMapsLink ?? sourceRequest.eventData.googleMapsLink,
-            category: updates.category ?? sourceRequest.eventData.category,
-            subcategory: updates.subcategory ?? sourceRequest.eventData.subcategory,
-            price: updates.price ?? sourceRequest.eventData.price,
-            description: updates.description ?? sourceRequest.eventData.description,
-            fullDescription: updates.description ?? sourceRequest.eventData.fullDescription,
-            image: updates.image ?? sourceRequest.eventData.image,
-            mediaFiles: updates.mediaFiles ?? sourceRequest.eventData.mediaFiles,
-            rules: updates.rules ?? sourceRequest.eventData.rules,
-            taggedArtists: updates.taggedArtists ?? sourceRequest.eventData.taggedArtists,
-            ticketCategories: updates.ticketCategories ?? sourceRequest.eventData.ticketCategories,
-            gatesOpen: updates.gatesOpen ?? sourceRequest.eventData.gatesOpen,
-            entryAge: updates.entryAge ?? sourceRequest.eventData.entryAge,
-            layout: updates.layout ?? sourceRequest.eventData.layout,
-            seating: updates.seating ?? sourceRequest.eventData.seating,
-            couponRules: updates.couponRules ?? sourceRequest.eventData.couponRules,
-          },
-        });
+      try {
+        const sourceRequest = await getEventRequestById(updated.sourceRequestId);
+        if (sourceRequest) {
+          await updateEventRequest(sourceRequest.id, {
+            eventData: {
+              ...sourceRequest.eventData,
+              title: updates.title ?? sourceRequest.eventData.title,
+              subtitle: updates.subtitle ?? sourceRequest.eventData.subtitle,
+              date: updates.date ?? sourceRequest.eventData.date,
+              time: startTime ?? updates.time ?? sourceRequest.eventData.time,
+              endTime: endTime ?? sourceRequest.eventData.endTime,
+              venue: updates.venue ?? sourceRequest.eventData.venue,
+              locationState: updates.locationState ?? sourceRequest.eventData.locationState,
+              locationDistrict: updates.locationDistrict ?? sourceRequest.eventData.locationDistrict,
+              locationArea: updates.locationArea ?? sourceRequest.eventData.locationArea,
+              googleMapsLink: updates.googleMapsLink ?? sourceRequest.eventData.googleMapsLink,
+              category: updates.category ?? sourceRequest.eventData.category,
+              subcategory: updates.subcategory ?? sourceRequest.eventData.subcategory,
+              price: updates.price ?? sourceRequest.eventData.price,
+              description: updates.description ?? sourceRequest.eventData.description,
+              fullDescription: updates.description ?? sourceRequest.eventData.fullDescription,
+              image: updates.image ?? sourceRequest.eventData.image,
+              mediaFiles: updates.mediaFiles ?? sourceRequest.eventData.mediaFiles,
+              rules: updates.rules ?? sourceRequest.eventData.rules,
+              taggedArtists: updates.taggedArtists ?? sourceRequest.eventData.taggedArtists,
+              ticketCategories: updates.ticketCategories ?? sourceRequest.eventData.ticketCategories,
+              gatesOpen: updates.gatesOpen ?? sourceRequest.eventData.gatesOpen,
+              entryAge: updates.entryAge ?? sourceRequest.eventData.entryAge,
+              layout: updates.layout ?? sourceRequest.eventData.layout,
+              seating: updates.seating ?? sourceRequest.eventData.seating,
+              couponRules: updates.couponRules ?? sourceRequest.eventData.couponRules,
+            },
+          });
+        }
+      } catch (syncError) {
+        console.error('Failed to sync source event request after published event update:', syncError);
       }
     }
 
     return NextResponse.json({ success: true, event: updated });
   } catch (error) {
     console.error('Failed to update event:', error);
-    return NextResponse.json({ error: 'Failed to update event' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to update event' },
+      { status: 500 }
+    );
   }
 }
