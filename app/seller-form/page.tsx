@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
@@ -93,7 +93,7 @@ async function compressImageForUpload(file: File): Promise<File> {
   return new File([blob], compressedName, { type: 'image/jpeg' });
 }
 
-export default function SellerFormPage() {
+function SellerFormPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editEventId = (searchParams.get('editEventId') || '').trim();
@@ -2265,5 +2265,13 @@ export default function SellerFormPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function SellerFormPageRoute() {
+  return (
+    <Suspense fallback={null}>
+      <SellerFormPage />
+    </Suspense>
   );
 }
