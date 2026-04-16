@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, ChevronDown, Heart, Instagram, MapPin, MapPinned, Star, Ticket, Video, Play, Loader2, CheckCircle, Download, X, MessageCircle } from 'lucide-react';
+import { BsWhatsapp } from 'react-icons/bs';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
@@ -628,26 +629,6 @@ export default function EventDetailsPage() {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3 z-50">
-            <motion.button
-              onClick={shareToInstagram}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className="w-10 h-10 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 backdrop-blur-md flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-shadow"
-              title="Share to Instagram"
-            >
-              <Instagram className="w-5 h-5" />
-            </motion.button>
-            <motion.button
-              onClick={shareToWhatsApp}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className="w-10 h-10 rounded-full bg-[#25D366] backdrop-blur-md flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-shadow"
-              title="Share to WhatsApp"
-            >
-              <MessageCircle className="w-5 h-5" />
-            </motion.button>
-          </div>
         </div>
 
         {/* Instagram Share Modal */}
@@ -854,6 +835,28 @@ export default function EventDetailsPage() {
                 >
                   <Heart className={`w-5 h-5 ${liked ? 'fill-white' : ''}`} />
                 </motion.button>
+
+                {/* Share Buttons - Below Favorite */}
+                <div className="absolute top-16 right-4 flex flex-col gap-2 z-50">
+                  <motion.button
+                    onClick={shareToInstagram}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    className="w-10 h-10 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 backdrop-blur-md flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-shadow"
+                    title="Share to Instagram"
+                  >
+                    <Instagram className="w-5 h-5" />
+                  </motion.button>
+                  <motion.button
+                    onClick={shareToWhatsApp}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    className="w-10 h-10 rounded-full bg-[#25D366] backdrop-blur-md flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-shadow"
+                    title="Share to WhatsApp"
+                  >
+                    <BsWhatsapp className="w-5 h-5" />
+                  </motion.button>
+                </div>
               </div>
             </motion.div>
 
@@ -904,6 +907,39 @@ export default function EventDetailsPage() {
                 </div>
               </motion.div>
             </div>
+
+            {/* Performing Artists - Separate Section */}
+            {event.taggedArtists && event.taggedArtists.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 }}
+                className="bg-[#2A2A2A] rounded-xl p-4 border border-[#2A2A2A]"
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <Star className="w-4 h-4 text-[#E5A823]" />
+                  <span className="text-sm font-bold text-[#F5F5DC]">Performing Artists</span>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                  {event.taggedArtists.map((artist) => (
+                    <Link
+                      key={artist.id}
+                      href={artist.profileUrl || `/artist/${artist.id}`}
+                      className="group flex flex-col items-center text-center"
+                    >
+                      <img
+                        src={artist.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name || 'Artist')}&background=1f2937&color=fff&size=80`}
+                        alt={artist.name}
+                        className="w-14 h-14 rounded-full object-cover border-2 border-[#E5A823]/40 group-hover:border-[#E5A823] transition-colors"
+                      />
+                      <span className="mt-2 text-xs font-semibold text-[#F5F5DC] group-hover:text-[#E5A823] line-clamp-2">
+                        {artist.name}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </motion.div>
+            )}
 
             {/* Map Location */}
             <motion.div
@@ -963,38 +999,6 @@ export default function EventDetailsPage() {
               </div>
             </motion.div>
 
-            {/* Tagged Artists */}
-            {event.taggedArtists && event.taggedArtists.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.45 }}
-                className="bg-[#2A2A2A] rounded-xl p-4 border border-[#2A2A2A]"
-              >
-                <div className="flex items-center gap-2 mb-4">
-                  <Star className="w-4 h-4 text-[#E5A823]" />
-                  <span className="text-sm font-bold text-[#F5F5DC]">Performing Artists</span>
-                </div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                  {event.taggedArtists.map((artist) => (
-                    <Link
-                      key={artist.id}
-                      href={artist.profileUrl || `/artist/${artist.id}`}
-                      className="group flex flex-col items-center text-center"
-                    >
-                      <img
-                        src={artist.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(artist.name || 'Artist')}&background=1f2937&color=fff&size=80`}
-                        alt={artist.name}
-                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-[#E5A823]/40 group-hover:border-[#E5A823] transition-colors"
-                      />
-                      <span className="mt-2 text-xs font-semibold text-[#F5F5DC] group-hover:text-[#E5A823] line-clamp-2">
-                        {artist.name}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              </motion.div>
-            )}
           </div>
 
           {/* Right Column - Get Tickets */}
@@ -1005,75 +1009,61 @@ export default function EventDetailsPage() {
               className="sticky top-4 bg-[#1A1A1A] rounded-xl p-4 border border-[#2A2A2A]"
             >
               <>
-                <h2 className="text-base font-semibold text-[#F5F5DC] mb-1">Select Tickets</h2>
+                <h2 className="text-lg font-bold text-[#F5F5DC] mb-4">Select Tickets</h2>
 
                   {/* Ticket Categories List */}
-                  <div className="space-y-2 mt-4">
+                  <div className="space-y-3">
                     {ticketTypes.map((ticket) => (
                       <div 
                         key={ticket.id}
-                        className="bg-[#2A2A2A] rounded-lg p-3 border border-[#2A2A2A]"
+                        className="bg-[#2A2A2A] rounded-xl p-4 border border-[#333333]"
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-3">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-[#F5F5DC]">{ticket.name}</p>
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-sm font-bold text-[#F5F5DC]">{ticket.name}</p>
+                              <p className="text-sm font-bold text-[#E5A823]">₹{ticket.price.toFixed(0)}</p>
+                            </div>
                             {ticket.description && (
-                              <p className="text-xs text-[#F5F5DC]/70 line-clamp-2">{ticket.description}</p>
-                            )}
-                            <p className="text-sm text-[#F5F5DC]/60">₹{ticket.price.toFixed(2)}</p>
-                            {(ticket.availableFrom || ticket.availableUntil) && (
-                              <p className="text-xs text-[#EB4D4B] mt-1">
-                                {ticket.availableFrom && ticket.availableUntil ? (
-                                  <>Available: {new Date(ticket.availableFrom).toLocaleString('en-IN', { 
-                                    day: 'numeric', 
-                                    month: 'short', 
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })} - {new Date(ticket.availableUntil).toLocaleString('en-IN', { 
-                                    day: 'numeric', 
-                                    month: 'short', 
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}</>
-                                ) : ticket.availableFrom ? (
-                                  <>Available from: {new Date(ticket.availableFrom).toLocaleString('en-IN', { 
-                                    day: 'numeric', 
-                                    month: 'short', 
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}</>
-                                ) : (
-                                  <>Available until: {new Date(ticket.availableUntil!).toLocaleString('en-IN', { 
-                                    day: 'numeric', 
-                                    month: 'short', 
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}</>
-                                )}
-                              </p>
+                              <p className="text-xs text-[#F5F5DC]/60 mb-2">{ticket.description}</p>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <button 
+                        </div>
+                        
+                        {(ticket.availableFrom || ticket.availableUntil) && (
+                          <p className="text-[10px] text-[#EB4D4B] mb-3">
+                            {ticket.availableFrom && ticket.availableUntil ? (
+                              <>Sale: {new Date(ticket.availableFrom).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} - {new Date(ticket.availableUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</>
+                            ) : ticket.availableFrom ? (
+                              <>On sale from {new Date(ticket.availableFrom).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</>
+                            ) : (
+                              <>Sale ends {new Date(ticket.availableUntil!).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</>
+                            )}
+                          </p>
+                        )}
+                        
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-xs text-[#F5F5DC]/50">Qty</span>
+                          <div className="flex items-center gap-1">
+                            <motion.button 
+                              whileTap={{ scale: 0.9 }}
                               onClick={() => setQuantities(prev => ({ ...prev, [ticket.id]: Math.max(0, (prev[ticket.id] || 0) - 1) }))}
-                              className="w-8 h-8 flex items-center justify-center bg-[#0D0D0D] rounded text-[#F5F5DC] hover:bg-[#3A3A3A]"
+                              className="w-7 h-7 flex items-center justify-center bg-[#1A1A1A] rounded-lg text-[#F5F5DC] hover:bg-[#333333] transition-colors disabled:opacity-30"
                               disabled={(quantities[ticket.id] || 0) <= 0}
                             >
-                              -
-                            </button>
-                            <span className="w-8 text-center text-sm font-medium text-[#F5F5DC]">
+                              <span className="text-sm font-medium">−</span>
+                            </motion.button>
+                            <span className="w-8 text-center text-sm font-semibold text-[#F5F5DC]">
                               {quantities[ticket.id] || 0}
                             </span>
-                            <button 
+                            <motion.button 
+                              whileTap={{ scale: 0.9 }}
                               onClick={() => setQuantities(prev => ({ ...prev, [ticket.id]: Math.min(maxTickets, (prev[ticket.id] || 0) + 1) }))}
-                              className="w-8 h-8 flex items-center justify-center bg-[#333333] rounded text-white hover:bg-[#444444]"
+                              className="w-7 h-7 flex items-center justify-center bg-[#E5A823] rounded-lg text-[#0D0D0D] hover:bg-[#F5C542] transition-colors disabled:opacity-30"
                               disabled={(quantities[ticket.id] || 0) >= maxTickets}
                             >
-                              +
-                            </button>
+                              <span className="text-sm font-medium">+</span>
+                            </motion.button>
                           </div>
                         </div>
                       </div>
@@ -1081,8 +1071,8 @@ export default function EventDetailsPage() {
                   </div>
 
                   {/* Coupon Code */}
-                  <div className="mt-4 rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/70 p-3">
-                    <p className="text-xs font-semibold text-[#F5F5DC]/60 mb-2">Coupon Code</p>
+                  <div className="mt-5 rounded-xl border border-[#333333] bg-[#0D0D0D] p-3">
+                    <p className="text-xs font-medium text-[#F5F5DC]/50 mb-2">Have a coupon?</p>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -1091,13 +1081,13 @@ export default function EventDetailsPage() {
                           setCouponCode(e.target.value.toUpperCase());
                           setCouponMessage(null);
                         }}
-                        placeholder="ENTER CODE"
-                        className="flex-1 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2 text-sm uppercase tracking-wider text-[#F5F5DC] placeholder:text-[#F5F5DC]/30 focus:border-[#E5A823] focus:outline-none"
+                        placeholder="Enter code"
+                        className="flex-1 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2 text-sm text-[#F5F5DC] placeholder:text-[#F5F5DC]/30 focus:border-[#E5A823] focus:outline-none"
                       />
                       <button
                         type="button"
                         onClick={handleApplyCoupon}
-                        className="rounded-lg bg-[#E5A823] px-3 py-2 text-xs font-semibold text-[#0D0D0D] transition hover:bg-[#F5C542]"
+                        className="rounded-lg bg-[#2A2A2A] px-4 py-2 text-xs font-semibold text-[#F5F5DC] border border-[#333333] hover:border-[#E5A823] hover:text-[#E5A823] transition-all"
                       >
                         Apply
                       </button>
@@ -1107,35 +1097,47 @@ export default function EventDetailsPage() {
                     )}
                   </div>
 
-                  {/* Total Summary Bar */}
-                  <div className="mt-4 bg-[#EB4D4B]/10 rounded-lg p-3 border border-[#EB4D4B]/20">
+                  {/* Total Summary */}
+                  <div className="mt-5 space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[#F5F5DC]/60">Subtotal</span>
+                      <span className="text-[#F5F5DC]">₹{calculateTotal().subtotal.toFixed(0)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[#F5F5DC]/60">Convenience Fee</span>
+                      <span className="text-[#F5F5DC]">₹{calculateTotal().convenienceFees.toFixed(0)}</span>
+                    </div>
+                    {calculateTotal().discountAmount > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-emerald-400">Discount</span>
+                        <span className="text-emerald-400">-₹{calculateTotal().discountAmount.toFixed(0)}</span>
+                      </div>
+                    )}
+                    <div className="h-px bg-[#2A2A2A]" />
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-[#F5F5DC]">₹{calculateTotal().total.toFixed(2)}</p>
-                        <p className="text-xs text-[#F5F5DC]/60">{calculateTotal().totalTickets} Tickets (₹{calculateTotal().subtotal.toFixed(2)} + ₹{calculateTotal().convenienceFees.toFixed(2)} fees)</p>
-                        {calculateTotal().discountAmount > 0 && (
-                          <p className="text-xs text-emerald-400">Coupon discount: -₹{calculateTotal().discountAmount.toFixed(2)}</p>
-                        )}
+                        <span className="text-xs text-[#F5F5DC]/50">{calculateTotal().totalTickets} ticket{calculateTotal().totalTickets !== 1 ? 's' : ''}</span>
+                        <p className="text-lg font-bold text-[#F5F5DC]">₹{calculateTotal().total.toFixed(0)}</p>
                       </div>
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={handleProceedToPayment}
                         disabled={isProcessingPayment || calculateTotal().totalTickets === 0}
-                        className="px-6 py-2 bg-[#EB4D4B] text-white font-semibold text-sm rounded-lg hover:bg-[#d43d3b] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-8 py-3 bg-[#EB4D4B] text-white font-bold text-sm rounded-xl hover:bg-[#d43d3b] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         {isProcessingPayment ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            Processing...
+                            <span>Processing</span>
                           </>
                         ) : (
                           'Proceed'
                         )}
                       </motion.button>
-                      </div>
+                    </div>
                     {paymentError && (
-                      <p className="mt-2 text-xs text-[#EB4D4B]">{paymentError}</p>
+                      <p className="text-xs text-[#EB4D4B]">{paymentError}</p>
                     )}
                   </div>
                 </>
