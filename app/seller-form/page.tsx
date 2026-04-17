@@ -36,6 +36,9 @@ type BrowseCategory = { name: string; icon: string; subFilters: string[] };
 type BrowseLocationCity = { name: string; icon: string; areas: string[] };
 type BrowseLocationState = { state: string; cities: BrowseLocationCity[] };
 
+const OTHER_CATEGORY_OPTION = '__other_category__';
+const OTHER_SUBCATEGORY_OPTION = '__other_subcategory__';
+
 // Converts a File to a base64 data URL so images persist after page reload
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -163,6 +166,8 @@ function SellerFormPage() {
   const [categories, setCategories] = useState<BrowseCategory[]>([]);
   const [locationFilters, setLocationFilters] = useState<BrowseLocationState[]>([]);
   const [rules, setRules] = useState<Array<{ id: string; text: string }>>([{ id: '1', text: '' }]);
+  const [customCategory, setCustomCategory] = useState('');
+  const [customSubcategory, setCustomSubcategory] = useState('');
   
   // Artists state
   const [artists, setArtists] = useState<Array<{ id: string; email: string; name: string | null; role: string }>>([]);
@@ -361,6 +366,47 @@ function SellerFormPage() {
     }
   }, []);
 
+  const resolveCategorySelection = (rawCategory?: unknown, rawSubcategory?: unknown) => {
+    const normalizedCategory = normalizeCategoryName(typeof rawCategory === 'string' ? rawCategory : '');
+    const normalizedSubcategory = normalizeCategoryName(typeof rawSubcategory === 'string' ? rawSubcategory : '');
+
+    if (!normalizedCategory) {
+      return {
+        categorySelection: '',
+        subcategorySelection: '',
+        categoryCustomValue: '',
+        subcategoryCustomValue: '',
+      };
+    }
+
+    const matchedCategory = categories.find(
+      (cat) => cat.name.toLowerCase() === normalizedCategory.toLowerCase()
+    );
+
+    if (!matchedCategory) {
+      return {
+        categorySelection: OTHER_CATEGORY_OPTION,
+        subcategorySelection: normalizedSubcategory ? OTHER_SUBCATEGORY_OPTION : '',
+        categoryCustomValue: normalizedCategory,
+        subcategoryCustomValue: normalizedSubcategory,
+      };
+    }
+
+    const matchedSubcategory = matchedCategory.subFilters.find(
+      (sub) => sub.toLowerCase() === normalizedSubcategory.toLowerCase()
+    );
+
+    return {
+      categorySelection: matchedCategory.name,
+      subcategorySelection: normalizedSubcategory
+        ? matchedSubcategory || OTHER_SUBCATEGORY_OPTION
+        : '',
+      categoryCustomValue: '',
+      subcategoryCustomValue:
+        normalizedSubcategory && !matchedSubcategory ? normalizedSubcategory : '',
+    };
+  };
+
   useEffect(() => {
     if (!isEditMode || !editEventId) return;
 
@@ -382,6 +428,8 @@ function SellerFormPage() {
 
         const eventTime = parseTimeRange(typeof event.time === 'string' ? event.time : '');
 
+        const categorySelection = resolveCategorySelection(event.category, event.subcategory);
+
         setFormData((prev) => ({
           ...prev,
           title: typeof event.title === 'string' ? event.title : '',
@@ -398,9 +446,12 @@ function SellerFormPage() {
           about:
             (typeof event.fullDescription === 'string' && event.fullDescription) ||
             (typeof event.description === 'string' ? event.description : ''),
-          category: typeof event.category === 'string' ? event.category : '',
-          subcategory: typeof event.subcategory === 'string' ? event.subcategory : '',
+          category: categorySelection.categorySelection,
+          subcategory: categorySelection.subcategorySelection,
         }));
+
+        setCustomCategory(categorySelection.categoryCustomValue);
+        setCustomSubcategory(categorySelection.subcategoryCustomValue);
 
         const eventRules = Array.isArray(event.rules)
           ? (event.rules as unknown[])
@@ -605,8 +656,12 @@ function SellerFormPage() {
   const handleSendEventRequest = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const resolvedCategory = normalizeCategoryName(formData.category);
-    const resolvedSubcategory = normalizeCategoryName(formData.subcategory);
+    const resolvedCategory = normalizeCategoryName(
+      formData.category === OTHER_CATEGORY_OPTION ? customCategory : formData.category
+    );
+    const resolvedSubcategory = normalizeCategoryName(
+      formData.subcategory === OTHER_SUBCATEGORY_OPTION ? customSubcategory : formData.subcategory
+    );
 
     if (!resolvedCategory) {
       setNotificationMessage('Please select or enter a valid category.');
@@ -809,6 +864,8 @@ function SellerFormPage() {
             category: '',
             subcategory: '',
           });
+          setCustomCategory('');
+          setCustomSubcategory('');
           setImages([]);
           setCoverImage(null);
           setMediaFiles([]);
@@ -951,6 +1008,11 @@ function SellerFormPage() {
   const selectedStateFilter = locationFilters.find(
     (item) => item.state.toLowerCase() === formData.locationState.toLowerCase()
   );
+  const isCategoryOtherSelected = formData.category === OTHER_CATEGORY_OPTION;
+  const isSubcategoryOtherSelected = formData.subcategory === OTHER_SUBCATEGORY_OPTION;
+  const selectedCategory = !isCategoryOtherSelected
+    ? categories.find((cat) => cat.name.toLowerCase() === formData.category.toLowerCase())
+    : undefined;
   const selectedDistrictFilter = selectedStateFilter?.cities.find(
     (city) => city.name.toLowerCase() === formData.locationDistrict.toLowerCase()
   );
@@ -1084,6 +1146,10 @@ function SellerFormPage() {
                         onChange={(e) => {
                           const value = e.target.value;
                           setFormData((prev) => ({ ...prev, category: value, subcategory: '' }));
+                          if (value !== OTHER_CATEGORY_OPTION) {
+                            setCustomCategory('');
+                          }
+                          setCustomSubcategory('');
                         }}
                         className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                         required
@@ -1092,7 +1158,18 @@ function SellerFormPage() {
                         {categories.map((cat) => (
                           <option key={cat.name} value={cat.name}>{cat.name}</option>
                         ))}
+                        <option value={OTHER_CATEGORY_OPTION}>Other (Add new)</option>
                       </select>
+                      {isCategoryOtherSelected && (
+                        <input
+                          type="text"
+                          value={customCategory}
+                          onChange={(e) => setCustomCategory(e.target.value)}
+                          className="mt-3 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                          placeholder="Enter custom category"
+                          required
+                        />
+                      )}
                     </div>
 
                     <div>
@@ -1111,12 +1188,23 @@ function SellerFormPage() {
                         <option value="">
                           {!formData.category ? 'Select category first' : 'Select subcategory'}
                         </option>
-                        {formData.category && categories
-                          .find((cat) => cat.name.toLowerCase() === formData.category.toLowerCase())
-                          ?.subFilters?.map((sub) => (
-                            <option key={sub} value={sub}>{sub}</option>
-                          ))}
+                        {selectedCategory?.subFilters?.map((sub) => (
+                          <option key={sub} value={sub}>{sub}</option>
+                        ))}
+                        {formData.category && (
+                          <option value={OTHER_SUBCATEGORY_OPTION}>Other (Add new)</option>
+                        )}
                       </select>
+                      {(isSubcategoryOtherSelected || isCategoryOtherSelected) && (
+                        <input
+                          type="text"
+                          value={customSubcategory}
+                          onChange={(e) => setCustomSubcategory(e.target.value)}
+                          className="mt-3 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                          placeholder="Enter custom subcategory"
+                          required
+                        />
+                      )}
                     </div>
 
                     <div>
