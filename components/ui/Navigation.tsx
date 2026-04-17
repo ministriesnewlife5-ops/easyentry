@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Menu, X, ChevronDown, Mic2, Building2, Megaphone, LogOut, UserCircle2, LayoutDashboard, CalendarDays, Heart, History } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
+import EyeDoodle from './EyeDoodle';
 
 export default function Navigation() {
   const [workDropdownOpen, setWorkDropdownOpen] = useState(false);
@@ -39,14 +39,9 @@ export default function Navigation() {
         <div className="flex items-center justify-between w-full">
           {/* Logo - Left Side */}
           <Link href="/" className="flex items-center gap-2 group mr-8">
-            <Image 
-              src="/Easy Entry Logo.png" 
-              alt="Easy Entry" 
-              width={120} 
-              height={40} 
-              className="h-8 w-auto object-contain"
-              priority
-            />
+            <div className="w-10 h-10 relative scale-75">
+              <EyeDoodle />
+            </div>
           </Link>
 
           {/* Search - Left-Middle (Hidden on mobile) */}
