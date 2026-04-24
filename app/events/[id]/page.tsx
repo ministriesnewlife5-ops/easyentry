@@ -143,6 +143,8 @@ export default function EventDetailsPage() {
         id: 'entry',
         name: 'General Admission',
         price: Number.isFinite(numericPrice) ? numericPrice : 0,
+        artistShare: 0,
+        influencerShare: 0,
         description: 'Select from available ticket types',
         availableFrom: undefined,
         availableUntil: undefined,
