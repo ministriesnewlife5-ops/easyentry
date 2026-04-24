@@ -11,7 +11,6 @@ import {
 import Image from 'next/image';
 import DragDropUpload from '@/components/ui/DragDropUpload';
 import { uploadFileDirectToSupabase } from '@/lib/browser-storage';
-import { getHostedEvents } from '@/lib/hosted-events';
 
 interface GalleryImage {
   id: string;
@@ -51,13 +50,18 @@ export default function PromoterProfilePage() {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-  const [events, setEvents] = useState<Array<{ id: number; title: string; venue: string; date: string }>>([]);
+  const [events, setEvents] = useState<Array<{ id: string; title: string; venue: string; date: string }>>([]);
   const [promoForm, setPromoForm] = useState({
     eventId: '',
     promoCode: '',
     discountPercent: ''
   });
-  const [promoRequests, setPromoRequests] = useState<Array<{ id: number; eventTitle: string; code: string; status: string }>>([]);
+  const [promoRequests, setPromoRequests] = useState<Array<{ id: string; eventTitle: string; code: string; status: string }>>([]);
+  const [promoSummary, setPromoSummary] = useState({
+    totalShareAmount: 0,
+    totalBookedAmount: 0,
+    totalBookings: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -67,12 +71,30 @@ export default function PromoterProfilePage() {
       try {
         setIsLoading(true);
 
-        const [eventsData, profileResponse] = await Promise.all([
-          getHostedEvents(),
+        const [promoResponse, profileResponse] = await Promise.all([
+          fetch('/api/promo-codes', { cache: 'no-store' }),
           fetch('/api/promoter/profile', { cache: 'no-store' }),
         ]);
 
-        setEvents(eventsData || []);
+        if (promoResponse.ok) {
+          const promoData = await promoResponse.json();
+          setEvents(Array.isArray(promoData?.events) ? promoData.events : []);
+          setPromoRequests(
+            Array.isArray(promoData?.promoCodes)
+              ? promoData.promoCodes.map((code: { eventId?: string; eventTitle?: string; code?: string }) => ({
+                  id: `${String(code.eventId || '')}-${String(code.code || '')}`,
+                  eventTitle: String(code.eventTitle || 'Unknown Event'),
+                  code: String(code.code || ''),
+                  status: 'Active',
+                }))
+              : []
+          );
+          setPromoSummary({
+            totalShareAmount: Number(promoData?.earnings?.totalShareAmount || 0),
+            totalBookedAmount: Number(promoData?.earnings?.totalBookedAmount || 0),
+            totalBookings: Number(promoData?.earnings?.totalBookings || 0),
+          });
+        }
 
         if (profileResponse.ok) {
           const data = await profileResponse.json();
@@ -122,24 +144,44 @@ export default function PromoterProfilePage() {
     setPromoForm(prev => ({ ...prev, promoCode: code }));
   };
 
-  const handleSendPromoRequest = (e: React.FormEvent) => {
+  const handleSendPromoRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!promoForm.eventId || !promoForm.promoCode) {
-      alert('Please select an event and enter a promo code');
+    if (!promoForm.eventId || !promoForm.promoCode || !promoForm.discountPercent) {
+      setMessage({ type: 'error', text: 'Please select an event, enter a promo code and discount percent' });
       return;
     }
-    
-    const selectedEvent = events.find(e => e.id.toString() === promoForm.eventId);
-    const newRequest = {
-      id: Date.now(),
-      eventTitle: selectedEvent?.title || 'Unknown Event',
-      code: promoForm.promoCode,
-      status: 'Pending'
-    };
-    
-    setPromoRequests(prev => [newRequest, ...prev]);
-    alert(`Promo code request sent for ${selectedEvent?.title}!\nCode: ${promoForm.promoCode}`);
-    setPromoForm({ eventId: '', promoCode: '', discountPercent: '' });
+
+    try {
+      const response = await fetch('/api/promo-codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: promoForm.eventId,
+          promoCode: promoForm.promoCode,
+          discountPercent: Number(promoForm.discountPercent),
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to create promo code');
+      }
+
+      const selectedEvent = events.find((event) => event.id === promoForm.eventId);
+      setPromoRequests((prev) => [
+        {
+          id: `${promoForm.eventId}-${String(data?.couponRule?.code || promoForm.promoCode).toUpperCase()}`,
+          eventTitle: selectedEvent?.title || 'Unknown Event',
+          code: String(data?.couponRule?.code || promoForm.promoCode).toUpperCase(),
+          status: 'Active',
+        },
+        ...prev,
+      ]);
+      setPromoForm({ eventId: '', promoCode: '', discountPercent: '' });
+      setMessage({ type: 'success', text: 'Promo code created successfully' });
+    } catch (error) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to create promo code' });
+    }
   };
 
   const handleProfileImageUpload = async (file: File) => {
@@ -540,7 +582,7 @@ export default function PromoterProfilePage() {
               <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Ticket className="w-5 h-5 text-[#E5A823]" />
-                  Create Promo Code
+                  Create Promo Code (Live)
                 </h3>
                 <form onSubmit={handleSendPromoRequest} className="space-y-6">
                   <div>
@@ -566,13 +608,30 @@ export default function PromoterProfilePage() {
                   </div>
                   <motion.button type="submit" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full py-4 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center justify-center gap-2">
                     <Send className="w-5 h-5" />
-                    Send Request
+                    Create Promo Code
                   </motion.button>
                 </form>
               </div>
+              <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
+                <h3 className="text-lg font-bold mb-4">Promo Earnings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-lg bg-[#2A2A2A]">
+                    <p className="text-xs text-[#F5F5DC]/60">Your Share</p>
+                    <p className="text-2xl font-bold text-[#E5A823]">₹{promoSummary.totalShareAmount.toFixed(2)}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-[#2A2A2A]">
+                    <p className="text-xs text-[#F5F5DC]/60">Bookings Using Your Code</p>
+                    <p className="text-2xl font-bold text-[#F5F5DC]">{promoSummary.totalBookings}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-[#2A2A2A]">
+                    <p className="text-xs text-[#F5F5DC]/60">Total GMV</p>
+                    <p className="text-2xl font-bold text-[#F5F5DC]">₹{promoSummary.totalBookedAmount.toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
               {promoRequests.length > 0 && (
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
-                  <h3 className="text-lg font-bold mb-4">Your Promo Code Requests</h3>
+                  <h3 className="text-lg font-bold mb-4">Your Active Promo Codes</h3>
                   <div className="space-y-3">
                     {promoRequests.map((request) => (
                       <div key={request.id} className="flex items-center justify-between p-4 bg-[#2A2A2A] rounded-lg">
@@ -580,7 +639,7 @@ export default function PromoterProfilePage() {
                           <p className="font-medium">{request.eventTitle}</p>
                           <p className="text-sm text-[#E5A823] font-mono">{request.code}</p>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${request.status === 'Pending' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-green-500/20 text-green-500'}`}>{request.status}</span>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${request.status === 'Active' ? 'bg-green-500/20 text-green-500' : 'bg-yellow-500/20 text-yellow-500'}`}>{request.status}</span>
                       </div>
                     ))}
                   </div>

@@ -22,6 +22,8 @@ interface TicketCategory {
   name: string;
   quantity: number;
   price: number;
+  artistShare?: number;
+  influencerShare?: number;
 }
 
 interface BookingDetails {
@@ -127,6 +129,8 @@ export default function EventDetailsPage() {
         id: cat.id,
         name: cat.name,
         price: cat.price,
+        artistShare: Number(cat.artistShare || 0),
+        influencerShare: Number(cat.influencerShare || 0),
         description: cat.tagline?.trim() ? cat.tagline.trim() : `Category: ${cat.name}`,
         availableFrom: cat.availableFrom,
         availableUntil: cat.availableUntil,
@@ -451,6 +455,8 @@ export default function EventDetailsPage() {
           name: t.name,
           quantity: quantities[t.id] || 0,
           price: t.price,
+          artistShare: Number(t.artistShare || 0),
+          influencerShare: Number(t.influencerShare || 0),
         }));
       console.log('Selected categories:', selectedCategories);
 
@@ -520,6 +526,8 @@ export default function EventDetailsPage() {
                   name: t.name,
                   quantity: quantities[t.id] || 0,
                   price: t.price,
+                  artistShare: Number(t.artistShare || 0),
+                  influencerShare: Number(t.influencerShare || 0),
                 }));
 
               const newBooking: BookingDetails = {

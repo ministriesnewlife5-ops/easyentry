@@ -38,6 +38,7 @@ type BrowseLocationState = { state: string; cities: BrowseLocationCity[] };
 
 const OTHER_CATEGORY_OPTION = '__other_category__';
 const OTHER_SUBCATEGORY_OPTION = '__other_subcategory__';
+const OTHER_AREA_OPTION = '__other_area__';
 
 // Converts a File to a base64 data URL so images persist after page reload
 function fileToBase64(file: File): Promise<string> {
@@ -168,6 +169,7 @@ function SellerFormPage() {
   const [rules, setRules] = useState<Array<{ id: string; text: string }>>([{ id: '1', text: '' }]);
   const [customCategory, setCustomCategory] = useState('');
   const [customSubcategory, setCustomSubcategory] = useState('');
+  const [customArea, setCustomArea] = useState('');
   
   // Artists state
   const [artists, setArtists] = useState<Array<{ id: string; email: string; name: string | null; role: string }>>([]);
@@ -407,6 +409,44 @@ function SellerFormPage() {
     };
   };
 
+  const resolveLocationSelection = (rawDistrict?: unknown, rawArea?: unknown) => {
+    const normalizedDistrict = normalizeCategoryName(typeof rawDistrict === 'string' ? rawDistrict : '');
+    const normalizedArea = normalizeCategoryName(typeof rawArea === 'string' ? rawArea : '');
+
+    if (!normalizedDistrict) {
+      return {
+        districtSelection: '',
+        areaSelection: '',
+        customAreaValue: '',
+      };
+    }
+
+    const matchedState = locationFilters.find((state) =>
+      state.cities.some((city) => city.name.toLowerCase() === normalizedDistrict.toLowerCase())
+    );
+    const matchedDistrict = matchedState?.cities.find(
+      (city) => city.name.toLowerCase() === normalizedDistrict.toLowerCase()
+    );
+
+    if (!matchedDistrict) {
+      return {
+        districtSelection: normalizedDistrict,
+        areaSelection: normalizedArea ? OTHER_AREA_OPTION : '',
+        customAreaValue: normalizedArea,
+      };
+    }
+
+    const matchedArea = matchedDistrict.areas.find(
+      (area) => area.toLowerCase() === normalizedArea.toLowerCase()
+    );
+
+    return {
+      districtSelection: matchedDistrict.name,
+      areaSelection: normalizedArea ? matchedArea || OTHER_AREA_OPTION : '',
+      customAreaValue: normalizedArea && !matchedArea ? normalizedArea : '',
+    };
+  };
+
   useEffect(() => {
     if (!isEditMode || !editEventId) return;
 
@@ -429,6 +469,7 @@ function SellerFormPage() {
         const eventTime = parseTimeRange(typeof event.time === 'string' ? event.time : '');
 
         const categorySelection = resolveCategorySelection(event.category, event.subcategory);
+        const locationSelection = resolveLocationSelection(event.locationDistrict, event.locationArea);
 
         setFormData((prev) => ({
           ...prev,
@@ -438,8 +479,8 @@ function SellerFormPage() {
           organizer: typeof event.promoterName === 'string' ? event.promoterName : '',
           location: typeof event.venue === 'string' ? event.venue : '',
           locationState: typeof event.locationState === 'string' ? event.locationState : '',
-          locationDistrict: typeof event.locationDistrict === 'string' ? event.locationDistrict : '',
-          locationArea: typeof event.locationArea === 'string' ? event.locationArea : '',
+          locationDistrict: locationSelection.districtSelection,
+          locationArea: locationSelection.areaSelection,
           date: typeof event.date === 'string' ? event.date : '',
           startTime: eventTime.startTime,
           endTime: eventTime.endTime,
@@ -452,6 +493,7 @@ function SellerFormPage() {
 
         setCustomCategory(categorySelection.categoryCustomValue);
         setCustomSubcategory(categorySelection.subcategoryCustomValue);
+        setCustomArea(locationSelection.customAreaValue);
 
         const eventRules = Array.isArray(event.rules)
           ? (event.rules as unknown[])
@@ -662,6 +704,9 @@ function SellerFormPage() {
     const resolvedSubcategory = normalizeCategoryName(
       formData.subcategory === OTHER_SUBCATEGORY_OPTION ? customSubcategory : formData.subcategory
     );
+    const resolvedArea = normalizeCategoryName(
+      formData.locationArea === OTHER_AREA_OPTION ? customArea : formData.locationArea
+    );
 
     if (!resolvedCategory) {
       setNotificationMessage('Please select or enter a valid category.');
@@ -680,6 +725,13 @@ function SellerFormPage() {
     // Validate required fields
     if (!formData.title || !formData.date || !formData.startTime || !formData.location) {
       setNotificationMessage('Please fill in all required fields (Title, Date, Start Time, Location)');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 5000);
+      return;
+    }
+
+    if (!formData.locationState || !formData.locationDistrict || !resolvedArea) {
+      setNotificationMessage('Please select or enter a valid state, district and area.');
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 5000);
       return;
@@ -765,7 +817,7 @@ function SellerFormPage() {
         venue: formData.location,
         locationState: formData.locationState || undefined,
         locationDistrict: formData.locationDistrict || undefined,
-        locationArea: formData.locationArea || undefined,
+        locationArea: resolvedArea || undefined,
         category: resolvedCategory || 'General',
         subcategory: resolvedSubcategory || undefined,
         price: `₹${minPrice}`,
@@ -839,7 +891,7 @@ function SellerFormPage() {
             venue: formData.location,
             locationState: formData.locationState || undefined,
             locationDistrict: formData.locationDistrict || undefined,
-            locationArea: formData.locationArea || undefined,
+            locationArea: resolvedArea || undefined,
             price: `₹${minPrice}`,
             imageColor: 'bg-blue-900',
             category: resolvedSubcategory ? `${resolvedCategory} • ${resolvedSubcategory}` : resolvedCategory,
@@ -866,6 +918,7 @@ function SellerFormPage() {
           });
           setCustomCategory('');
           setCustomSubcategory('');
+          setCustomArea('');
           setImages([]);
           setCoverImage(null);
           setMediaFiles([]);
@@ -1433,6 +1486,7 @@ function SellerFormPage() {
                                 locationDistrict: value,
                                 locationArea: '',
                               }));
+                              setCustomArea('');
                             }}
                             className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                             required
@@ -1452,7 +1506,13 @@ function SellerFormPage() {
                           <select
                             name="locationArea"
                             value={formData.locationArea}
-                            onChange={(e) => setFormData((prev) => ({ ...prev, locationArea: e.target.value }))}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setFormData((prev) => ({ ...prev, locationArea: value }));
+                              if (value !== OTHER_AREA_OPTION) {
+                                setCustomArea('');
+                              }
+                            }}
                             className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                             required
                             disabled={!selectedDistrictFilter}
@@ -1463,7 +1523,18 @@ function SellerFormPage() {
                             {areaOptions.map((area) => (
                               <option key={area} value={area}>{area}</option>
                             ))}
+                            {selectedDistrictFilter && <option value={OTHER_AREA_OPTION}>Other (Add new)</option>}
                           </select>
+                          {formData.locationArea === OTHER_AREA_OPTION && (
+                            <input
+                              type="text"
+                              value={customArea}
+                              onChange={(e) => setCustomArea(e.target.value)}
+                              className="mt-3 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                              placeholder="Enter custom area"
+                              required
+                            />
+                          )}
                         </div>
                       </div>
 

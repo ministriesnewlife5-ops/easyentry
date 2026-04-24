@@ -7,9 +7,14 @@ type PublicEventTicketCategory = {
   name: string;
   tagline?: string;
   price: number;
+  originalPrice?: number;
   quantity?: number;
   availableFrom?: string;
   availableUntil?: string;
+  discount?: number;
+  platformFee?: number;
+  artistShare?: number;
+  influencerShare?: number;
 };
 
 type PublicEventTaggedArtist = {
@@ -335,9 +340,14 @@ async function getTicketCategoriesFromSourceRequest(requestId: string): Promise<
     name: String(cat.name || 'General Admission'),
     tagline: typeof cat.tagline === 'string' ? cat.tagline : undefined,
     price: Number(cat.price || 0),
+    originalPrice: cat.originalPrice == null ? undefined : Number(cat.originalPrice),
     quantity: cat.quantity == null ? undefined : Number(cat.quantity),
     availableFrom: cat.availableFrom,
     availableUntil: cat.availableUntil,
+    discount: cat.discount == null ? undefined : Number(cat.discount),
+    platformFee: cat.platformFee == null ? undefined : Number(cat.platformFee),
+    artistShare: cat.artistShare == null ? undefined : Number(cat.artistShare),
+    influencerShare: cat.influencerShare == null ? undefined : Number(cat.influencerShare),
   }));
 }
 
