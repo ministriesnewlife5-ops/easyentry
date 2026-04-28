@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Menu, X, ChevronDown, Mic2, Building2, Megaphone, LogOut, UserCircle2, LayoutDashboard, CalendarDays, Heart, History } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
-import EyeDoodle from './EyeDoodle';
 
 export default function Navigation() {
   const [workDropdownOpen, setWorkDropdownOpen] = useState(false);
@@ -37,13 +36,6 @@ export default function Navigation() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0D0D0D]/95 backdrop-blur-md border-b border-[#2A2A2A] h-16 flex items-center">
       <div className="container mx-auto px-4 w-full">
         <div className="flex items-center justify-between w-full">
-          {/* Logo - Left Side */}
-          <Link href="/" className="flex items-center gap-2 group mr-8">
-            <div className="w-10 h-10 relative scale-75">
-              <EyeDoodle />
-            </div>
-          </Link>
-
           {/* Search - Left-Middle (Hidden on mobile) */}
           <div className="hidden md:flex items-center flex-1 max-w-2xl mr-auto">
             <div className="relative w-full group">

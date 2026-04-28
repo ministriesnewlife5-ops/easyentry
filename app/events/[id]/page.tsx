@@ -152,6 +152,7 @@ export default function EventDetailsPage() {
     ];
   }, [event]);
 
+  
   const directionsUrl = useMemo(() => {
     if (!event) return '';
     if (event.googleMapsLink && /^https?:\/\//i.test(event.googleMapsLink)) {
