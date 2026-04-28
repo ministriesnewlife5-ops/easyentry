@@ -22,6 +22,7 @@ interface TicketCategory {
   name: string;
   quantity: number;
   price: number;
+  originalPrice?: number;
   artistShare?: number;
   influencerShare?: number;
 }
@@ -64,7 +65,7 @@ export default function EventDetailsPage() {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const ticketRef = useRef<HTMLDivElement>(null);
 
-  const convenienceFee = 175;
+  const [convenienceFee, setConvenienceFee] = useState(175);
   const maxTickets = 10;
   useEffect(() => {
     const eventId = params.id as string;
@@ -92,7 +93,20 @@ export default function EventDetailsPage() {
       }
     };
 
+    const fetchConvenienceFee = async () => {
+      try {
+        const response = await fetch('/api/admin/convenience-fee');
+        if (response.ok) {
+          const data = await response.json();
+          setConvenienceFee(Number(data.fee) || 175);
+        }
+      } catch (error) {
+        console.error('Failed to load convenience fee:', error);
+      }
+    };
+
     fetchEvent();
+    fetchConvenienceFee();
   }, [params.id]);
 
   useEffect(() => {
@@ -129,6 +143,7 @@ export default function EventDetailsPage() {
         id: cat.id,
         name: cat.name,
         price: cat.price,
+        originalPrice: cat.originalPrice,
         artistShare: Number(cat.artistShare || 0),
         influencerShare: Number(cat.influencerShare || 0),
         description: cat.tagline?.trim() ? cat.tagline.trim() : `Category: ${cat.name}`,
@@ -143,6 +158,7 @@ export default function EventDetailsPage() {
         id: 'entry',
         name: 'General Admission',
         price: Number.isFinite(numericPrice) ? numericPrice : 0,
+        originalPrice: Number.isFinite(numericPrice) ? numericPrice : 0,
         artistShare: 0,
         influencerShare: 0,
         description: 'Select from available ticket types',
@@ -1033,7 +1049,16 @@ export default function EventDetailsPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
                               <p className="text-sm font-bold text-[#F5F5DC]">{ticket.name}</p>
-                              <p className="text-sm font-bold text-[#E5A823]">₹{ticket.price.toFixed(0)}</p>
+                              <div className="text-right">
+                                {ticket.originalPrice && ticket.originalPrice > ticket.price ? (
+                                  <div className="flex flex-col items-end">
+                                    <span className="text-sm font-bold text-[#E5A823]">₹{ticket.price.toFixed(0)}</span>
+                                    <span className="text-xs text-[#F5F5DC]/50 line-through">₹{ticket.originalPrice.toFixed(0)}</span>
+                                  </div>
+                                ) : (
+                                  <p className="text-sm font-bold text-[#E5A823]">₹{ticket.price.toFixed(0)}</p>
+                                )}
+                              </div>
                             </div>
                             {ticket.description && (
                               <p className="text-xs text-[#F5F5DC]/60 mb-2">{ticket.description}</p>

@@ -39,6 +39,8 @@ type BrowseLocationState = { state: string; cities: BrowseLocationCity[] };
 const OTHER_CATEGORY_OPTION = '__other_category__';
 const OTHER_SUBCATEGORY_OPTION = '__other_subcategory__';
 const OTHER_AREA_OPTION = '__other_area__';
+const OTHER_STATE_OPTION = '__other_state__';
+const OTHER_DISTRICT_OPTION = '__other_district__';
 
 // Converts a File to a base64 data URL so images persist after page reload
 function fileToBase64(file: File): Promise<string> {
@@ -170,6 +172,8 @@ function SellerFormPage() {
   const [customCategory, setCustomCategory] = useState('');
   const [customSubcategory, setCustomSubcategory] = useState('');
   const [customArea, setCustomArea] = useState('');
+  const [customState, setCustomState] = useState('');
+  const [customDistrict, setCustomDistrict] = useState('');
   
   // Artists state
   const [artists, setArtists] = useState<Array<{ id: string; email: string; name: string | null; role: string }>>([]);
@@ -409,41 +413,81 @@ function SellerFormPage() {
     };
   };
 
-  const resolveLocationSelection = (rawDistrict?: unknown, rawArea?: unknown) => {
+  const resolveLocationSelection = (rawDistrict?: unknown, rawArea?: unknown, rawState?: unknown) => {
+    const normalizedState = normalizeCategoryName(typeof rawState === 'string' ? rawState : '');
     const normalizedDistrict = normalizeCategoryName(typeof rawDistrict === 'string' ? rawDistrict : '');
     const normalizedArea = normalizeCategoryName(typeof rawArea === 'string' ? rawArea : '');
 
-    if (!normalizedDistrict) {
+    if (!normalizedDistrict && !normalizedState) {
       return {
         districtSelection: '',
         areaSelection: '',
+        stateSelection: '',
         customAreaValue: '',
+        customStateValue: '',
+        customDistrictValue: '',
       };
     }
 
-    const matchedState = locationFilters.find((state) =>
-      state.cities.some((city) => city.name.toLowerCase() === normalizedDistrict.toLowerCase())
-    );
-    const matchedDistrict = matchedState?.cities.find(
-      (city) => city.name.toLowerCase() === normalizedDistrict.toLowerCase()
-    );
-
-    if (!matchedDistrict) {
-      return {
-        districtSelection: normalizedDistrict,
-        areaSelection: normalizedArea ? OTHER_AREA_OPTION : '',
-        customAreaValue: normalizedArea,
-      };
+    // Handle state resolution
+    let resolvedState = '';
+    let customStateValue = '';
+    if (normalizedState) {
+      const matchedState = locationFilters.find((state) =>
+        state.state.toLowerCase() === normalizedState.toLowerCase()
+      );
+      if (matchedState) {
+        resolvedState = matchedState.state;
+      } else {
+        resolvedState = OTHER_STATE_OPTION;
+        customStateValue = normalizedState;
+      }
     }
 
-    const matchedArea = matchedDistrict.areas.find(
-      (area) => area.toLowerCase() === normalizedArea.toLowerCase()
-    );
+    // Handle district resolution
+    let resolvedDistrict = '';
+    let customDistrictValue = '';
+    if (normalizedDistrict) {
+      const stateToSearch = resolvedState === OTHER_STATE_OPTION ? null : locationFilters.find(state => state.state === resolvedState);
+      const matchedDistrict = stateToSearch?.cities.find(
+        (city) => city.name.toLowerCase() === normalizedDistrict.toLowerCase()
+      );
+
+      if (matchedDistrict) {
+        resolvedDistrict = matchedDistrict.name;
+      } else {
+        resolvedDistrict = OTHER_DISTRICT_OPTION;
+        customDistrictValue = normalizedDistrict;
+      }
+    }
+
+    // Handle area resolution
+    let resolvedArea = '';
+    let customAreaValue = '';
+    if (normalizedArea) {
+      const stateToSearch = resolvedState === OTHER_STATE_OPTION ? null : locationFilters.find(state => state.state === resolvedState);
+      const districtToSearch = resolvedDistrict === OTHER_DISTRICT_OPTION ? null : stateToSearch?.cities.find(
+        (city) => city.name === resolvedDistrict
+      );
+      const matchedArea = districtToSearch?.areas.find(
+        (area) => area.toLowerCase() === normalizedArea.toLowerCase()
+      );
+
+      if (matchedArea) {
+        resolvedArea = matchedArea;
+      } else {
+        resolvedArea = OTHER_AREA_OPTION;
+        customAreaValue = normalizedArea;
+      }
+    }
 
     return {
-      districtSelection: matchedDistrict.name,
-      areaSelection: normalizedArea ? matchedArea || OTHER_AREA_OPTION : '',
-      customAreaValue: normalizedArea && !matchedArea ? normalizedArea : '',
+      districtSelection: resolvedDistrict,
+      areaSelection: resolvedArea,
+      stateSelection: resolvedState,
+      customAreaValue,
+      customStateValue,
+      customDistrictValue,
     };
   };
 
@@ -469,7 +513,7 @@ function SellerFormPage() {
         const eventTime = parseTimeRange(typeof event.time === 'string' ? event.time : '');
 
         const categorySelection = resolveCategorySelection(event.category, event.subcategory);
-        const locationSelection = resolveLocationSelection(event.locationDistrict, event.locationArea);
+        const locationSelection = resolveLocationSelection(event.locationDistrict, event.locationArea, event.locationState);
 
         setFormData((prev) => ({
           ...prev,
@@ -478,7 +522,7 @@ function SellerFormPage() {
           price: typeof event.price === 'string' ? event.price : '',
           organizer: typeof event.promoterName === 'string' ? event.promoterName : '',
           location: typeof event.venue === 'string' ? event.venue : '',
-          locationState: typeof event.locationState === 'string' ? event.locationState : '',
+          locationState: locationSelection.stateSelection,
           locationDistrict: locationSelection.districtSelection,
           locationArea: locationSelection.areaSelection,
           date: typeof event.date === 'string' ? event.date : '',
@@ -493,6 +537,8 @@ function SellerFormPage() {
 
         setCustomCategory(categorySelection.categoryCustomValue);
         setCustomSubcategory(categorySelection.subcategoryCustomValue);
+        setCustomState(locationSelection.customStateValue);
+        setCustomDistrict(locationSelection.customDistrictValue);
         setCustomArea(locationSelection.customAreaValue);
 
         const eventRules = Array.isArray(event.rules)
@@ -704,6 +750,12 @@ function SellerFormPage() {
     const resolvedSubcategory = normalizeCategoryName(
       formData.subcategory === OTHER_SUBCATEGORY_OPTION ? customSubcategory : formData.subcategory
     );
+    const resolvedState = normalizeCategoryName(
+      formData.locationState === OTHER_STATE_OPTION ? customState : formData.locationState
+    );
+    const resolvedDistrict = normalizeCategoryName(
+      formData.locationDistrict === OTHER_DISTRICT_OPTION ? customDistrict : formData.locationDistrict
+    );
     const resolvedArea = normalizeCategoryName(
       formData.locationArea === OTHER_AREA_OPTION ? customArea : formData.locationArea
     );
@@ -730,7 +782,7 @@ function SellerFormPage() {
       return;
     }
 
-    if (!formData.locationState || !formData.locationDistrict || !resolvedArea) {
+    if (!resolvedState || !resolvedDistrict || !resolvedArea) {
       setNotificationMessage('Please select or enter a valid state, district and area.');
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 5000);
@@ -815,8 +867,8 @@ function SellerFormPage() {
         startTime: formData.startTime,
         endTime: formData.endTime,
         venue: formData.location,
-        locationState: formData.locationState || undefined,
-        locationDistrict: formData.locationDistrict || undefined,
+        locationState: resolvedState || undefined,
+        locationDistrict: resolvedDistrict || undefined,
         locationArea: resolvedArea || undefined,
         category: resolvedCategory || 'General',
         subcategory: resolvedSubcategory || undefined,
@@ -889,8 +941,8 @@ function SellerFormPage() {
             title: formData.title,
             date: formData.date,
             venue: formData.location,
-            locationState: formData.locationState || undefined,
-            locationDistrict: formData.locationDistrict || undefined,
+            locationState: resolvedState || undefined,
+            locationDistrict: resolvedDistrict || undefined,
             locationArea: resolvedArea || undefined,
             price: `₹${minPrice}`,
             imageColor: 'bg-blue-900',
@@ -918,6 +970,8 @@ function SellerFormPage() {
           });
           setCustomCategory('');
           setCustomSubcategory('');
+          setCustomState('');
+          setCustomDistrict('');
           setCustomArea('');
           setImages([]);
           setCoverImage(null);
@@ -1449,95 +1503,134 @@ function SellerFormPage() {
 
                     <div className="md:col-span-3">
                       <label className="block text-sm font-medium mb-3">Location Filters *</label>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-xs text-[#F5F5DC]/50 mb-2">State</label>
-                          <select
-                            name="locationState"
-                            value={formData.locationState}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setFormData((prev) => ({
-                                ...prev,
-                                locationState: value,
-                                locationDistrict: '',
-                                locationArea: '',
-                              }));
-                            }}
-                            className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                            required
-                          >
-                            <option value="">Select state</option>
-                            {locationFilters.map((state) => (
-                              <option key={state.state} value={state.state}>{state.state}</option>
-                            ))}
-                          </select>
-                        </div>
+                      {(() => {
+                        const selectedStateFilter = locationFilters.find(state => state.state === formData.locationState);
+                        const districtOptions = selectedStateFilter ? selectedStateFilter.cities : [];
+                        const selectedDistrictFilter = selectedStateFilter?.cities.find(city => city.name === formData.locationDistrict);
+                        const areaOptions = selectedDistrictFilter ? selectedDistrictFilter.areas : [];
 
-                        <div>
-                          <label className="block text-xs text-[#F5F5DC]/50 mb-2">District / City</label>
-                          <select
-                            name="locationDistrict"
-                            value={formData.locationDistrict}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setFormData((prev) => ({
-                                ...prev,
-                                locationDistrict: value,
-                                locationArea: '',
-                              }));
-                              setCustomArea('');
-                            }}
-                            className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                            required
-                            disabled={!selectedStateFilter}
-                          >
-                            <option value="">
-                              {!selectedStateFilter ? 'Select state first' : 'Select district'}
-                            </option>
-                            {districtOptions.map((district) => (
-                              <option key={district.name} value={district.name}>{district.name}</option>
-                            ))}
-                          </select>
-                        </div>
+                        return (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <label className="block text-xs text-[#F5F5DC]/50 mb-2">State</label>
+                              <select
+                                name="locationState"
+                                value={formData.locationState}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    locationState: value,
+                                    locationDistrict: '',
+                                    locationArea: '',
+                                  }));
+                                  if (value !== OTHER_STATE_OPTION) {
+                                    setCustomState('');
+                                  }
+                                  setCustomDistrict('');
+                                  setCustomArea('');
+                                }}
+                                className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                required
+                              >
+                                <option value="">Select state</option>
+                                {locationFilters.map((state) => (
+                                  <option key={state.state} value={state.state}>{state.state}</option>
+                                ))}
+                                <option value={OTHER_STATE_OPTION}>Other (Add new)</option>
+                              </select>
+                              {formData.locationState === OTHER_STATE_OPTION && (
+                                <input
+                                  type="text"
+                                  value={customState}
+                                  onChange={(e) => setCustomState(e.target.value)}
+                                  className="mt-3 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                  placeholder="Enter custom state"
+                                  required
+                                />
+                              )}
+                            </div>
 
-                        <div>
-                          <label className="block text-xs text-[#F5F5DC]/50 mb-2">Area</label>
-                          <select
-                            name="locationArea"
-                            value={formData.locationArea}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setFormData((prev) => ({ ...prev, locationArea: value }));
-                              if (value !== OTHER_AREA_OPTION) {
-                                setCustomArea('');
-                              }
-                            }}
-                            className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                            required
-                            disabled={!selectedDistrictFilter}
-                          >
-                            <option value="">
-                              {!selectedDistrictFilter ? 'Select district first' : 'Select area'}
-                            </option>
-                            {areaOptions.map((area) => (
-                              <option key={area} value={area}>{area}</option>
-                            ))}
-                            {selectedDistrictFilter && <option value={OTHER_AREA_OPTION}>Other (Add new)</option>}
-                          </select>
-                          {formData.locationArea === OTHER_AREA_OPTION && (
-                            <input
-                              type="text"
-                              value={customArea}
-                              onChange={(e) => setCustomArea(e.target.value)}
-                              className="mt-3 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                              placeholder="Enter custom area"
-                              required
-                            />
-                          )}
-                        </div>
-                      </div>
+                            <div>
+                              <label className="block text-xs text-[#F5F5DC]/50 mb-2">District / City</label>
+                              <select
+                                name="locationDistrict"
+                                value={formData.locationDistrict}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    locationDistrict: value,
+                                    locationArea: '',
+                                  }));
+                                  if (value !== OTHER_DISTRICT_OPTION) {
+                                    setCustomDistrict('');
+                                  }
+                                  setCustomArea('');
+                                }}
+                                className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                required
+                                disabled={!selectedStateFilter && formData.locationState !== OTHER_STATE_OPTION}
+                              >
+                                <option value="">
+                                  {!selectedStateFilter && formData.locationState !== OTHER_STATE_OPTION ? 'Select state first' : 'Select district'}
+                                </option>
+                                {districtOptions.map((district) => (
+                                  <option key={district.name} value={district.name}>{district.name}</option>
+                                ))}
+                                {(selectedStateFilter || formData.locationState === OTHER_STATE_OPTION) && <option value={OTHER_DISTRICT_OPTION}>Other (Add new)</option>}
+                              </select>
+                              {formData.locationDistrict === OTHER_DISTRICT_OPTION && (
+                                <input
+                                  type="text"
+                                  value={customDistrict}
+                                  onChange={(e) => setCustomDistrict(e.target.value)}
+                                  className="mt-3 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                  placeholder="Enter custom district"
+                                  required
+                                />
+                              )}
+                            </div>
 
+                            <div>
+                              <label className="block text-xs text-[#F5F5DC]/50 mb-2">Area</label>
+                              <select
+                                name="locationArea"
+                                value={formData.locationArea}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setFormData((prev) => ({ ...prev, locationArea: value }));
+                                  if (value !== OTHER_AREA_OPTION) {
+                                    setCustomArea('');
+                                  }
+                                }}
+                                className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                required
+                                disabled={!selectedDistrictFilter && formData.locationDistrict !== OTHER_DISTRICT_OPTION}
+                              >
+                                <option value="">
+                                  {!selectedDistrictFilter && formData.locationDistrict !== OTHER_DISTRICT_OPTION ? 'Select district first' : 'Select area'}
+                                </option>
+                                {areaOptions.map((area) => (
+                                  <option key={area} value={area}>{area}</option>
+                                ))}
+                                {(selectedDistrictFilter || formData.locationDistrict === OTHER_DISTRICT_OPTION) && <option value={OTHER_AREA_OPTION}>Other (Add new)</option>}
+                              </select>
+                              {formData.locationArea === OTHER_AREA_OPTION && (
+                                <input
+                                  type="text"
+                                  value={customArea}
+                                  onChange={(e) => setCustomArea(e.target.value)}
+                                  className="mt-3 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                  placeholder="Enter custom area"
+                                  required
+                                />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      
                       <div className="mt-4 relative">
                         <MapPin className="absolute left-4 top-3.5 w-4 h-4 text-[#F5F5DC]/50" />
                         <input
