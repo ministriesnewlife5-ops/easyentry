@@ -1,25 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Server-side Supabase client singleton
+// Server-side Supabase client singleton (lazy-initialized)
 // Uses service role key for admin-level operations (bypasses RLS)
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl) {
-  throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_URL');
-}
-
-if (!supabaseServiceKey) {
-  throw new Error('Missing env.SUPABASE_SERVICE_ROLE_KEY');
-}
-
-// Singleton pattern for server-side Supabase client
 let supabaseClient: any = null;
 
 export function getSupabaseServerClient(): any {
   if (!supabaseClient) {
-    supabaseClient = createClient(supabaseUrl!, supabaseServiceKey!, {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl) {
+      throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_URL');
+    }
+
+    if (!supabaseServiceKey) {
+      throw new Error('Missing env.SUPABASE_SERVICE_ROLE_KEY');
+    }
+
+    supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -29,8 +28,20 @@ export function getSupabaseServerClient(): any {
   return supabaseClient;
 }
 
-// Export singleton instance
-export const supabase = getSupabaseServerClient();
+// Provide a lazy proxy so `import { supabase } from '@/lib/supabase'` still works
+// without constructing the client at module import time. The real client is
+// created when a property is first accessed, which preserves current call-sites.
+export const supabase: any = new Proxy({}, {
+  get(_, prop) {
+    const client = getSupabaseServerClient();
+    // forward access
+    return (client as any)[prop];
+  },
+  apply(_, thisArg, args) {
+    const client = getSupabaseServerClient();
+    return (client as any).apply(thisArg, args);
+  }
+});
 
 // Types for database tables
 export type AppUser = {

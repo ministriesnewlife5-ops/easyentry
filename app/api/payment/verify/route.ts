@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import crypto from 'crypto';
 import { getSupabaseServerClient } from '@/lib/supabase';
+import { getGlobalCouponByCode, incrementGlobalCouponUsage } from '@/lib/global-coupons-store';
 
 function normalizeEnvValue(value?: string) {
   return value?.trim().replace(/^['\"]|['\"]$/g, '');
@@ -105,6 +106,21 @@ export async function POST(request: NextRequest) {
     if (bookingError) {
       console.error('Failed to persist booking:', bookingError);
       return NextResponse.json({ error: 'Payment verified but failed to save booking' }, { status: 500 });
+    }
+
+    // If couponAudit indicates this was an event-based (global) coupon, try to increment its usage count
+    try {
+      if (bookingPayload.coupon_code && couponAudit && couponAudit.discountModel === 'event-based') {
+        const found = await getGlobalCouponByCode(String(bookingPayload.coupon_code));
+        if (found) {
+          const ok = await incrementGlobalCouponUsage(found.id);
+          if (!ok) {
+            console.error('Failed to increment global coupon usage for coupon id', found.id);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error while incrementing global coupon usage:', err);
     }
 
     return NextResponse.json({

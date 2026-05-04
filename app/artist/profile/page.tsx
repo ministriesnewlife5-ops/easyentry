@@ -5,11 +5,13 @@ import { motion } from 'framer-motion';
 import { 
   Upload, X, Plus, Camera, Star, MapPin, Languages, 
   Clock, Award, Music, Mic2, Trash2, Edit2, CheckCircle2,
-  Video, Image as ImageIcon, ChevronRight, Ticket, Send
+  Video, Image as ImageIcon, ChevronRight
 } from 'lucide-react';
+import { Ticket } from 'lucide-react';
 import Image from 'next/image';
 import DragDropUpload from '@/components/ui/DragDropUpload';
 import { uploadFileDirectToSupabase } from '@/lib/browser-storage';
+import PromoCodeSection from '@/components/PromoCodeSection';
 
 interface Award {
   id: string;
@@ -150,13 +152,10 @@ export default function ArtistProfilePage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const [events, setEvents] = useState<Array<{ id: string; title: string; venue: string; date: string }>>([]);
   const [promoForm, setPromoForm] = useState({
-    eventId: '',
-    promoCode: '',
-    discountPercent: ''
+    code: '',
   });
-  const [promoRequests, setPromoRequests] = useState<Array<{ id: string; eventTitle: string; code: string; status: string }>>([]);
+  const [globalCoupons, setGlobalCoupons] = useState<Array<{ id: string; code: string; discountPercent: number; isActive: boolean; createdAt: string }>>([]);
   const [promoSummary, setPromoSummary] = useState<{
     totalShareAmount: number;
     totalBookedAmount: number;
@@ -174,28 +173,28 @@ export default function ArtistProfilePage() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [promoResponse, profileResponse] = await Promise.all([
-          fetch('/api/promo-codes', { cache: 'no-store' }),
+        const [globalCouponsResponse, profileResponse] = await Promise.all([
+          fetch('/api/global-coupons', { cache: 'no-store' }),
           fetch('/api/artist/profile', { cache: 'no-store' }),
         ]);
 
-        if (promoResponse.ok) {
-          const promoData = await promoResponse.json();
-          setEvents(Array.isArray(promoData?.events) ? promoData.events : []);
-          setPromoRequests(
-            Array.isArray(promoData?.promoCodes)
-              ? promoData.promoCodes.map((code: { eventId?: string; eventTitle?: string; code?: string }) => ({
-                  id: `${String(code.eventId || '')}-${String(code.code || '')}`,
-                  eventTitle: String(code.eventTitle || 'Unknown Event'),
-                  code: String(code.code || ''),
-                  status: 'Active',
+        if (globalCouponsResponse.ok) {
+          const couponData = await globalCouponsResponse.json();
+          setGlobalCoupons(
+            Array.isArray(couponData?.coupons)
+              ? couponData.coupons.map((coupon: { id: string; code: string; discount_percent: number; is_active: boolean; created_at: string }) => ({
+                  id: coupon.id,
+                  code: coupon.code,
+                  discountPercent: coupon.discount_percent,
+                  isActive: coupon.is_active,
+                  createdAt: coupon.created_at,
                 }))
               : []
           );
           setPromoSummary({
-            totalShareAmount: Number(promoData?.earnings?.totalShareAmount || 0),
-            totalBookedAmount: Number(promoData?.earnings?.totalBookedAmount || 0),
-            totalBookings: Number(promoData?.earnings?.totalBookings || 0),
+            totalShareAmount: Number(couponData?.earnings?.totalShareAmount || 0),
+            totalBookedAmount: Number(couponData?.earnings?.totalBookedAmount || 0),
+            totalBookings: Number(couponData?.earnings?.totalBookings || 0),
           });
         }
 
@@ -240,7 +239,7 @@ export default function ArtistProfilePage() {
     loadData();
   }, []);
 
-  const handlePromoInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handlePromoInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setPromoForm(prev => ({ ...prev, [name]: value }));
   };
@@ -249,46 +248,44 @@ export default function ArtistProfilePage() {
     const prefix = 'ARTIST';
     const random = Math.random().toString(36).substring(2, 6).toUpperCase();
     const code = `${prefix}${random}`;
-    setPromoForm(prev => ({ ...prev, promoCode: code }));
+    setPromoForm(prev => ({ ...prev, code: code }));
   };
 
   const handleSendPromoRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!promoForm.eventId || !promoForm.promoCode || !promoForm.discountPercent) {
-      setMessage({ type: 'error', text: 'Please select event, promo code and discount percent' });
+    if (!promoForm.code) {
+      setMessage({ type: 'error', text: 'Please enter coupon code' });
       return;
     }
 
     try {
-      const response = await fetch('/api/promo-codes', {
+      const response = await fetch('/api/global-coupons', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          eventId: promoForm.eventId,
-          promoCode: promoForm.promoCode,
-          discountPercent: Number(promoForm.discountPercent),
+          code: promoForm.code,
         }),
       });
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data?.error || 'Failed to create promo code');
+        throw new Error(data?.error || 'Failed to create global coupon');
       }
 
-      const selectedEvent = events.find((evt) => evt.id === promoForm.eventId);
-      setPromoRequests((prev) => [
+      setGlobalCoupons((prev) => [
         {
-          id: `${promoForm.eventId}-${String(data?.couponRule?.code || promoForm.promoCode).toUpperCase()}`,
-          eventTitle: selectedEvent?.title || 'Unknown Event',
-          code: String(data?.couponRule?.code || promoForm.promoCode).toUpperCase(),
-          status: 'Active',
+          id: data?.coupon?.id || '',
+          code: String(data?.coupon?.code || promoForm.code).toUpperCase(),
+          discountPercent: Number(data?.coupon?.discount_percent || 0),
+          isActive: data?.coupon?.is_active ?? true,
+          createdAt: data?.coupon?.created_at || new Date().toISOString(),
         },
         ...prev,
       ]);
-      setPromoForm({ eventId: '', promoCode: '', discountPercent: '' });
-      setMessage({ type: 'success', text: 'Promo code created successfully' });
+      setPromoForm({ code: '' });
+      setMessage({ type: 'success', text: 'Global coupon created successfully. Discount will be computed per event ticket settings.' });
     } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to create promo code' });
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to create global coupon' });
     }
   };
 
@@ -893,124 +890,16 @@ export default function ArtistProfilePage() {
 
             {/* Promo Codes Tab */}
             {activeTab === 'promo' && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-6"
-              >
-                <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
-                  <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                    <Ticket className="w-5 h-5 text-[#E5A823]" />
-                    Create Promo Code (Live)
-                  </h3>
-                  
-                  <form onSubmit={handleSendPromoRequest} className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-medium mb-3">Select Event</label>
-                      <select 
-                        name="eventId"
-                        value={promoForm.eventId}
-                        onChange={handlePromoInputChange}
-                        className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                      >
-                        <option value="">Choose an event...</option>
-                        {events.map((event) => (
-                          <option key={event.id} value={event.id}>
-                            {event.title} - {event.venue} ({event.date})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-3">Promo Code</label>
-                      <div className="flex gap-3">
-                        <input 
-                          type="text" 
-                          name="promoCode"
-                          value={promoForm.promoCode}
-                          onChange={handlePromoInputChange}
-                          className="flex-1 bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] uppercase tracking-wider"
-                          placeholder="e.g. ARTIST2024"
-                        />
-                        <button 
-                          type="button"
-                          onClick={generateUniqueCode}
-                          className="px-4 py-3 bg-[#2A2A2A] border border-[#E5A823]/30 text-[#E5A823] rounded-lg font-medium hover:bg-[#E5A823]/10 transition-colors"
-                        >
-                          Generate
-                        </button>
-                      </div>
-                      <p className="text-xs text-[#F5F5DC]/50 mt-2">Click "Generate" to create a unique code automatically</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-3">Discount Percentage</label>
-                      <input 
-                        type="number" 
-                        name="discountPercent"
-                        value={promoForm.discountPercent}
-                        onChange={handlePromoInputChange}
-                        className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                        placeholder="e.g. 15"
-                        min="1"
-                        max="100"
-                      />
-                    </div>
-
-                    <motion.button
-                      type="submit"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="w-full py-4 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center justify-center gap-2"
-                    >
-                      <Send className="w-5 h-5" />
-                      Create Promo Code
-                    </motion.button>
-                  </form>
-                </div>
-
-                <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
-                  <h3 className="text-lg font-bold mb-4">Promo Earnings</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 rounded-lg bg-[#2A2A2A]">
-                      <p className="text-xs text-[#F5F5DC]/60">Your Share (Auto Credited)</p>
-                      <p className="text-2xl font-bold text-[#E5A823]">₹{promoSummary.totalShareAmount.toFixed(2)}</p>
-                    </div>
-                    <div className="p-4 rounded-lg bg-[#2A2A2A]">
-                      <p className="text-xs text-[#F5F5DC]/60">Promo Bookings</p>
-                      <p className="text-2xl font-bold text-[#F5F5DC]">{promoSummary.totalBookings}</p>
-                    </div>
-                    <div className="p-4 rounded-lg bg-[#2A2A2A]">
-                      <p className="text-xs text-[#F5F5DC]/60">Total GMV via Promo</p>
-                      <p className="text-2xl font-bold text-[#F5F5DC]">₹{promoSummary.totalBookedAmount.toFixed(2)}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {promoRequests.length > 0 && (
-                  <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
-                    <h3 className="text-lg font-bold mb-4">Your Active Promo Codes</h3>
-                    <div className="space-y-3">
-                      {promoRequests.map((request) => (
-                        <div key={request.id} className="flex items-center justify-between p-4 bg-[#2A2A2A] rounded-lg">
-                          <div>
-                            <p className="font-medium">{request.eventTitle}</p>
-                            <p className="text-sm text-[#E5A823] font-mono">{request.code}</p>
-                          </div>
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            request.status === 'Active' 
-                              ? 'bg-green-500/20 text-green-500' 
-                              : 'bg-yellow-500/20 text-yellow-500'
-                          }`}>
-                            {request.status}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </motion.div>
+              <PromoCodeSection
+                role="artist"
+                promoForm={promoForm}
+                globalCoupons={globalCoupons}
+                promoSummary={promoSummary}
+                message={message}
+                onPromoInputChange={handlePromoInputChange}
+                onGenerateCode={generateUniqueCode}
+                onSubmitPromo={handleSendPromoRequest}
+              />
             )}
           </div>
 

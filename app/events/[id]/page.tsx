@@ -426,7 +426,7 @@ export default function EventDetailsPage() {
       return;
     }
 
-    setCouponMessage('Invalid coupon code.');
+    setCouponMessage('Coupon captured. Final discount will be validated at checkout based on this event.');
   };
 
   // Handle payment

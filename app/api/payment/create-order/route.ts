@@ -42,6 +42,69 @@ type CouponRule = {
   maxUses?: number;
 };
 
+type GlobalCouponRule = {
+  id: string;
+  code: string;
+  sourceType: 'artist' | 'promoter';
+  sourceId?: string;
+  sourceName?: string;
+  startsAt?: string;
+  endsAt?: string;
+  maxUses?: number;
+};
+
+type CheckoutTicketCategory = {
+  id?: string;
+  name?: string;
+  quantity?: number;
+  price?: number;
+  artistShare?: number;
+  influencerShare?: number;
+};
+
+function toFiniteNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
+function computeEventBasedDiscount(
+  ticketCategories: CheckoutTicketCategory[],
+  sourceType: 'artist' | 'promoter' | 'influencer'
+): { discountAmount: number; effectiveDiscountPercent: number } {
+  const subtotal = ticketCategories.reduce((sum, item) => {
+    const qty = Math.max(0, toFiniteNumber(item.quantity));
+    const price = Math.max(0, toFiniteNumber(item.price));
+    return sum + qty * price;
+  }, 0);
+
+  if (subtotal <= 0) {
+    return { discountAmount: 0, effectiveDiscountPercent: 0 };
+  }
+
+  const discountAmount = ticketCategories.reduce((sum, item) => {
+    const qty = Math.max(0, toFiniteNumber(item.quantity));
+    const price = Math.max(0, toFiniteNumber(item.price));
+    const lineSubtotal = qty * price;
+    const linePercent =
+      sourceType === 'artist'
+        ? clampPercent(toFiniteNumber(item.artistShare))
+        : clampPercent(toFiniteNumber(item.influencerShare));
+
+    return sum + lineSubtotal * (linePercent / 100);
+  }, 0);
+
+  const safeDiscount = Math.min(discountAmount, subtotal);
+  return {
+    discountAmount: safeDiscount,
+    effectiveDiscountPercent: (safeDiscount / subtotal) * 100,
+  };
+}
+
 function parseCouponRules(socialLinks: Record<string, unknown> | null): CouponRule[] {
   if (!socialLinks) return [];
 
@@ -112,7 +175,7 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseServerClient();
     const { data: eventData, error: eventError } = await supabase
       .from('published_events')
-      .select('title, social_links')
+      .select('title, social_links, ticket_categories, ticket_price')
       .eq('id', eventId)
       .single();
 
@@ -128,12 +191,57 @@ export async function POST(request: NextRequest) {
       ? couponRules.find((rule) => rule.code === requestedCouponCode)
       : undefined;
 
+    let matchedGlobalRule: GlobalCouponRule | undefined;
+
     if (requestedCouponCode && !matchedRule) {
-      return NextResponse.json({ error: 'Invalid coupon code' }, { status: 400 });
+      const { data: globalCoupon, error: globalCouponError } = await supabase
+        .from('global_coupons')
+        .select('id, code, source_type, source_id, source_name, starts_at, ends_at, max_uses, is_active')
+        .eq('code', requestedCouponCode)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (globalCouponError) {
+        return NextResponse.json({ error: 'Failed to validate coupon code' }, { status: 500 });
+      }
+
+      if (!globalCoupon) {
+        return NextResponse.json({ error: 'Invalid coupon code' }, { status: 400 });
+      }
+
+      matchedGlobalRule = {
+        id: String(globalCoupon.id),
+        code: normalizeCode(globalCoupon.code),
+        sourceType: String(globalCoupon.source_type) === 'artist' ? 'artist' : 'promoter',
+        sourceId: typeof globalCoupon.source_id === 'string' ? globalCoupon.source_id : undefined,
+        sourceName: typeof globalCoupon.source_name === 'string' ? globalCoupon.source_name : undefined,
+        startsAt: typeof globalCoupon.starts_at === 'string' ? globalCoupon.starts_at : undefined,
+        endsAt: typeof globalCoupon.ends_at === 'string' ? globalCoupon.ends_at : undefined,
+        maxUses: Number.isFinite(Number(globalCoupon.max_uses)) ? Number(globalCoupon.max_uses) : undefined,
+      };
     }
 
     if (matchedRule) {
       const status = getCouponStatus(matchedRule);
+      if (!status.valid) {
+        return NextResponse.json({ error: status.reason || 'Coupon is not valid right now' }, { status: 400 });
+      }
+    }
+
+    if (matchedGlobalRule) {
+      const status = getCouponStatus({
+        code: matchedGlobalRule.code,
+        discountPercent: 0,
+        sourceType: matchedGlobalRule.sourceType,
+        sourceId: matchedGlobalRule.sourceId,
+        sourceName: matchedGlobalRule.sourceName,
+        startsAt: matchedGlobalRule.startsAt,
+        endsAt: matchedGlobalRule.endsAt,
+        maxUses: matchedGlobalRule.maxUses,
+      });
+
       if (!status.valid) {
         return NextResponse.json({ error: status.reason || 'Coupon is not valid right now' }, { status: 400 });
       }
@@ -156,14 +264,60 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const discountPercent = matchedRule ? matchedRule.discountPercent : 0;
+    if (matchedGlobalRule?.maxUses) {
+      const { count, error: countError } = await supabase
+        .from('ticket_bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('coupon_code', matchedGlobalRule.code)
+        .eq('coupon_source_type', matchedGlobalRule.sourceType)
+        .eq('coupon_source_id', matchedGlobalRule.sourceId || '');
 
-    const subtotal = ticketCategories.reduce((sum: number, item: { quantity?: number; price?: number }) => {
-      return sum + (Number(item.price) || 0) * (Number(item.quantity) || 0);
-    }, 0);
-    const totalTickets = ticketCategories.reduce((sum: number, item: { quantity?: number }) => sum + (Number(item.quantity) || 0), 0);
+      if (!countError) {
+        usedCount = Number(count || 0);
+      }
+
+      if (usedCount >= matchedGlobalRule.maxUses) {
+        return NextResponse.json({ error: 'Coupon usage limit has been reached' }, { status: 400 });
+      }
+    }
+
+    const eventTicketCategories = Array.isArray(eventData.ticket_categories)
+      ? (eventData.ticket_categories as Array<Record<string, unknown>>)
+      : [];
+
+    const normalizedCategories: CheckoutTicketCategory[] = (ticketCategories as CheckoutTicketCategory[]).map((item) => {
+      const itemId = String(item.id || '');
+      const itemName = String(item.name || '').trim().toLowerCase();
+      const matchedEventCategory = eventTicketCategories.find((cat) => {
+        const catId = String(cat.id || '');
+        const catName = String(cat.name || '').trim().toLowerCase();
+        return (itemId && catId && itemId === catId) || (itemName && catName && itemName === catName);
+      });
+
+      return {
+        id: itemId,
+        name: String(item.name || matchedEventCategory?.name || ''),
+        quantity: Math.max(0, toFiniteNumber(item.quantity)),
+        price: Math.max(0, toFiniteNumber(matchedEventCategory?.price ?? item.price ?? eventData.ticket_price)),
+        artistShare: clampPercent(toFiniteNumber(matchedEventCategory?.artistShare ?? item.artistShare)),
+        influencerShare: clampPercent(toFiniteNumber(matchedEventCategory?.influencerShare ?? item.influencerShare)),
+      };
+    });
+
+    const subtotal = normalizedCategories.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0);
+    const totalTickets = normalizedCategories.reduce((sum, item) => sum + (item.quantity || 0), 0);
     const convenienceFees = totalTickets > 0 ? totalTickets * 175 : 0;
-    const discountAmount = Math.min(subtotal * (discountPercent / 100), subtotal);
+
+    let discountPercent = matchedRule ? matchedRule.discountPercent : 0;
+    let discountAmount = Math.min(subtotal * (discountPercent / 100), subtotal);
+
+    if (matchedGlobalRule) {
+      const sourceForDiscount = matchedGlobalRule.sourceType === 'artist' ? 'artist' : 'influencer';
+      const eventBasedDiscount = computeEventBasedDiscount(normalizedCategories, sourceForDiscount);
+      discountAmount = eventBasedDiscount.discountAmount;
+      discountPercent = eventBasedDiscount.effectiveDiscountPercent;
+    }
+
     const finalAmount = Math.max(subtotal - discountAmount + convenienceFees, 0);
 
     if (!Number.isFinite(finalAmount) || finalAmount <= 0) {
@@ -188,13 +342,13 @@ export async function POST(request: NextRequest) {
         userId: String(session.user.email || ''),
         userEmail: String(session.user.email || ''),
         userName: String(session.user.name || ''),
-        ticketCategories: JSON.stringify(ticketCategories),
-        couponCode: matchedRule?.code || '',
+        ticketCategories: JSON.stringify(normalizedCategories),
+        couponCode: matchedRule?.code || matchedGlobalRule?.code || '',
         couponPercent: String(discountPercent),
         discountAmount: String(discountAmount),
-        couponSourceType: matchedRule?.sourceType || '',
-        couponSourceId: matchedRule?.sourceId || '',
-        couponSourceName: matchedRule?.sourceName || '',
+        couponSourceType: matchedRule?.sourceType || matchedGlobalRule?.sourceType || '',
+        couponSourceId: matchedRule?.sourceId || matchedGlobalRule?.sourceId || '',
+        couponSourceName: matchedRule?.sourceName || matchedGlobalRule?.sourceName || '',
       },
     };
 
@@ -207,19 +361,23 @@ export async function POST(request: NextRequest) {
       currency: order.currency,
       keyId,
       discountAmount: Math.round(discountAmount * 100),
-      couponCode: matchedRule?.code || '',
-      couponAudit: matchedRule ? {
-        code: matchedRule.code,
+      couponCode: matchedRule?.code || matchedGlobalRule?.code || '',
+      couponAudit: matchedRule || matchedGlobalRule ? {
+        code: matchedRule?.code || matchedGlobalRule?.code || '',
         discountPercent,
         discountAmount: Math.round(discountAmount * 100),
-        sourceType: matchedRule.sourceType,
-        sourceId: matchedRule.sourceId || null,
-        sourceName: matchedRule.sourceName || null,
-        startsAt: matchedRule.startsAt || null,
-        endsAt: matchedRule.endsAt || null,
-        maxUses: matchedRule.maxUses ?? null,
+        sourceType: matchedRule?.sourceType || matchedGlobalRule?.sourceType || null,
+        sourceId: matchedRule?.sourceId || matchedGlobalRule?.sourceId || null,
+        sourceName: matchedRule?.sourceName || matchedGlobalRule?.sourceName || null,
+        startsAt: matchedRule?.startsAt || matchedGlobalRule?.startsAt || null,
+        endsAt: matchedRule?.endsAt || matchedGlobalRule?.endsAt || null,
+        maxUses: matchedRule?.maxUses ?? matchedGlobalRule?.maxUses ?? null,
         usedCount,
-        remainingUses: matchedRule.maxUses ? Math.max(matchedRule.maxUses - usedCount - 1, 0) : null,
+        remainingUses:
+          (matchedRule?.maxUses ?? matchedGlobalRule?.maxUses)
+            ? Math.max((matchedRule?.maxUses ?? matchedGlobalRule?.maxUses ?? 0) - usedCount - 1, 0)
+            : null,
+        discountModel: matchedGlobalRule ? 'event-based' : 'fixed-percent',
       } : null,
     });
 

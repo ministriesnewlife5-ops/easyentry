@@ -1,0 +1,337 @@
+import { getSupabaseServerClient } from '@/lib/supabase';
+import { NextRequest, NextResponse } from 'next/server';
+
+type TicketCategory = {
+  id: string;
+  artistShare?: number;
+  influencerShare?: number;
+};
+
+type PublishedEventRow = {
+  id: string;
+  title?: string;
+  ticket_categories?: TicketCategory[] | null;
+};
+
+type GlobalCouponRow = {
+  code: string;
+  source_type: 'artist' | 'promoter';
+  source_id: string;
+  is_active: boolean;
+  usage_count: number;
+  max_uses: number | null;
+  starts_at: string | null;
+  ends_at: string | null;
+};
+
+interface PreviewRequest {
+  code: string;
+  eventId: string;
+  tickets: Array<{
+    ticketCategoryId: string;
+    quantity: number;
+    price: number;
+  }>;
+}
+
+interface CouponPreviewResponse {
+  valid: boolean;
+  code: string;
+  message: string;
+  discount?: {
+    percent: number;
+    amount: number;
+    breakdown: Array<{
+      ticketCategoryId: string;
+      quantity: number;
+      unitPrice: number;
+      sharePercent: number;
+      discountAmount: number;
+    }>;
+  };
+}
+
+type CouponQuickValidationResponse = {
+  valid: boolean;
+  code?: string;
+  usageRemaining?: number | null;
+  message: string;
+};
+
+/**
+ * POST /api/global-coupons/preview
+ * 
+ * Preview what discount will be applied for a given coupon code, event, and cart
+ * 
+ * Request body:
+ * {
+ *   "code": "ARTIST123",
+ *   "eventId": "event-uuid",
+ *   "tickets": [
+ *     { "ticketCategoryId": "cat-1", "quantity": 2, "price": 500 },
+ *     { "ticketCategoryId": "cat-2", "quantity": 1, "price": 1000 }
+ *   ]
+ * }
+ * 
+ * Response:
+ * {
+ *   "valid": true,
+ *   "code": "ARTIST123",
+ *   "message": "Coupon applied successfully",
+ *   "discount": {
+ *     "percent": 15,
+ *     "amount": 225,
+ *     "breakdown": [...]
+ *   }
+ * }
+ */
+export async function POST(request: NextRequest): Promise<NextResponse<CouponPreviewResponse>> {
+  try {
+    const supabase = getSupabaseServerClient();
+    const body: PreviewRequest = await request.json();
+    const { code, eventId, tickets } = body;
+
+    if (!code || !eventId || !tickets || tickets.length === 0) {
+      return NextResponse.json(
+        {
+          valid: false,
+          code,
+          message: 'Missing required fields: code, eventId, and tickets'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Fetch the event to get ticket categories and source info
+    const { data: event, error: eventError } = await supabase
+      .from('published_events')
+      .select('id, title, ticket_categories')
+      .eq('id', eventId)
+      .single();
+
+    if (eventError || !event) {
+      return NextResponse.json(
+        {
+          valid: false,
+          code,
+          message: 'Event not found'
+        },
+        { status: 404 }
+      );
+    }
+
+    // Get the coupon
+    const { data: coupon, error: couponError } = await supabase
+      .from('global_coupons')
+      .select('*')
+      .ilike('code', code)
+      .eq('is_active', true)
+      .single();
+
+    if (couponError || !coupon) {
+      return NextResponse.json(
+        {
+          valid: false,
+          code,
+          message: 'Coupon code not found or inactive'
+        },
+        { status: 404 }
+      );
+    }
+
+    const typedCoupon = coupon as GlobalCouponRow;
+    const typedEvent = event as PublishedEventRow;
+
+    // Check if coupon has reached max uses
+    if (typedCoupon.max_uses !== null && typedCoupon.usage_count >= typedCoupon.max_uses) {
+      return NextResponse.json(
+        {
+          valid: false,
+          code,
+          message: 'Coupon usage limit reached'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check active window
+    if (typedCoupon.starts_at && new Date(typedCoupon.starts_at) > new Date()) {
+      return NextResponse.json(
+        {
+          valid: false,
+          code,
+          message: 'Coupon is not active yet'
+        },
+        { status: 400 }
+      );
+    }
+
+    if (typedCoupon.ends_at && new Date(typedCoupon.ends_at) < new Date()) {
+      return NextResponse.json(
+        {
+          valid: false,
+          code,
+          message: 'Coupon has expired'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Calculate event-based discount from ticket categories
+    const ticketCategories = Array.isArray(typedEvent.ticket_categories) ? typedEvent.ticket_categories : [];
+    let totalDiscount = 0;
+    const breakdown: NonNullable<CouponPreviewResponse['discount']>['breakdown'] = [];
+
+    for (const ticket of tickets) {
+      const category = ticketCategories.find((tc) => tc.id === ticket.ticketCategoryId);
+
+      if (!category) {
+        return NextResponse.json(
+          {
+            valid: false,
+            code,
+            message: `Ticket category ${ticket.ticketCategoryId} not found`
+          },
+          { status: 400 }
+        );
+      }
+
+      // Determine share percentage based on event creator type
+      const sharePercent = typedCoupon.source_type === 'artist'
+        ? (category.artistShare || 0)
+        : (category.influencerShare || 0);
+
+      const lineTotal = ticket.quantity * ticket.price;
+      const lineDiscount = lineTotal * (sharePercent / 100);
+
+      totalDiscount += lineDiscount;
+
+      breakdown.push({
+        ticketCategoryId: ticket.ticketCategoryId,
+        quantity: ticket.quantity,
+        unitPrice: ticket.price,
+        sharePercent,
+        discountAmount: lineDiscount
+      });
+    }
+
+    // Calculate overall discount percentage
+    const cartTotal = tickets.reduce((sum, t) => sum + (t.quantity * t.price), 0);
+    const discountPercent = cartTotal > 0 ? (totalDiscount / cartTotal) * 100 : 0;
+
+    if (totalDiscount <= 0) {
+      return NextResponse.json(
+        {
+          valid: false,
+          code: typedCoupon.code,
+          message: 'Coupon not applicable to selected tickets for this event'
+        },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({
+      valid: true,
+      code: coupon.code,
+      message: 'Coupon preview calculated successfully',
+      discount: {
+        percent: Math.round(discountPercent * 100) / 100,
+        amount: Math.round(totalDiscount * 100) / 100,
+        breakdown
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in coupon preview:', error);
+    return NextResponse.json(
+      {
+        valid: false,
+        code: '',
+        message: 'Internal server error'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * GET /api/global-coupons/preview?code=ARTIST123
+ * 
+ * Quick validation of coupon without event context
+ */
+export async function GET(request: NextRequest): Promise<NextResponse<CouponQuickValidationResponse>> {
+  try {
+    const supabase = getSupabaseServerClient();
+    const code = request.nextUrl.searchParams.get('code');
+
+    if (!code) {
+      return NextResponse.json(
+        {
+          valid: false,
+          message: 'Code parameter required'
+        },
+        { status: 400 }
+      );
+    }
+
+    const { data: coupon, error } = await supabase
+      .from('global_coupons')
+      .select('code, is_active, usage_count, max_uses, starts_at, ends_at')
+      .ilike('code', code)
+      .single();
+
+    if (error || !coupon) {
+      return NextResponse.json({
+        valid: false,
+        code,
+        message: 'Coupon not found'
+      });
+    }
+
+    if (!coupon.is_active) {
+      return NextResponse.json({
+        valid: false,
+        code,
+        message: 'Coupon is inactive'
+      });
+    }
+
+    if (coupon.max_uses !== null && coupon.usage_count >= coupon.max_uses) {
+      return NextResponse.json({
+        valid: false,
+        code,
+        message: 'Coupon usage limit reached'
+      });
+    }
+
+    if (coupon.starts_at && new Date(coupon.starts_at) > new Date()) {
+      return NextResponse.json({
+        valid: false,
+        code,
+        message: 'Coupon is not active yet'
+      });
+    }
+
+    if (coupon.ends_at && new Date(coupon.ends_at) < new Date()) {
+      return NextResponse.json({
+        valid: false,
+        code,
+        message: 'Coupon has expired'
+      });
+    }
+
+    return NextResponse.json({
+      valid: true,
+      code: coupon.code,
+      usageRemaining: coupon.max_uses - coupon.usage_count,
+      message: 'Coupon is valid'
+    });
+
+  } catch (error) {
+    console.error('Error in coupon preview GET:', error);
+    return NextResponse.json(
+      { valid: false, message: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
