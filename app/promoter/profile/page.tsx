@@ -53,8 +53,19 @@ export default function PromoterProfilePage() {
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [promoForm, setPromoForm] = useState({
     code: '',
+    maxUses: '',
+    isActive: true,
   });
-  const [globalCoupons, setGlobalCoupons] = useState<Array<{ id: string; code: string; discountPercent: number; isActive: boolean; createdAt: string }>>([]);
+  const [globalCoupons, setGlobalCoupons] = useState<Array<{
+    id: string;
+    code: string;
+    is_active: boolean;
+    starts_at: string | null;
+    ends_at: string | null;
+    max_uses: number | null;
+    usage_count: number;
+    created_at: string;
+  }>>([]);
   const [promoSummary, setPromoSummary] = useState({
     totalShareAmount: 0,
     totalBookedAmount: 0,
@@ -78,12 +89,24 @@ export default function PromoterProfilePage() {
           const couponData = await globalCouponsResponse.json();
           setGlobalCoupons(
             Array.isArray(couponData?.coupons)
-              ? couponData.coupons.map((coupon: { id: string; code: string; discount_percent: number; is_active: boolean; created_at: string }) => ({
+              ? couponData.coupons.map((coupon: {
+                  id: string;
+                  code: string;
+                  is_active: boolean;
+                  starts_at: string | null;
+                  ends_at: string | null;
+                  max_uses: number | null;
+                  usage_count: number;
+                  created_at: string;
+                }) => ({
                   id: coupon.id,
                   code: coupon.code,
-                  discountPercent: coupon.discount_percent,
-                  isActive: coupon.is_active,
-                  createdAt: coupon.created_at,
+                  is_active: coupon.is_active,
+                  starts_at: coupon.starts_at,
+                  ends_at: coupon.ends_at,
+                  max_uses: coupon.max_uses,
+                  usage_count: coupon.usage_count,
+                  created_at: coupon.created_at,
                 }))
               : []
           );
@@ -130,8 +153,15 @@ export default function PromoterProfilePage() {
     loadData();
   }, []);
 
-  const handlePromoInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+  const handlePromoInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const target = e.target as HTMLInputElement;
+    const { name, value, type } = target;
+
+    if (type === 'checkbox') {
+      setPromoForm(prev => ({ ...prev, [name]: target.checked }));
+      return;
+    }
+
     setPromoForm(prev => ({ ...prev, [name]: value }));
   };
 
@@ -150,11 +180,14 @@ export default function PromoterProfilePage() {
     }
 
     try {
+      const hasCoupon = globalCoupons.length > 0;
       const response = await fetch('/api/global-coupons', {
-        method: 'POST',
+        method: hasCoupon ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: promoForm.code,
+          maxUses: promoForm.maxUses ? Number(promoForm.maxUses) : null,
+          isActive: promoForm.isActive,
         }),
       });
 
@@ -163,20 +196,25 @@ export default function PromoterProfilePage() {
         throw new Error(data?.error || 'Failed to create global coupon');
       }
 
-      setGlobalCoupons((prev) => [
+      setGlobalCoupons([
         {
           id: data?.coupon?.id || '',
           code: String(data?.coupon?.code || promoForm.code).toUpperCase(),
-          discountPercent: Number(data?.coupon?.discount_percent || 0),
-          isActive: data?.coupon?.is_active ?? true,
-          createdAt: data?.coupon?.created_at || new Date().toISOString(),
+          is_active: data?.coupon?.is_active ?? true,
+          starts_at: data?.coupon?.starts_at ?? null,
+          ends_at: data?.coupon?.ends_at ?? null,
+          max_uses: data?.coupon?.max_uses ?? null,
+          usage_count: Number(data?.coupon?.usage_count || 0),
+          created_at: data?.coupon?.created_at || new Date().toISOString(),
         },
-        ...prev,
       ]);
-      setPromoForm({ code: '' });
-      setMessage({ type: 'success', text: 'Global coupon created successfully. Discount will be computed per event ticket settings.' });
+      setPromoForm({ code: '', maxUses: '', isActive: true });
+      setMessage({
+        type: 'success',
+        text: `Global coupon ${hasCoupon ? 'updated' : 'created'} successfully. Discount will be computed per event ticket settings.`,
+      });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to create global coupon' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to manage global coupon' });
     }
   };
 
