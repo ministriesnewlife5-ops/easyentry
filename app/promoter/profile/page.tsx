@@ -26,6 +26,17 @@ interface VideoThumbnail {
   title: string;
 }
 
+interface GlobalCouponRow {
+  id: string;
+  code: string;
+  is_active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  max_uses: number | null;
+  usage_count: number;
+  created_at: string;
+}
+
 export default function PromoterProfilePage() {
   const [activeTab, setActiveTab] = useState<'details' | 'media' | 'about' | 'promo'>('details');
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -56,16 +67,7 @@ export default function PromoterProfilePage() {
     maxUses: '',
     isActive: true,
   });
-  const [globalCoupons, setGlobalCoupons] = useState<Array<{
-    id: string;
-    code: string;
-    is_active: boolean;
-    starts_at: string | null;
-    ends_at: string | null;
-    max_uses: number | null;
-    usage_count: number;
-    created_at: string;
-  }>>([]);
+  const [globalCoupons, setGlobalCoupons] = useState<GlobalCouponRow[]>([]);
   const [promoSummary, setPromoSummary] = useState({
     totalShareAmount: 0,
     totalBookedAmount: 0,
@@ -74,6 +76,31 @@ export default function PromoterProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const couponStorageKey = 'global_coupon_promoter';
+
+  const readStoredCoupon = (): GlobalCouponRow[] => {
+    if (typeof window === 'undefined') return [];
+
+    try {
+      const stored = window.localStorage.getItem(couponStorageKey);
+      if (!stored) return [];
+      const parsed = JSON.parse(stored) as GlobalCouponRow;
+      return parsed?.code ? [parsed] : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveStoredCoupon = (coupon: GlobalCouponRow) => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      window.localStorage.setItem(couponStorageKey, JSON.stringify(coupon));
+    } catch {
+      // ignore storage failures
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -87,29 +114,21 @@ export default function PromoterProfilePage() {
 
         if (globalCouponsResponse.ok) {
           const couponData = await globalCouponsResponse.json();
-          setGlobalCoupons(
-            Array.isArray(couponData?.coupons)
-              ? couponData.coupons.map((coupon: {
-                  id: string;
-                  code: string;
-                  is_active: boolean;
-                  starts_at: string | null;
-                  ends_at: string | null;
-                  max_uses: number | null;
-                  usage_count: number;
-                  created_at: string;
-                }) => ({
-                  id: coupon.id,
-                  code: coupon.code,
-                  is_active: coupon.is_active,
-                  starts_at: coupon.starts_at,
-                  ends_at: coupon.ends_at,
-                  max_uses: coupon.max_uses,
-                  usage_count: coupon.usage_count,
-                  created_at: coupon.created_at,
-                }))
-              : []
-          );
+          const coupons = Array.isArray(couponData?.coupons)
+            ? couponData.coupons.map((coupon: GlobalCouponRow) => ({
+                id: coupon.id,
+                code: coupon.code,
+                is_active: coupon.is_active,
+                starts_at: coupon.starts_at,
+                ends_at: coupon.ends_at,
+                max_uses: coupon.max_uses,
+                usage_count: coupon.usage_count,
+                created_at: coupon.created_at,
+              }))
+            : [];
+
+          const activeCoupons = coupons.length > 0 ? coupons : readStoredCoupon();
+          setGlobalCoupons(activeCoupons);
           setPromoSummary({
             totalShareAmount: Number(couponData?.earnings?.totalShareAmount || 0),
             totalBookedAmount: Number(couponData?.earnings?.totalBookedAmount || 0),
@@ -208,6 +227,16 @@ export default function PromoterProfilePage() {
           created_at: data?.coupon?.created_at || new Date().toISOString(),
         },
       ]);
+      saveStoredCoupon({
+        id: data?.coupon?.id || '',
+        code: String(data?.coupon?.code || promoForm.code).toUpperCase(),
+        is_active: data?.coupon?.is_active ?? true,
+        starts_at: data?.coupon?.starts_at ?? null,
+        ends_at: data?.coupon?.ends_at ?? null,
+        max_uses: data?.coupon?.max_uses ?? null,
+        usage_count: Number(data?.coupon?.usage_count || 0),
+        created_at: data?.coupon?.created_at || new Date().toISOString(),
+      });
       setPromoForm({ code: '', maxUses: '', isActive: true });
       setMessage({
         type: 'success',
