@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseServerClient } from '@/lib/supabase';
+
+const CONVENIENCE_FEE_KEY = 'convenience_fee';
+const DEFAULT_CONVENIENCE_FEE = 175;
+
+function toFee(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return DEFAULT_CONVENIENCE_FEE;
+  }
+  return Math.round(parsed);
+}
 
 export async function GET() {
   try {
@@ -10,24 +21,26 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get convenience fee from settings table
+    const supabase = getSupabaseServerClient();
+
+    // Get convenience fee from app_settings table
     const { data, error } = await supabase
-      .from('settings')
+      .from('app_settings')
       .select('value')
-      .eq('key', 'convenience_fee')
+      .eq('key', CONVENIENCE_FEE_KEY)
       .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+    if (error && error.code !== 'PGRST116') {
       console.error('Error fetching convenience fee:', error);
-      return NextResponse.json({ error: 'Failed to fetch convenience fee' }, { status: 500 });
+      return NextResponse.json({ fee: DEFAULT_CONVENIENCE_FEE });
     }
 
-    const fee = data?.value ? parseInt(data.value) : 175; // Default to 175 if not set
+    const fee = data ? toFee(data.value) : DEFAULT_CONVENIENCE_FEE;
 
     return NextResponse.json({ fee });
   } catch (error) {
     console.error('Error in convenience fee API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ fee: DEFAULT_CONVENIENCE_FEE });
   }
 }
 
@@ -38,18 +51,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { fee } = await request.json();
+    const supabase = getSupabaseServerClient();
 
-    if (typeof fee !== 'number' || fee < 0) {
+    const { fee } = await request.json();
+    const normalizedFee = Number(fee);
+
+    if (!Number.isFinite(normalizedFee) || normalizedFee < 0) {
       return NextResponse.json({ error: 'Invalid fee amount' }, { status: 400 });
     }
 
-    // Upsert convenience fee in settings table
+    // Upsert convenience fee in app_settings table
     const { error } = await supabase
-      .from('settings')
+      .from('app_settings')
       .upsert({
-        key: 'convenience_fee',
-        value: fee.toString(),
+        key: CONVENIENCE_FEE_KEY,
+        value: Math.round(normalizedFee),
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'key'
@@ -60,7 +76,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update convenience fee' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, fee });
+    return NextResponse.json({ success: true, fee: Math.round(normalizedFee) });
   } catch (error) {
     console.error('Error in convenience fee API:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
