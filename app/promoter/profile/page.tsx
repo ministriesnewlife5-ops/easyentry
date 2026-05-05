@@ -127,7 +127,34 @@ export default function PromoterProfilePage() {
               }))
             : [];
 
-          const activeCoupons = coupons.length > 0 ? coupons : readStoredCoupon();
+          let activeCoupons = coupons.length > 0 ? coupons : [];
+
+          // If no coupons from API, check URL `code` param and localStorage fallback
+          if (activeCoupons.length === 0) {
+            try {
+              const params = new URLSearchParams(window.location.search);
+              const codeParam = params.get('code');
+              if (codeParam) {
+                const couponFromUrl: GlobalCouponRow = {
+                  id: '',
+                  code: String(codeParam).toUpperCase(),
+                  is_active: true,
+                  starts_at: null,
+                  ends_at: null,
+                  max_uses: null,
+                  usage_count: 0,
+                  created_at: new Date().toISOString(),
+                };
+                activeCoupons = [couponFromUrl];
+                setPromoForm(prev => ({ ...prev, code: couponFromUrl.code }));
+              } else {
+                activeCoupons = readStoredCoupon();
+              }
+            } catch {
+              activeCoupons = readStoredCoupon();
+            }
+          }
+
           setGlobalCoupons(activeCoupons);
           setPromoSummary({
             totalShareAmount: Number(couponData?.earnings?.totalShareAmount || 0),
