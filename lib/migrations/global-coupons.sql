@@ -15,15 +15,15 @@ CREATE TABLE IF NOT EXISTS global_coupons (
   usage_count INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  CONSTRAINT unique_global_coupon_per_source UNIQUE(code, source_type, source_id),
+  CONSTRAINT unique_coupon_per_creator UNIQUE(source_type, source_id),
   CONSTRAINT valid_date_range CHECK (starts_at IS NULL OR ends_at IS NULL OR starts_at < ends_at)
 );
 
 -- Indexes for better query performance
-CREATE INDEX idx_global_coupons_code ON global_coupons(code);
-CREATE INDEX idx_global_coupons_source ON global_coupons(source_type, source_id);
-CREATE INDEX idx_global_coupons_active ON global_coupons(is_active) WHERE is_active = true;
-CREATE INDEX idx_global_coupons_source_active ON global_coupons(source_type, source_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_global_coupons_code ON global_coupons(code);
+CREATE INDEX IF NOT EXISTS idx_global_coupons_source ON global_coupons(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_global_coupons_active ON global_coupons(is_active) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_global_coupons_source_active ON global_coupons(source_type, source_id, is_active);
 
 -- View for easy coupon validation at checkout
 CREATE OR REPLACE VIEW global_coupons_valid AS

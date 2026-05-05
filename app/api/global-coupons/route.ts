@@ -180,11 +180,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseServerClient();
 
-    // Check if coupon code already exists globally
+    // Check if user already has a coupon (one per creator)
     const { data: existing, error: checkError } = await supabase
       .from('global_coupons')
       .select('id')
-      .eq('code', code)
       .eq('source_type', sourceType)
       .eq('source_id', session.user.id)
       .single();
@@ -194,7 +193,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (existing) {
-      return NextResponse.json({ error: 'This global coupon code already exists' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'You already have a global coupon. Edit your existing coupon instead.' },
+        { status: 409 }
+      );
     }
 
     // Create new global coupon
@@ -227,6 +229,102 @@ export async function POST(request: NextRequest) {
     console.error('Failed to create global coupon:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create global coupon' },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH: Update existing global coupon
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id || !session.user.role) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const sourceType = toSourceType(session.user.role);
+    if (!sourceType) {
+      return NextResponse.json(
+        { error: 'Only artists and promoters can manage global coupons' },
+        { status: 403 }
+      );
+    }
+
+    const body = await request.json();
+    const code = normalizeCode(body.code || body.promoCode);
+    const startsAt = typeof body.startsAt === 'string' ? body.startsAt : null;
+    const endsAt = typeof body.endsAt === 'string' ? body.endsAt : null;
+    const maxUses = Number.isFinite(Number(body.maxUses)) ? Number(body.maxUses) : null;
+    const isActive = typeof body.isActive === 'boolean' ? body.isActive : true;
+
+    // Validation
+    if (!code || !/^[A-Z0-9_-]{3,24}$/.test(code)) {
+      return NextResponse.json(
+        { error: 'Coupon code must be 3-24 characters (A-Z, 0-9, _ or -)' },
+        { status: 400 }
+      );
+    }
+
+    if (startsAt && endsAt) {
+      const start = new Date(startsAt).getTime();
+      const end = new Date(endsAt).getTime();
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        return NextResponse.json({ error: 'Invalid date format' }, { status: 400 });
+      }
+      if (start >= end) {
+        return NextResponse.json({ error: 'End date must be after start date' }, { status: 400 });
+      }
+    }
+
+    if (maxUses !== null && maxUses <= 0) {
+      return NextResponse.json({ error: 'Max uses must be greater than 0' }, { status: 400 });
+    }
+
+    const supabase = getSupabaseServerClient();
+
+    // Fetch existing coupon for this creator
+    const { data: coupon, error: fetchError } = await supabase
+      .from('global_coupons')
+      .select('id')
+      .eq('source_type', sourceType)
+      .eq('source_id', session.user.id)
+      .single();
+
+    if (fetchError) {
+      if (fetchError.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'You do not have a global coupon to edit. Create one first.' },
+          { status: 404 }
+        );
+      }
+      throw new Error(`Failed to fetch coupon: ${fetchError.message}`);
+    }
+
+    // Update the coupon
+    const { data: updated, error: updateError } = await supabase
+      .from('global_coupons')
+      .update({
+        code,
+        is_active: isActive,
+        starts_at: startsAt,
+        ends_at: endsAt,
+        max_uses: maxUses,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', coupon.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new Error(`Failed to update coupon: ${updateError.message}`);
+    }
+
+    return NextResponse.json({ success: true, coupon: updated });
+  } catch (error) {
+    console.error('Failed to update global coupon:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to update global coupon' },
       { status: 500 }
     );
   }
