@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
     const venue = normalizeText(eventData.venue);
 
     if (!title || !date || !venue) {
-      return NextResponse.json({ error: 'Missing required event fields' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing required event fields: title, date, and venue are required.' }, { status: 400 });
     }
 
     const category = normalizeText(eventData.category) || 'General';
@@ -238,12 +238,25 @@ export async function POST(request: NextRequest) {
       : [];
 
     if (ticketCategories.length === 0) {
+      console.error('Admin event creation: No valid ticket categories provided', {
+        providedCategories: eventData.ticketCategories,
+      });
       return NextResponse.json({ error: 'At least one ticket category is required' }, { status: 400 });
     }
 
     const totalTickets = ticketCategories.reduce((sum: number, cat) => sum + (cat.quantity || 0), 0);
     const minPrice = Math.min(...ticketCategories.map((cat) => cat.price || 0));
     const googleMapsLink = normalizeGoogleMapsLink(eventData.googleMapsLink, venue);
+
+    console.log('Admin event creation - Processing event:', {
+      title,
+      date,
+      venue,
+      ticketCategoriesCount: ticketCategories.length,
+      couponRulesCount: couponRules.length,
+      outletUserId,
+      hostCompanyName,
+    });
 
     const createdRequest = await createEventRequest(
       outletUserId,
@@ -280,12 +293,20 @@ export async function POST(request: NextRequest) {
       }
     );
 
+    console.log('Admin event creation - Event request created:', { requestId: createdRequest.id });
+
     const approvedRequest = await updateEventRequestStatus(createdRequest.id, 'approved', session.user.id as string);
     if (!approvedRequest) {
+      console.error('Admin event creation - Failed to approve request:', { requestId: createdRequest.id });
       return NextResponse.json({ error: 'Failed to approve admin event request' }, { status: 500 });
     }
 
+    console.log('Admin event creation - Request approved, publishing event...');
+
     const event = await publishEventFromRequest(approvedRequest);
+
+    console.log('Admin event creation - Event published successfully:', { eventId: event.id });
+
     await upsertBrowseCategoryFromEvent(category, subcategory);
 
     return NextResponse.json({ 
@@ -295,7 +316,25 @@ export async function POST(request: NextRequest) {
       message: 'Event created and published successfully' 
     });
   } catch (error) {
-    console.error('Error in host-event POST:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const err = error as {
+      message?: string;
+      statusCode?: number;
+      code?: string;
+    };
+    
+    console.error('Error in host-event POST:', {
+      message: err?.message,
+      code: err?.code,
+      stack: error instanceof Error ? error.stack : 'unknown',
+      fullError: error,
+    });
+    
+    return NextResponse.json(
+      { 
+        error: 'Internal server error',
+        details: err?.message || 'Unknown error occurred',
+      }, 
+      { status: 500 }
+    );
   }
 }

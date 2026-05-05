@@ -709,69 +709,109 @@ export async function publishEventFromRequest(request: EventRequest): Promise<Pu
   const eventData = createApprovedEvent(request);
   const dbData = mapEventToDb({ ...eventData, sourceRequestId: request.id });
 
-  // Check if already published
-  const { data: existing } = await supabase
-    .from('published_events')
-    .select('id')
-    .eq('request_id', request.id)
-    .single();
-
-  let result;
-  if (existing) {
-    // Update existing
-    const { data, error } = await supabase
+  try {
+    // Check if already published
+    const { data: existing } = await supabase
       .from('published_events')
-      .update(dbData)
+      .select('id')
       .eq('request_id', request.id)
-      .select()
       .single();
-    if (error) throw new Error(`Failed to update published event: ${error.message}`);
-    result = data;
-  } else {
-    // Create new
-    const { data, error } = await supabase
-      .from('published_events')
-      .insert(dbData)
-      .select()
-      .single();
-    if (error) throw new Error(`Failed to create published event: ${error.message}`);
-    result = data;
-  }
 
-  const publishedEventId = (result as Record<string, unknown>).id as string;
-
-  const { error: deleteTicketsError } = await supabase
-    .from('ticket_categories')
-    .delete()
-    .eq('event_id', publishedEventId);
-
-  if (deleteTicketsError) {
-    throw new Error(`Failed to refresh ticket categories: ${deleteTicketsError.message}`);
-  }
-
-  const categories = request.eventData.ticketCategories || [];
-  if (categories.length > 0) {
-    const { error: insertTicketsError } = await supabase
-      .from('ticket_categories')
-      .insert(
-        categories.map((cat) => ({
-          event_id: publishedEventId,
-          name: cat.name,
-          price: cat.price,
-          quantity: cat.quantity ?? null,
-          available_from: cat.availableFrom ?? null,
-          available_until: cat.availableUntil ?? null,
-          created_at: new Date().toISOString(),
-        }))
-      );
-
-    if (insertTicketsError) {
-      throw new Error(`Failed to store ticket categories: ${insertTicketsError.message}`);
+    let result;
+    if (existing) {
+      // Update existing
+      const { data, error } = await supabase
+        .from('published_events')
+        .update(dbData)
+        .eq('request_id', request.id)
+        .select()
+        .single();
+      if (error) throw new Error(`Failed to update published event: ${error.message}`);
+      result = data;
+    } else {
+      // Create new
+      const { data, error } = await supabase
+        .from('published_events')
+        .insert(dbData)
+        .select()
+        .single();
+      if (error) {
+        console.error('Failed to insert published event:', {
+          error: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          dbData: dbData,
+        });
+        throw new Error(`Failed to create published event: ${error.message}`);
+      }
+      result = data;
     }
-  }
 
-  const ticketCategories = await getTicketCategoriesByEventId(publishedEventId);
-  return mapDbToEvent(result as Record<string, unknown>, ticketCategories);
+    const publishedEventId = (result as Record<string, unknown>).id as string;
+
+    const { error: deleteTicketsError } = await supabase
+      .from('ticket_categories')
+      .delete()
+      .eq('event_id', publishedEventId);
+
+    if (deleteTicketsError) {
+      console.error('Failed to delete existing ticket categories:', deleteTicketsError.message);
+      throw new Error(`Failed to refresh ticket categories: ${deleteTicketsError.message}`);
+    }
+
+    const categories = request.eventData.ticketCategories || [];
+    if (categories.length > 0) {
+      const ticketInsertData = categories.map((cat) => ({
+        event_id: publishedEventId,
+        name: cat.name,
+        price: cat.price,
+        quantity: cat.quantity ?? null,
+        available_from: cat.availableFrom ?? null,
+        available_until: cat.availableUntil ?? null,
+        created_at: new Date().toISOString(),
+      }));
+
+      console.log('Inserting ticket categories:', {
+        eventId: publishedEventId,
+        categoriesCount: ticketInsertData.length,
+        categories: ticketInsertData,
+      });
+
+      const { error: insertTicketsError } = await supabase
+        .from('ticket_categories')
+        .insert(ticketInsertData);
+
+      if (insertTicketsError) {
+        console.error('Failed to insert ticket categories:', {
+          error: insertTicketsError.message,
+          code: insertTicketsError.code,
+          details: insertTicketsError.details,
+          hint: insertTicketsError.hint,
+        });
+        throw new Error(`Failed to store ticket categories: ${insertTicketsError.message}`);
+      }
+    }
+
+    const ticketCategories = await getTicketCategoriesByEventId(publishedEventId);
+    const publishedEvent = mapDbToEvent(result as Record<string, unknown>, ticketCategories);
+    
+    console.log('Event published successfully:', {
+      eventId: publishedEventId,
+      title: publishedEvent.title,
+      ticketCategoriesCount: ticketCategories.length,
+    });
+
+    return publishedEvent;
+  } catch (error) {
+    console.error('Error in publishEventFromRequest:', {
+      error: error instanceof Error ? error.message : String(error),
+      requestId: request.id,
+      eventTitle: request.eventData.title,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    throw error;
+  }
 }
 
 /**
