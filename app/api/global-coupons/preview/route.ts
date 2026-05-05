@@ -3,8 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 type TicketCategory = {
   id: string;
+  name?: string;
   artistShare?: number;
   influencerShare?: number;
+  artist_share?: number;
+  influencer_share?: number;
 };
 
 type PublishedEventRow = {
@@ -29,6 +32,7 @@ interface PreviewRequest {
   eventId: string;
   tickets: Array<{
     ticketCategoryId: string;
+    ticketCategoryName?: string;
     quantity: number;
     price: number;
   }>;
@@ -102,7 +106,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
       );
     }
 
-    // Fetch the event to get ticket categories and source info
+    // Fetch event core row
     const { data: event, error: eventError } = await supabase
       .from('published_events')
       .select('id, title, ticket_categories')
@@ -142,6 +146,23 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
     const typedCoupon = coupon as GlobalCouponRow;
     const typedEvent = event as PublishedEventRow;
 
+    // Fetch normalized ticket categories from dedicated table (authoritative source)
+    const { data: ticketCategoryRows, error: ticketCategoryError } = await supabase
+      .from('ticket_categories')
+      .select('id, name, artist_share, influencer_share')
+      .eq('event_id', eventId);
+
+    if (ticketCategoryError) {
+      return NextResponse.json(
+        {
+          valid: false,
+          code,
+          message: 'Failed to read event ticket categories'
+        },
+        { status: 500 }
+      );
+    }
+
     // Check if coupon has reached max uses
     if (typedCoupon.max_uses !== null && typedCoupon.usage_count >= typedCoupon.max_uses) {
       return NextResponse.json(
@@ -178,12 +199,30 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
     }
 
     // Calculate event-based discount from ticket categories
-    const ticketCategories = Array.isArray(typedEvent.ticket_categories) ? typedEvent.ticket_categories : [];
+    const tableCategories = Array.isArray(ticketCategoryRows)
+      ? (ticketCategoryRows as Array<Record<string, unknown>>).map((row) => ({
+          id: String(row.id || ''),
+          name: typeof row.name === 'string' ? row.name : undefined,
+          artist_share: Number(row.artist_share || 0),
+          influencer_share: Number(row.influencer_share || 0),
+        }))
+      : [];
+
+    const fallbackCategories = Array.isArray(typedEvent.ticket_categories) ? typedEvent.ticket_categories : [];
+    const ticketCategories: TicketCategory[] = tableCategories.length > 0 ? tableCategories : fallbackCategories;
+
     let totalDiscount = 0;
     const breakdown: NonNullable<CouponPreviewResponse['discount']>['breakdown'] = [];
 
     for (const ticket of tickets) {
-      const category = ticketCategories.find((tc) => tc.id === ticket.ticketCategoryId);
+      const category = ticketCategories.find((tc) => {
+        const byId = String(tc.id || '') === String(ticket.ticketCategoryId || '');
+        const byName =
+          Boolean(ticket.ticketCategoryName) &&
+          typeof tc.name === 'string' &&
+          tc.name.trim().toLowerCase() === String(ticket.ticketCategoryName).trim().toLowerCase();
+        return byId || byName;
+      });
 
       if (!category) {
         return NextResponse.json(
@@ -198,8 +237,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
 
       // Determine share percentage based on event creator type
       const sharePercent = typedCoupon.source_type === 'artist'
-        ? (category.artistShare || 0)
-        : (category.influencerShare || 0);
+        ? Number(category.artist_share ?? category.artistShare ?? 0)
+        : Number(category.influencer_share ?? category.influencerShare ?? 0);
 
       const lineTotal = ticket.quantity * ticket.price;
       const lineDiscount = lineTotal * (sharePercent / 100);

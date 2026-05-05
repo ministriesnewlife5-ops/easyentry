@@ -156,11 +156,33 @@ export default function PromoterProfilePage() {
           }
 
           setGlobalCoupons(activeCoupons);
+          if (activeCoupons.length > 0) {
+            const primary = activeCoupons[0];
+            setPromoForm((prev) => ({
+              ...prev,
+              code: primary.code,
+              maxUses: primary.max_uses ? String(primary.max_uses) : '',
+              isActive: primary.is_active,
+            }));
+            saveStoredCoupon(primary);
+          }
           setPromoSummary({
             totalShareAmount: Number(couponData?.earnings?.totalShareAmount || 0),
             totalBookedAmount: Number(couponData?.earnings?.totalBookedAmount || 0),
             totalBookings: Number(couponData?.earnings?.totalBookings || 0),
           });
+        } else {
+          const fallbackCoupons = readStoredCoupon();
+          if (fallbackCoupons.length > 0) {
+            const primary = fallbackCoupons[0];
+            setGlobalCoupons(fallbackCoupons);
+            setPromoForm((prev) => ({
+              ...prev,
+              code: primary.code,
+              maxUses: primary.max_uses ? String(primary.max_uses) : '',
+              isActive: primary.is_active,
+            }));
+          }
         }
 
         if (profileResponse.ok) {

@@ -54,6 +54,13 @@ export default function EventDetailsPage() {
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponMessage, setCouponMessage] = useState<string | null>(null);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    type: 'event' | 'global';
+    percent: number;
+    breakdownByCategory?: Record<string, number>;
+  } | null>(null);
   const [event, setEvent] = useState<PublicEvent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMediaType, setSelectedMediaType] = useState<'image' | 'video'>('image');
@@ -375,35 +382,58 @@ export default function EventDetailsPage() {
     const subtotal = ticketTypes.reduce((sum, t) => sum + (t.price * (quantities[t.id] || 0)), 0);
     const totalTickets = Object.values(quantities).reduce((a, b) => a + b, 0);
     const convenienceFees = totalTickets > 0 ? convenienceFee * totalTickets : 0;
-    const enteredCoupon = couponCode.trim().toUpperCase();
-    const matchedRule = event?.couponRules?.find((rule) => rule.code?.trim().toUpperCase() === enteredCoupon);
-    const now = Date.now();
-    const startsAt = matchedRule?.startsAt ? new Date(matchedRule.startsAt).getTime() : undefined;
-    const endsAt = matchedRule?.endsAt ? new Date(matchedRule.endsAt).getTime() : undefined;
-    const isActiveByTime = !matchedRule
-      ? false
-      : (!Number.isFinite(startsAt as number) || now >= (startsAt as number))
-      && (!Number.isFinite(endsAt as number) || now <= (endsAt as number));
-    const discountPercent = matchedRule && isActiveByTime
-      ? Number(matchedRule.discountPercent || 0)
-      : 0;
-    const discountAmount = Math.min(subtotal * (discountPercent / 100), subtotal);
+
+    let discountAmount = 0;
+    if (appliedCoupon) {
+      if (appliedCoupon.type === 'event') {
+        discountAmount = subtotal * (appliedCoupon.percent / 100);
+      } else if (appliedCoupon.breakdownByCategory) {
+        discountAmount = ticketTypes.reduce((sum, t) => {
+          const qty = quantities[t.id] || 0;
+          if (qty <= 0) return sum;
+          const sharePercent = Number(appliedCoupon.breakdownByCategory?.[t.id] || 0);
+          return sum + (t.price * qty * (sharePercent / 100));
+        }, 0);
+      } else {
+        discountAmount = subtotal * (appliedCoupon.percent / 100);
+      }
+    }
+
+    const safeDiscountAmount = Math.min(Math.max(discountAmount, 0), subtotal);
+
     return {
       subtotal,
       convenienceFees,
-      discountAmount,
-      total: subtotal - discountAmount + convenienceFees,
+      discountAmount: safeDiscountAmount,
+      total: subtotal - safeDiscountAmount + convenienceFees,
       totalTickets,
     };
-  }, [ticketTypes, quantities, convenienceFee, couponCode, event?.couponRules]);
+  }, [ticketTypes, quantities, convenienceFee, appliedCoupon]);
 
-  const handleApplyCoupon = () => {
+  const handleApplyCoupon = async () => {
     const enteredCoupon = couponCode.trim().toUpperCase();
 
     if (!enteredCoupon) {
       setCouponMessage('Enter a coupon code first.');
+      setAppliedCoupon(null);
       return;
     }
+
+    const selectedCategories = ticketTypes
+      .filter((t) => (quantities[t.id] || 0) > 0)
+      .map((t) => ({
+        ticketCategoryId: t.id,
+        quantity: quantities[t.id] || 0,
+        price: t.price,
+      }));
+
+    if (selectedCategories.length === 0) {
+      setCouponMessage('Select at least one ticket before applying coupon.');
+      setAppliedCoupon(null);
+      return;
+    }
+
+    setIsApplyingCoupon(true);
 
     const matchedRule = event?.couponRules?.find((rule) => rule.code?.trim().toUpperCase() === enteredCoupon);
 
@@ -414,19 +444,79 @@ export default function EventDetailsPage() {
 
       if (Number.isFinite(startsAt as number) && now < (startsAt as number)) {
         setCouponMessage('Coupon is not active yet.');
+        setAppliedCoupon(null);
+        setIsApplyingCoupon(false);
         return;
       }
 
       if (Number.isFinite(endsAt as number) && now > (endsAt as number)) {
         setCouponMessage('Coupon has expired.');
+        setAppliedCoupon(null);
+        setIsApplyingCoupon(false);
         return;
       }
 
+      const percent = Number(matchedRule.discountPercent || 0);
+      setAppliedCoupon({
+        code: enteredCoupon,
+        type: 'event',
+        percent,
+      });
       setCouponMessage(`Coupon applied: ${matchedRule.discountPercent || 0}% off ticket subtotal.`);
+      setIsApplyingCoupon(false);
       return;
     }
 
-    setCouponMessage('Coupon captured. Final discount will be validated at checkout based on this event.');
+    try {
+      if (!event?.id) {
+        setCouponMessage('Event not loaded yet. Try again.');
+        setAppliedCoupon(null);
+        return;
+      }
+
+      const previewResponse = await fetch('/api/global-coupons/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: enteredCoupon,
+          eventId: event.id,
+          tickets: selectedCategories,
+        }),
+      });
+
+      const previewData = await previewResponse.json().catch(() => ({}));
+
+      if (!previewResponse.ok || !previewData?.valid || !previewData?.discount) {
+        setCouponMessage(previewData?.message || previewData?.error || 'Coupon is not valid for this event/cart.');
+        setAppliedCoupon(null);
+        return;
+      }
+
+      const breakdown = Array.isArray(previewData.discount.breakdown)
+        ? previewData.discount.breakdown
+        : [];
+
+      setAppliedCoupon({
+        code: enteredCoupon,
+        type: 'global',
+        percent: Number(previewData.discount.percent || 0),
+        breakdownByCategory: Object.fromEntries(
+          breakdown.map((item: { ticketCategoryId: string; sharePercent: number }) => [
+            String(item.ticketCategoryId),
+            Number(item.sharePercent || 0),
+          ])
+        ),
+      });
+
+      setCouponMessage(
+        `Coupon applied: ₹${Number(previewData.discount.amount || 0).toFixed(0)} off (${Number(previewData.discount.percent || 0).toFixed(2)}%).`
+      );
+    } catch {
+      setCouponMessage('Failed to validate coupon right now. Please try again.');
+      setAppliedCoupon(null);
+    } finally {
+      setIsApplyingCoupon(false);
+    }
   };
 
   // Handle payment
@@ -488,7 +578,7 @@ export default function EventDetailsPage() {
           eventId: event.id,
           eventTitle: event.title,
           ticketCategories: selectedCategories,
-          couponCode: couponCode.trim(),
+          couponCode: appliedCoupon?.code || '',
         }),
       });
 
@@ -523,7 +613,7 @@ export default function EventDetailsPage() {
                 eventId: event.id,
                 ticketCategories: selectedCategories,
                 amount: orderData.amount,
-                couponCode: couponCode.trim(),
+                couponCode: appliedCoupon?.code || '',
                 couponAudit: orderData.couponAudit || null,
                 eventSnapshot: {
                   title: event.title,
@@ -610,7 +700,7 @@ export default function EventDetailsPage() {
     } finally {
       setIsProcessingPayment(false);
     }
-  }, [session, event, ticketTypes, quantities, calculateTotal, loadRazorpayScript]);
+  }, [session, event, ticketTypes, quantities, calculateTotal, loadRazorpayScript, appliedCoupon]);
 
   if (isLoading) {
     return (
@@ -1116,6 +1206,7 @@ export default function EventDetailsPage() {
                         onChange={(e) => {
                           setCouponCode(e.target.value.toUpperCase());
                           setCouponMessage(null);
+                          setAppliedCoupon(null);
                         }}
                         placeholder="Enter code"
                         className="flex-1 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2 text-sm text-[#F5F5DC] placeholder:text-[#F5F5DC]/30 focus:border-[#E5A823] focus:outline-none"
@@ -1123,9 +1214,10 @@ export default function EventDetailsPage() {
                       <button
                         type="button"
                         onClick={handleApplyCoupon}
+                        disabled={isApplyingCoupon}
                         className="rounded-lg bg-[#2A2A2A] px-4 py-2 text-xs font-semibold text-[#F5F5DC] border border-[#333333] hover:border-[#E5A823] hover:text-[#E5A823] transition-all"
                       >
-                        Apply
+                        {isApplyingCoupon ? 'Applying...' : 'Apply'}
                       </button>
                     </div>
                     {couponMessage && (
