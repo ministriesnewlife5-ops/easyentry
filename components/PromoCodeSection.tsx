@@ -134,18 +134,11 @@ export default function PromoCodeSection({
       ) : (
         // Active Coupon Card with Edit
         <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
-          <div className="flex items-center justify-between mb-6">
+          <div className="mb-6">
             <h3 className="text-lg font-bold flex items-center gap-2">
               <Ticket className="w-5 h-5 text-[#E5A823]" />
               Your Promo Code
             </h3>
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="flex items-center gap-2 px-3 py-2 text-sm bg-[#2A2A2A] hover:bg-[#E5A823]/20 text-[#E5A823] rounded-lg transition-colors"
-            >
-              <Edit2 className="w-4 h-4" />
-              Edit
-            </button>
           </div>
 
           {isEditing ? (
@@ -208,11 +201,21 @@ export default function PromoCodeSection({
             </form>
           ) : (
             <div className="space-y-4">
-              <div className="p-4 bg-[#2A2A2A] rounded-lg">
-                <p className="text-xs text-[#F5F5DC]/60 mb-2">Active Coupon Code</p>
-                <p className="text-2xl font-mono font-bold text-[#E5A823]">{existingCoupon?.code}</p>
-                <p className="text-xs text-[#F5F5DC]/50 mt-2">Works on ALL your events • Event-based discount</p>
-              </div>
+                <div className="p-4 bg-[#2A2A2A] rounded-lg">
+                  <p className="text-xs text-[#F5F5DC]/60 mb-2">Active Coupon Code</p>
+                  <p className="text-2xl font-mono font-bold text-[#E5A823]">{existingCoupon?.code}</p>
+                  <p className="text-xs text-[#F5F5DC]/50 mt-2">Works on ALL your events • Event-based discount</p>
+
+                  {/* Edit button under the displayed code */}
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="px-4 py-2 bg-[#2A2A2A] border border-[#E5A823]/30 text-[#E5A823] rounded-lg font-medium hover:bg-[#E5A823]/10 transition-colors"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
 
               {existingCoupon?.max_uses && (
                 <div className="p-4 bg-[#2A2A2A] rounded-lg">
