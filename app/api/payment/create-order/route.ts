@@ -188,14 +188,14 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseServerClient();
     const eventQuery = supabase
       .from('published_events')
-      .select('id, title, social_links, ticket_price, date, time, venue, request_id')
+      .select('id, title, social_links, ticket_price, date, time, request_id')
       .eq('id', normalizedEventId)
       .single();
 
     console.log('[payment/create-order] published_events query', {
       table: 'published_events',
       filter: { id: normalizedEventId },
-      select: 'id, title, social_links, ticket_price, date, time, venue, request_id',
+      select: 'id, title, social_links, ticket_price, date, time, request_id',
     });
 
     const { data: eventData, error: eventError } = await eventQuery;
@@ -215,22 +215,61 @@ export async function POST(request: NextRequest) {
         : null,
     });
 
+    let resolvedEventData = eventData;
+    let resolvedSource: 'id' | 'request_id' | null = eventData ? 'id' : null;
+
     if (eventError || !eventData) {
-      let alternateLookup: { table: string; found: boolean } | null = null;
+      const fallbackPublishedLookup = normalizedEventId
+        ? await supabase
+            .from('published_events')
+        .select('id, title, social_links, ticket_price, date, time, request_id')
+            .eq('request_id', normalizedEventId)
+            .maybeSingle()
+        : { data: null, error: null };
+
+      if (fallbackPublishedLookup.data) {
+        resolvedEventData = fallbackPublishedLookup.data;
+        resolvedSource = 'request_id';
+        console.warn('[payment/create-order] resolved event via published_events.request_id fallback', {
+          eventId: normalizedEventId,
+          publishedEventId: (fallbackPublishedLookup.data as { id?: string }).id,
+          requestId: (fallbackPublishedLookup.data as { request_id?: string }).request_id,
+        });
+      }
+    }
+
+    if (eventError || !resolvedEventData) {
+      let alternateLookup: Array<{ table: string; field: string; found: boolean }> = [];
       if (normalizedEventId) {
-        const { data: requestRecord } = await supabase
-          .from('event_requests')
-          .select('id')
-          .eq('id', normalizedEventId)
-          .maybeSingle();
-        alternateLookup = {
-          table: 'event_requests',
-          found: Boolean(requestRecord),
-        };
+        const [{ data: requestRecord }, { data: requestPublishedRecord }] = await Promise.all([
+          supabase
+            .from('event_requests')
+            .select('id')
+            .eq('id', normalizedEventId)
+            .maybeSingle(),
+          supabase
+            .from('published_events')
+            .select('id, request_id')
+            .eq('request_id', normalizedEventId)
+            .maybeSingle(),
+        ]);
+
+        alternateLookup = [
+          {
+            table: 'event_requests',
+            field: 'id',
+            found: Boolean(requestRecord),
+          },
+          {
+            table: 'published_events',
+            field: 'request_id',
+            found: Boolean(requestPublishedRecord),
+          },
+        ];
       }
 
       const queryResult = {
-        data: eventData ?? null,
+        data: resolvedEventData ?? null,
         error: eventError
           ? {
               message: eventError.message,
@@ -240,6 +279,7 @@ export async function POST(request: NextRequest) {
             }
           : null,
         alternateLookup,
+        resolvedSource,
       };
 
       console.error('[payment/create-order] EVENT_NOT_FOUND', {
@@ -279,7 +319,7 @@ export async function POST(request: NextRequest) {
       ? (dbTicketCategories as DbTicketCategory[])
       : [];
 
-    const socialLinks = (eventData.social_links as Record<string, unknown> | null) || null;
+    const socialLinks = (resolvedEventData.social_links as Record<string, unknown> | null) || null;
     const couponRules = parseCouponRules(socialLinks);
 
     const requestedCouponCode = normalizeCode(couponCode);
@@ -390,7 +430,7 @@ export async function POST(request: NextRequest) {
         id: itemId,
         name: String(item.name || matchedEventCategory?.name || ''),
         quantity: Math.max(0, toFiniteNumber(item.quantity)),
-        price: Math.max(0, toFiniteNumber(matchedEventCategory?.price ?? item.price ?? eventData.ticket_price)),
+        price: Math.max(0, toFiniteNumber(matchedEventCategory?.price ?? item.price ?? resolvedEventData.ticket_price)),
         artistShare: clampPercent(toFiniteNumber(item.artistShare)),
         influencerShare: clampPercent(toFiniteNumber(item.influencerShare)),
       };
@@ -433,7 +473,7 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           user_id: session.user.id,
-          event_id: normalizedEventId,
+          event_id: String((resolvedEventData as { id?: string }).id || normalizedEventId),
           ticket_categories: normalizedCategories,
           subtotal: subtotal,
           discount_amount: discountAmount,
@@ -466,7 +506,9 @@ export async function POST(request: NextRequest) {
       receipt: String(intentId),
       notes: {
         intent_id: String(intentId),
-        eventId: String(normalizedEventId),
+        eventId: String((resolvedEventData as { id?: string }).id || normalizedEventId),
+        publishedEventId: String((resolvedEventData as { id?: string }).id || normalizedEventId),
+        resolvedFrom: resolvedSource || 'id',
       },
     };
 
