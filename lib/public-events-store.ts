@@ -157,7 +157,28 @@ function mapEventToDb(event: Partial<PublicEvent> & { sourceRequestId?: string }
   return {
     title: event.title || 'Untitled Event',
     date: event.date || new Date().toISOString().split('T')[0],
-    time: event.time || null,
+    // Store canonical start time into `time` (DB existing TIME column) when possible.
+    // Also store `start_time`, `end_time` (new columns) and `event_time_label` for display when the input is a range.
+    time: (() => {
+      const raw = typeof event.time === 'string' ? event.time.trim() : '';
+      if (!raw) return null;
+      const parts = raw.includes('-') ? raw.split('-').map((s) => s.trim()) : [raw];
+      // prefer first segment as the canonical time value
+      return parts[0] || null;
+    })(),
+    start_time: (() => {
+      const raw = typeof event.time === 'string' ? event.time.trim() : '';
+      if (!raw) return null;
+      const parts = raw.includes('-') ? raw.split('-').map((s) => s.trim()) : [raw];
+      return parts[0] || null;
+    })(),
+    end_time: (() => {
+      const raw = typeof event.time === 'string' ? event.time.trim() : '';
+      if (!raw) return null;
+      const parts = raw.includes('-') ? raw.split('-').map((s) => s.trim()) : [raw];
+      return parts[1] || null;
+    })(),
+    event_time_label: typeof event.time === 'string' && event.time ? event.time : null,
     description: event.description || event.fullDescription || null,
     venue_id: null,
     organizer_id: null,
@@ -257,7 +278,15 @@ function mapDbToEvent(
     title: (record.title as string) || '',
     subtitle,
     date: (record.date as string) || '',
-    time: (record.time as string) || '',
+    // Build display time: prefer explicit label, then start-end, then single time
+    time: (() => {
+      const label = (record.event_time_label as string) || '';
+      if (label) return label;
+      const start = record.start_time as string | null;
+      const end = record.end_time as string | null;
+      if (start && end) return `${start} - ${end}`;
+      return (record.time as string) || '';
+    })(),
     venue,
     couponRules,
     locationState,
