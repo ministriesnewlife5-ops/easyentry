@@ -691,7 +691,7 @@ export default function PromoterProfilePage() {
 
           {activeTab === 'promo' && (
             <PromoCodeSection
-              role="promoter"
+              role="PROMOTER"
               promoForm={promoForm}
               globalCoupons={globalCoupons}
               promoSummary={promoSummary}
