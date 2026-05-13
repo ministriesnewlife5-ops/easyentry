@@ -12,6 +12,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { isAdminRole } from '@/lib/roles';
 
 type Venue = {
   id: string;
@@ -45,7 +46,7 @@ export default function VenueProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const isAdmin = session?.user?.role === 'admin';
+  const isAdmin = isAdminRole(session?.user?.role);
 
   useEffect(() => {
     if (venueId) {

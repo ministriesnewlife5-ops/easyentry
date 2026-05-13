@@ -8,6 +8,7 @@ import {
 import { sendEventRequestNotificationEmail } from '@/lib/mailer';
 import { publishEventFromRequest, unpublishEventByRequestId } from '@/lib/public-events-store';
 import { getSupabaseServerClient } from '@/lib/supabase';
+import { isAdminRole, isOrganizerRole } from '@/lib/roles';
 
 const BROWSE_FILTERS_SETTINGS_KEY = 'browse_filters';
 
@@ -205,7 +206,7 @@ export async function GET(request: NextRequest) {
   try {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
     
-    if (!token || (token.role !== 'admin' && token.role !== 'sub_admin')) {
+    if (!token || !isAdminRole(token.role)) {
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
     }
 
@@ -228,7 +229,7 @@ export async function POST(request: NextRequest) {
   try {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
 
-    if (!token || token.role !== 'outlet') {
+    if (!token || !isOrganizerRole(token.role)) {
       return NextResponse.json({ error: 'Unauthorized - Outlet provider access required' }, { status: 403 });
     }
 
@@ -303,7 +304,7 @@ export async function PUT(request: NextRequest) {
   try {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
 
-    if (!token || (token.role !== 'admin' && token.role !== 'sub_admin')) {
+    if (!token || !isAdminRole(token.role)) {
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
     }
 

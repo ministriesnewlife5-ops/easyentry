@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getEventRequestsByOutlet } from '@/lib/event-request-store';
 import { getAllPublishedEvents } from '@/lib/public-events-store';
+import { isAdminRole, isOrganizerRole } from '@/lib/roles';
 
 type OutletEventLifecycle = 'waiting_approval' | 'upcoming' | 'completed';
 
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
   try {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
 
-    if (!token || token.role !== 'outlet') {
+    if (!token || (!isOrganizerRole(token.role) && !isAdminRole(token.role))) {
       return NextResponse.json({ error: 'Unauthorized - Outlet provider access required' }, { status: 403 });
     }
 

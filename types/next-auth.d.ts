@@ -1,5 +1,5 @@
 import NextAuth, { DefaultSession } from "next-auth";
-import { AppRole } from "@/lib/auth-store";
+import { AppRole } from "@/lib/roles";
 
 declare module "next-auth" {
   interface Session {

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Menu, X, ChevronDown, Mic2, Building2, Megaphone, LogOut, UserCircle2, LayoutDashboard, CalendarDays, Heart, History } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
+import { getRoleDisplayName, getRoleHomePath, isAdminRole, isCustomerRole, normalizeRole } from '@/lib/roles';
 
 export default function Navigation() {
   const [workDropdownOpen, setWorkDropdownOpen] = useState(false);
@@ -12,14 +13,16 @@ export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { data: session } = useSession();
   const isLoggedIn = Boolean(session?.user);
-  const isAdmin = session?.user?.role === 'admin';
+  const normalizedRole = normalizeRole(session?.user?.role);
+  const isAdmin = isAdminRole(normalizedRole);
+  const isCustomer = isCustomerRole(normalizedRole);
   const userName = session?.user?.name || 'User';
   const userEmail = session?.user?.email || '';
 
   const workItems = [
     { name: 'Artist', href: '/work/register?role=artist', icon: Mic2, desc: 'Perform & grow' },
-    { name: 'Outlet Provider', href: '/work/register?role=outlet', icon: Building2, desc: 'Host events' },
-    { name: 'Influencer', href: '/work/register?role=promoter', icon: Megaphone, desc: 'Sell tickets' },
+    { name: 'Organizer', href: '/work/register?role=organizer', icon: Building2, desc: 'Host events' },
+    { name: 'Promoter', href: '/work/register?role=promoter', icon: Megaphone, desc: 'Sell tickets' },
   ];
 
   // Close mobile menu on route change
@@ -141,22 +144,19 @@ export default function Navigation() {
 
                           {/* Dynamic Profile Link based on Role */}
                           <Link
-                            href={isAdmin ? "/admin" : (session?.user?.role && ['artist', 'promoter', 'outlet'].includes(session.user.role)) ? `/${session.user.role}/profile` : "/profile"}
+                            href={getRoleHomePath(normalizedRole)}
                             className="flex items-center gap-3 px-4 py-3 hover:bg-[#E5A823]/10 transition-colors group"
                           >
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#2A2A2A] border border-[#2A2A2A] group-hover:bg-[#E5A823]/20 group-hover:border-[#E5A823] transition-all">
                               {isAdmin ? <LayoutDashboard className="w-4 h-4 text-[#E5A823] group-hover:text-[#F5C542]" /> : 
-                               session?.user?.role === 'artist' ? <Mic2 className="w-4 h-4 text-[#E5A823] group-hover:text-[#F5C542]" /> :
-                               session?.user?.role === 'promoter' ? <Megaphone className="w-4 h-4 text-[#E5A823] group-hover:text-[#F5C542]" /> :
-                               session?.user?.role === 'outlet' ? <Building2 className="w-4 h-4 text-[#E5A823] group-hover:text-[#F5C542]" /> :
+                               normalizedRole === 'ARTIST' ? <Mic2 className="w-4 h-4 text-[#E5A823] group-hover:text-[#F5C542]" /> :
+                               normalizedRole === 'PROMOTER' ? <Megaphone className="w-4 h-4 text-[#E5A823] group-hover:text-[#F5C542]" /> :
+                               normalizedRole === 'ORGANIZER' ? <Building2 className="w-4 h-4 text-[#E5A823] group-hover:text-[#F5C542]" /> :
                                <UserCircle2 className="w-4 h-4 text-[#E5A823] group-hover:text-[#F5C542]" />}
                             </div>
                             <div>
                               <span className="block text-[#F5F5DC] font-medium text-sm group-hover:text-[#E5A823] transition-colors">
-                                {isAdmin ? 'Admin Dashboard' : 
-                                 (session?.user?.role && ['artist', 'promoter', 'outlet'].includes(session.user.role)) ? 
-                                 `${session.user.role.charAt(0).toUpperCase() + session.user.role.slice(1)} Profile` : 
-                                 'Profile'}
+                                {isAdmin ? 'Admin Dashboard' : `${getRoleDisplayName(normalizedRole)} Profile`}
                               </span>
                               <span className="block text-[#F5F5DC]/40 text-xs">
                                 {isAdmin ? 'Manage platform' : 'Manage your presence'}
@@ -179,7 +179,7 @@ export default function Navigation() {
                           </Link>
 
                           {/* Wishlist link for regular users */}
-                          {session?.user?.role === 'user' && (
+                          {isCustomer && (
                             <Link
                               href="/profile?tab=wishlist"
                               className="flex items-center gap-3 px-4 py-3 hover:bg-[#E5A823]/10 transition-colors group border-t border-[#2A2A2A]"
@@ -195,7 +195,7 @@ export default function Navigation() {
                           )}
 
                           {/* History/Bookings link for regular users */}
-                          {session?.user?.role === 'user' && (
+                          {isCustomer && (
                             <Link
                               href="/profile?tab=history"
                               className="flex items-center gap-3 px-4 py-3 hover:bg-[#E5A823]/10 transition-colors group border-t border-[#2A2A2A]"
@@ -210,7 +210,7 @@ export default function Navigation() {
                             </Link>
                           )}
 
-                          {session?.user?.role === 'outlet' && (
+                          {normalizedRole === 'ORGANIZER' && (
                             <Link
                               href="/outlet/dashboard"
                               className="flex items-center gap-3 px-4 py-3 hover:bg-[#E5A823]/10 transition-colors group border-t border-[#2A2A2A]"
@@ -225,7 +225,7 @@ export default function Navigation() {
                             </Link>
                           )}
 
-                          {session?.user?.role === 'outlet' && (
+                          {normalizedRole === 'ORGANIZER' && (
                             <Link
                               href="/outlet/profile?tab=events"
                               className="flex items-center gap-3 px-4 py-3 hover:bg-[#E5A823]/10 transition-colors group border-t border-[#2A2A2A]"
@@ -240,7 +240,7 @@ export default function Navigation() {
                             </Link>
                           )}
 
-                          {session?.user?.role === 'outlet' && (
+                          {normalizedRole === 'ORGANIZER' && (
                             <Link
                               href="/seller-form"
                               className="flex items-center gap-3 px-4 py-3 hover:bg-[#E5A823]/10 transition-colors group border-t border-[#2A2A2A]"
@@ -394,20 +394,17 @@ export default function Navigation() {
                     </div>
                     
                     <Link
-                      href={isAdmin ? "/admin" : (session?.user?.role && ['artist', 'promoter', 'outlet'].includes(session.user.role)) ? `/${session.user.role}/profile` : "/profile"}
+                      href={getRoleHomePath(normalizedRole)}
                       onClick={() => setMobileMenuOpen(false)}
                       className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC]"
                     >
                       <LayoutDashboard className="w-5 h-5 text-[#E5A823]" />
                       <span className="text-sm">
-                        {isAdmin ? 'Admin Dashboard' : 
-                         (session?.user?.role && ['artist', 'promoter', 'outlet'].includes(session.user.role)) ? 
-                         `${session.user.role.charAt(0).toUpperCase() + session.user.role.slice(1)} Dashboard` : 
-                         'My Account'}
+                        {isAdmin ? 'Admin Dashboard' : `${getRoleDisplayName(normalizedRole)} Dashboard`}
                       </span>
                     </Link>
 
-                    {session?.user?.role === 'user' && (
+                    {isCustomer && (
                       <>
                         <Link
                           href="/profile?tab=wishlist"
@@ -428,7 +425,7 @@ export default function Navigation() {
                       </>
                     )}
 
-                    {session?.user?.role === 'outlet' && (
+                    {normalizedRole === 'ORGANIZER' && (
                       <>
                         <Link
                           href="/outlet/dashboard"

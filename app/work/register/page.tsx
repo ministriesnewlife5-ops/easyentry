@@ -4,12 +4,13 @@ import { motion } from 'framer-motion';
 import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Mic2, Building2, Megaphone, User, Mail, Phone, MapPin, Briefcase, FileText, Image as ImageIcon } from 'lucide-react';
+import { normalizeRole } from '@/lib/roles';
 
-type Role = 'artist' | 'promoter' | 'outlet';
+type Role = 'ARTIST' | 'PROMOTER' | 'ORGANIZER';
 
 function RegisterForm() {
   const searchParams = useSearchParams();
-  const initialRole = (searchParams.get('role') as Role) || 'artist';
+  const initialRole = normalizeRole(searchParams.get('role')) ?? 'ARTIST';
   const [selectedRole, setSelectedRole] = useState<Role>(initialRole);
   const [formData, setFormData] = useState({
     fullName: '',
@@ -36,9 +37,9 @@ function RegisterForm() {
   });
 
   const roles = [
-    { id: 'artist', label: 'Artist', icon: Mic2, desc: 'Perform & grow your audience' },
-    { id: 'promoter', label: 'Promoter', icon: Megaphone, desc: 'Sell tickets & promote events' },
-    { id: 'outlet', label: 'Outlet Provider', icon: Building2, desc: 'Host events at your venue' },
+    { id: 'ARTIST', label: 'Artist', icon: Mic2, desc: 'Perform & grow your audience' },
+    { id: 'PROMOTER', label: 'Promoter', icon: Megaphone, desc: 'Sell tickets & promote events' },
+    { id: 'ORGANIZER', label: 'Organizer', icon: Building2, desc: 'Host events at your venue' },
   ];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -160,7 +161,7 @@ function RegisterForm() {
           </div>
 
           {/* Role-specific fields */}
-          {selectedRole === 'artist' && (
+          {selectedRole === 'ARTIST' && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -228,7 +229,7 @@ function RegisterForm() {
             </motion.div>
           )}
 
-          {selectedRole === 'promoter' && (
+          {selectedRole === 'PROMOTER' && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -289,7 +290,7 @@ function RegisterForm() {
             </motion.div>
           )}
 
-          {selectedRole === 'outlet' && (
+          {selectedRole === 'ORGANIZER' && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}

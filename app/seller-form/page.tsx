@@ -27,8 +27,6 @@ import {
   Clock,
   Mic
 } from 'lucide-react';
-import Navigation from '@/components/ui/Navigation';
-import Footer from '@/components/ui/Footer';
 import DragDropUpload from '@/components/ui/DragDropUpload';
 import { uploadFileDirectToSupabase } from '@/lib/browser-storage';
 

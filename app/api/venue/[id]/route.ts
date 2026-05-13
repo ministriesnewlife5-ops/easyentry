@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getVenueById } from '@/lib/venue-store';
 import { getToken } from 'next-auth/jwt';
+import { isAdminRole } from '@/lib/roles';
 
 export async function GET(
   request: NextRequest,
@@ -15,7 +16,7 @@ export async function GET(
     }
 
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-    const isAdmin = token?.role === 'admin';
+    const isAdmin = isAdminRole(token?.role);
 
     // If not admin, strip out sensitive contact information
     if (!isAdmin) {

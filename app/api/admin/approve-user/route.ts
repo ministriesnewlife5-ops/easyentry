@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { getSupabaseServerClient } from '@/lib/supabase';
+import { isAdminRole, normalizeRole } from '@/lib/roles';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -11,7 +12,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (session.user.role !== 'admin' && session.user.role !== 'sub_admin') {
+    if (!isAdminRole(session.user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -33,7 +34,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    if (!['artist', 'promoter', 'outlet', 'outlet_provider'].includes(String(existingUser.role || ''))) {
+    if (!['ARTIST', 'PROMOTER', 'ORGANIZER'].includes(String(normalizeRole(existingUser.role) || ''))) {
       return NextResponse.json({ error: 'This account type cannot be approved here' }, { status: 400 });
     }
 

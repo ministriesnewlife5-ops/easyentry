@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { createEventRequest, updateEventRequestStatus } from '@/lib/event-request-store';
 import { publishEventFromRequest } from '@/lib/public-events-store';
+import { isAdminRole } from '@/lib/roles';
 
 const BROWSE_FILTERS_SETTINGS_KEY = 'browse_filters';
 
@@ -185,7 +186,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (session.user.role !== 'admin') {
+    if (!isAdminRole(session.user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

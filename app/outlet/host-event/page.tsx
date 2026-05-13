@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Calendar, Clock3, ImageIcon, IndianRupee, Info, MapPin, Percent, Sparkles, Ticket, Upload, X, Loader2, Users } from 'lucide-react';
 import DragDropUpload from '@/components/ui/DragDropUpload';
+import { isOrganizerRole, normalizeRole } from '@/lib/roles';
 
 type EventTemplate = {
   id: string | number;
@@ -67,7 +68,7 @@ export default function OutletHostEventPage() {
       router.push('/login');
       return;
     }
-    if (status === 'authenticated' && session?.user?.role !== 'outlet') {
+    if (status === 'authenticated' && !isOrganizerRole(session?.user?.role)) {
       router.push('/events');
     }
   }, [status, session, router]);
@@ -257,7 +258,7 @@ export default function OutletHostEventPage() {
     return <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC] flex items-center justify-center">Loading...</div>;
   }
 
-  if (!session?.user || session.user.role !== 'outlet') {
+  if (!session?.user || !isOrganizerRole(session.user.role)) {
     return null;
   }
 

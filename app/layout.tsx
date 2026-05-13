@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Bebas_Neue, DM_Sans, Space_Mono } from "next/font/google";
 import "./globals.css";
-import Navigation from "@/components/ui/Navigation";
-import Footer from "@/components/ui/Footer";
 import AuthProvider from "@/components/ui/AuthProvider";
+import RouteShell from "@/components/layout/RouteShell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -48,11 +47,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${bebasNeue.variable} ${dmSans.variable} ${spaceMono.variable} antialiased min-h-screen flex flex-col font-dm`}
       >
         <AuthProvider>
-          <Navigation />
-          <main className="flex-grow pt-16">
+          <RouteShell>
             {children}
-          </main>
-          <Footer />
+          </RouteShell>
         </AuthProvider>
       </body>
     </html>

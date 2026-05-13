@@ -33,7 +33,7 @@ interface Message {
 }
 
 interface PromoCodeSectionProps {
-  role: 'artist' | 'promoter';
+  role: 'ARTIST' | 'PROMOTER';
   promoForm: PromoForm;
   globalCoupons: GlobalCoupon[];
   promoSummary: PromoSummary;
@@ -60,7 +60,7 @@ export default function PromoCodeSection({
   const [isEditing, setIsEditing] = useState(false);
 
   const getPlaceholder = () => {
-    return role === 'artist' ? 'e.g. ARTIST2024' : 'e.g. PARTY2024';
+    return role === 'ARTIST' ? 'e.g. ARTIST2024' : 'e.g. PARTY2024';
   };
 
   const usagePercent = existingCoupon && existingCoupon.max_uses

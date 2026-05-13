@@ -306,7 +306,16 @@ export async function POST(request: NextRequest) {
 
     const subtotal = normalizedCategories.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0);
     const totalTickets = normalizedCategories.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const convenienceFees = totalTickets > 0 ? totalTickets * 175 : 0;
+
+    // Read authoritative convenience fee from app_settings (fallback to 175)
+    const { data: feeSetting, error: feeError } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'convenience_fee')
+      .maybeSingle();
+
+    const feeValue = feeSetting && feeSetting.value != null ? Number(feeSetting.value) : 175;
+    const convenienceFees = totalTickets > 0 ? totalTickets * (Number.isFinite(feeValue) ? Math.round(feeValue) : 175) : 0;
 
     let discountPercent = matchedRule ? matchedRule.discountPercent : 0;
     let discountAmount = Math.min(subtotal * (discountPercent / 100), subtotal);
@@ -324,35 +333,58 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
     }
 
+    // Persist canonical checkout intent (server authoritative)
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutes
+
+    const { data: intentCreated, error: intentError } = await supabase
+      .from('checkout_intents')
+      .insert([
+        {
+          user_id: session.user.id,
+          event_id: eventId,
+          ticket_categories: normalizedCategories,
+          subtotal: subtotal,
+          discount_amount: discountAmount,
+          discount_percent: discountPercent || null,
+          coupon_code: matchedRule?.code || matchedGlobalRule?.code || null,
+          coupon_source_type: matchedRule?.sourceType || matchedGlobalRule?.sourceType || null,
+          coupon_source_id: matchedRule?.sourceId || matchedGlobalRule?.sourceId || null,
+          convenience_fee: convenienceFees,
+          final_amount: finalAmount,
+          currency,
+          expires_at: expiresAt,
+        },
+      ])
+      .select()
+      .single();
+
+    if (intentError || !intentCreated) {
+      console.error('Failed to create checkout intent:', intentError);
+      return NextResponse.json({ error: 'Failed to create checkout intent' }, { status: 500 });
+    }
+
+    const intentId = intentCreated.id;
+
     const { client: razorpay, keyId } = getRazorpayClient();
 
-    // Create Razorpay order
-    const orderOptions: {
-      amount: number;
-      currency: string;
-      receipt: string;
-      notes: Record<string, string>;
-    } = {
+    // Create Razorpay order using authoritative final amount and attach receipt = intentId
+    const orderOptions = {
       amount: Math.round(finalAmount * 100), // Razorpay expects amount in paise
       currency,
-      receipt: `receipt_${Date.now()}`,
+      receipt: String(intentId),
       notes: {
+        intent_id: String(intentId),
         eventId: String(eventId),
-        eventTitle: String(eventTitle || ''),
-        userId: String(session.user.email || ''),
-        userEmail: String(session.user.email || ''),
-        userName: String(session.user.name || ''),
-        ticketCategories: JSON.stringify(normalizedCategories),
-        couponCode: matchedRule?.code || matchedGlobalRule?.code || '',
-        couponPercent: String(discountPercent),
-        discountAmount: String(discountAmount),
-        couponSourceType: matchedRule?.sourceType || matchedGlobalRule?.sourceType || '',
-        couponSourceId: matchedRule?.sourceId || matchedGlobalRule?.sourceId || '',
-        couponSourceName: matchedRule?.sourceName || matchedGlobalRule?.sourceName || '',
       },
     };
 
     const order = await razorpay.orders.create(orderOptions);
+
+    // Persist razorpay order id back to intent record
+    await supabase
+      .from('checkout_intents')
+      .update({ razorpay_order_id: order.id, updated_at: new Date().toISOString() })
+      .eq('id', intentId);
 
     return NextResponse.json({
       success: true,
@@ -360,25 +392,7 @@ export async function POST(request: NextRequest) {
       amount: order.amount,
       currency: order.currency,
       keyId,
-      discountAmount: Math.round(discountAmount * 100),
-      couponCode: matchedRule?.code || matchedGlobalRule?.code || '',
-      couponAudit: matchedRule || matchedGlobalRule ? {
-        code: matchedRule?.code || matchedGlobalRule?.code || '',
-        discountPercent,
-        discountAmount: Math.round(discountAmount * 100),
-        sourceType: matchedRule?.sourceType || matchedGlobalRule?.sourceType || null,
-        sourceId: matchedRule?.sourceId || matchedGlobalRule?.sourceId || null,
-        sourceName: matchedRule?.sourceName || matchedGlobalRule?.sourceName || null,
-        startsAt: matchedRule?.startsAt || matchedGlobalRule?.startsAt || null,
-        endsAt: matchedRule?.endsAt || matchedGlobalRule?.endsAt || null,
-        maxUses: matchedRule?.maxUses ?? matchedGlobalRule?.maxUses ?? null,
-        usedCount,
-        remainingUses:
-          (matchedRule?.maxUses ?? matchedGlobalRule?.maxUses)
-            ? Math.max((matchedRule?.maxUses ?? matchedGlobalRule?.maxUses ?? 0) - usedCount - 1, 0)
-            : null,
-        discountModel: matchedGlobalRule ? 'event-based' : 'fixed-percent',
-      } : null,
+      intentId,
     });
 
   } catch (error: unknown) {

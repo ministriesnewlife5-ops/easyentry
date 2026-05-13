@@ -17,6 +17,7 @@ import { getAllPublishedEvents, getPublishedEventCards } from '@/lib/public-even
 import { getAllEventRequests } from '@/lib/event-request-store';
 import { getAllUsers } from '@/lib/auth-store';
 import { getSupabaseServerClient } from '@/lib/supabase';
+import { isAdminRole, normalizeRole } from '@/lib/roles';
 
 export default async function AdminPage({
   searchParams,
@@ -29,11 +30,11 @@ export default async function AdminPage({
     redirect('/login');
   }
 
-  if (session.user.role !== 'admin' && session.user.role !== 'sub_admin') {
+  if (!isAdminRole(session.user.role)) {
     redirect('/events');
   }
 
-  const isSuperAdmin = session.user.role === 'admin';
+  const isSuperAdmin = normalizeRole(session.user.role) === 'ADMIN';
   const restrictedSections = ['ads', 'browse-filters', 'host-event', 'onboarding', 'settings'];
   const currentSection = !isSuperAdmin && restrictedSections.includes(activeSection) ? 'overview' : activeSection;
 
@@ -60,13 +61,13 @@ export default async function AdminPage({
     .limit(10);
   
   // Get real artists (users with artist role)
-  const enrolledArtists = allUsers.filter((user: { role: string }) => user.role === 'artist');
+  const enrolledArtists = allUsers.filter((user: { role: string }) => normalizeRole(user.role) === 'ARTIST');
   
-  // Get real influencers/promoters (users with promoter role)
-  const enrolledInfluencers = allUsers.filter((user: { role: string }) => user.role === 'promoter');
+  // Get real promoters (users with promoter role)
+  const enrolledInfluencers = allUsers.filter((user: { role: string }) => normalizeRole(user.role) === 'PROMOTER');
   
-  // Get outlet providers (users with outlet or outlet_provider role)
-  const outletProviders = allUsers.filter((user: { role: string }) => user.role === 'outlet' || user.role === 'outlet_provider');
+  // Get organizers (users with outlet or outlet_provider legacy role)
+  const outletProviders = allUsers.filter((user: { role: string }) => normalizeRole(user.role) === 'ORGANIZER');
 
   // Map published events to the format used in the admin dashboard
   const allWebsiteEvents = publishedEvents.map(event => ({

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getEventRequestsByOutlet } from '@/lib/event-request-store';
+import { isAdminRole, isOrganizerRole } from '@/lib/roles';
 
 // GET - Outlet: Get all event requests for the current outlet
 export async function GET(request: NextRequest) {
   try {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
     
-    if (!token || token.role !== 'outlet') {
+    if (!token || (!isOrganizerRole(token.role) && !isAdminRole(token.role))) {
       return NextResponse.json({ error: 'Unauthorized - Outlet provider access required' }, { status: 403 });
     }
 

@@ -17,13 +17,13 @@ import {
   EyeOff
 } from 'lucide-react';
 
-type Role = 'sub_admin' | 'artist' | 'promoter' | 'outlet';
+type Role = 'SUB_ADMIN' | 'ARTIST' | 'PROMOTER' | 'ORGANIZER';
 
 const roles = [
-  { id: 'sub_admin' as Role, label: 'Sub Admin', icon: Shield, desc: 'Manage approved admin operations', color: '#6366F1' },
-  { id: 'artist' as Role, label: 'Artist', icon: Mic2, desc: 'Performer account for hosting and promotions', color: '#E5A823' },
-  { id: 'promoter' as Role, label: 'Promoter', icon: Megaphone, desc: 'Promoter account for campaigns and events', color: '#EB4D4B' },
-  { id: 'outlet' as Role, label: 'Outlet', icon: Building2, desc: 'Venue/outlet account for hosting events', color: '#10B981' },
+  { id: 'SUB_ADMIN' as Role, label: 'Sub Admin', icon: Shield, desc: 'Manage approved admin operations', color: '#6366F1' },
+  { id: 'ARTIST' as Role, label: 'Artist', icon: Mic2, desc: 'Performer account for hosting and promotions', color: '#E5A823' },
+  { id: 'PROMOTER' as Role, label: 'Promoter', icon: Megaphone, desc: 'Promoter account for campaigns and events', color: '#EB4D4B' },
+  { id: 'ORGANIZER' as Role, label: 'Organizer', icon: Building2, desc: 'Venue/organizer account for hosting events', color: '#10B981' },
 ];
 
 const sectionVariants = {
@@ -36,7 +36,7 @@ const sectionVariants = {
 };
 
 export default function AdminOnboardingSection() {
-  const [selectedRole, setSelectedRole] = useState<Role>('sub_admin');
+  const [selectedRole, setSelectedRole] = useState<Role>('SUB_ADMIN');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -306,23 +306,23 @@ export default function AdminOnboardingSection() {
                 <h2 className="font-semibold text-[#F5F5DC]">Role Permissions</h2>
               </div>
               <div className="p-5">
-                {selectedRole === 'sub_admin' ? (
+                {selectedRole === 'SUB_ADMIN' ? (
                   <ul className="text-sm text-[#F5F5DC]/80 space-y-2 list-disc list-inside">
                     <li>Approve events</li>
                     <li>Edit and delete events</li>
-                    <li>Approve seller, artist, and influencer onboarding requests</li>
+                    <li>Approve seller, artist, and promoter onboarding requests</li>
                   </ul>
-                ) : selectedRole === 'artist' ? (
+                ) : selectedRole === 'ARTIST' ? (
                   <p className="text-sm text-[#F5F5DC]/80">
                     Artist accounts can manage artist profile information and participate in hosted event flows.
                   </p>
-                ) : selectedRole === 'promoter' ? (
+                ) : selectedRole === 'PROMOTER' ? (
                   <p className="text-sm text-[#F5F5DC]/80">
                     Promoter accounts can manage promoter profile information and run promotions for hosted events.
                   </p>
                 ) : (
                   <p className="text-sm text-[#F5F5DC]/80">
-                    Outlet accounts can manage venue profile and host events through the outlet workflow.
+                    Organizer accounts can manage venue profile and host events through the organizer workflow.
                   </p>
                 )}
               </div>

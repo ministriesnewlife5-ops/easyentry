@@ -4,6 +4,7 @@ import { updatePublishedEvent } from '@/lib/public-events-store';
 import { getEventRequestById, updateEventRequest } from '@/lib/event-request-store';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { isAdminRole } from '@/lib/roles';
 
 type EventCouponRule = {
   code: string;
@@ -224,7 +225,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    const isAdmin = session.user.role === 'admin' || session.user.role === 'sub_admin';
+    const isAdmin = isAdminRole(session.user.role);
 
     if (!isAdmin) {
       if (!existingEvent.sourceRequestId) {

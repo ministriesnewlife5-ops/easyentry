@@ -21,114 +21,61 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { 
-      razorpay_order_id, 
-      razorpay_payment_id, 
-      razorpay_signature,
-      eventId,
-      ticketCategories,
-      amount,
-      couponCode,
-      couponAudit,
-      eventSnapshot,
-    } = body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
 
-    if (!session.user.id) {
-      return NextResponse.json({ error: 'User ID missing in session' }, { status: 400 });
-    }
-
-    if (!eventId || !Array.isArray(ticketCategories) || typeof amount !== 'number') {
-      return NextResponse.json({ error: 'Invalid booking payload' }, { status: 400 });
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return NextResponse.json({ error: 'Missing payment fields' }, { status: 400 });
     }
 
     // Verify signature
     const razorpaySecret = normalizeEnvValue(process.env.RAZORPAY_KEY_SECRET) || '';
-
     const expectedSignature = crypto
       .createHmac('sha256', razorpaySecret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex');
 
     if (expectedSignature !== razorpay_signature) {
-      return NextResponse.json(
-        { error: 'Invalid payment signature' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid payment signature' }, { status: 400 });
     }
 
-    // Payment is verified - save ticket booking to Supabase
     const supabase = getSupabaseServerClient();
-    const totalTickets = ticketCategories.reduce((sum: number, item: { quantity?: number }) => {
-      return sum + (item.quantity || 0);
-    }, 0);
 
-    const fallbackTitle = typeof eventSnapshot?.title === 'string' ? eventSnapshot.title : 'Untitled Event';
-    const fallbackDate = typeof eventSnapshot?.date === 'string' ? eventSnapshot.date : null;
-    const fallbackVenue = typeof eventSnapshot?.venue === 'string' ? eventSnapshot.venue : null;
-    const fallbackImage = typeof eventSnapshot?.image === 'string' ? eventSnapshot.image : null;
+    // Load authoritative checkout intent by razorpay_order_id
+    const { data: intent, error: intentError } = await supabase
+      .from('checkout_intents')
+      .select('*')
+      .eq('razorpay_order_id', razorpay_order_id)
+      .maybeSingle();
 
-    const { data: eventData } = await supabase
-      .from('published_events')
-      .select('title, date, image_url')
-      .eq('id', eventId)
-      .single();
-
-    const bookingPayload = {
-      user_id: session.user.id,
-      user_email: session.user.email || null,
-      user_name: session.user.name || null,
-      event_id: eventId,
-      event_title: eventData?.title || fallbackTitle,
-      event_date: eventData?.date || fallbackDate,
-      event_venue: fallbackVenue,
-      event_image: eventData?.image_url || fallbackImage,
-      ticket_categories: ticketCategories,
-      total_tickets: totalTickets,
-      amount_paid: amount / 100, // Convert paise to rupees
-      coupon_code: typeof couponCode === 'string' && couponCode.trim() ? couponCode.trim().toUpperCase() : null,
-      coupon_source_type: typeof couponAudit?.sourceType === 'string' ? couponAudit.sourceType : null,
-      coupon_source_id: typeof couponAudit?.sourceId === 'string' ? couponAudit.sourceId : null,
-      coupon_source_name: typeof couponAudit?.sourceName === 'string' ? couponAudit.sourceName : null,
-      coupon_discount_percent: Number.isFinite(Number(couponAudit?.discountPercent)) ? Number(couponAudit.discountPercent) : null,
-      coupon_discount_amount: Number.isFinite(Number(couponAudit?.discountAmount)) ? Number(couponAudit.discountAmount) / 100 : null,
-      payment_id: razorpay_payment_id,
-      order_id: razorpay_order_id,
-      status: 'confirmed',
-      booked_at: new Date().toISOString(),
-    };
-
-    const { data: createdBooking, error: bookingError } = await supabase
-      .from('ticket_bookings')
-      .insert(bookingPayload)
-      .select('id')
-      .single();
-
-    if (bookingError) {
-      console.error('Failed to persist booking:', bookingError);
-      return NextResponse.json({ error: 'Payment verified but failed to save booking' }, { status: 500 });
+    if (intentError) {
+      console.error('Failed to load checkout intent:', intentError);
+      return NextResponse.json({ error: 'Failed to load checkout intent' }, { status: 500 });
     }
 
-    // If couponAudit indicates this was an event-based (global) coupon, try to increment its usage count
+    if (!intent) {
+      return NextResponse.json({ error: 'Checkout intent not found' }, { status: 404 });
+    }
+
+    // Call Postgres RPC that finalizes intent atomically (inventory decrement, booking insert, coupon increment)
     try {
-      if (bookingPayload.coupon_code && couponAudit && couponAudit.discountModel === 'event-based') {
-        const found = await getGlobalCouponByCode(String(bookingPayload.coupon_code));
-        if (found) {
-          const ok = await incrementGlobalCouponUsage(found.id);
-          if (!ok) {
-            console.error('Failed to increment global coupon usage for coupon id', found.id);
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Error while incrementing global coupon usage:', err);
-    }
+      const { data: finalizeResult, error: finalizeError } = await supabase.rpc('finalize_checkout_intent', {
+        in_intent_id: intent.id,
+        in_razorpay_order_id: razorpay_order_id,
+        in_razorpay_payment_id: razorpay_payment_id,
+      });
 
-    return NextResponse.json({
-      success: true,
-      message: 'Payment verified and tickets booked successfully',
-      bookingId: createdBooking.id,
-      paymentId: razorpay_payment_id,
-    });
+      if (finalizeError) {
+        console.error('Failed to finalize checkout intent:', finalizeError);
+        return NextResponse.json({ error: 'Failed to finalize booking' }, { status: 500 });
+      }
+
+      const bookingId = Array.isArray(finalizeResult) && finalizeResult.length > 0 ? finalizeResult[0].booking_id : null;
+
+      return NextResponse.json({ success: true, message: 'Payment verified and tickets booked successfully', bookingId, paymentId: razorpay_payment_id });
+    } catch (err) {
+      console.error('Error during finalize RPC:', err);
+      return NextResponse.json({ error: 'Failed to finalize booking' }, { status: 500 });
+    }
 
   } catch (error) {
     console.error('Payment verification failed:', error);

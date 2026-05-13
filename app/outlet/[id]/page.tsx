@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { isAdminRole } from '@/lib/roles';
 
 interface VenueProfile {
   id: string;
@@ -91,7 +92,7 @@ export default function OutletViewProfile() {
     );
   }
 
-  const isAdmin = session?.user?.role === 'admin';
+  const isAdmin = isAdminRole(session?.user?.role);
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC]">

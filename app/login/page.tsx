@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Facebook, Linkedin, Loader2, ArrowRight } from 'lucide-react';
 import { signIn, getSession } from 'next-auth/react';
+import { getRoleHomePath, normalizeRole } from '@/lib/roles';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,17 +22,17 @@ export default function LoginPage() {
   const [formData, setFormData] = useState({
     email: '',
     otp: '',
-    role: 'user', // Default role
+    role: 'CUSTOMER', // Default role
     password: '',
     confirmPassword: '',
     name: '' // Kept for backwards compatibility if needed, though not explicitly asked
   });
 
   const roles = [
-    { id: 'user', label: 'Regular User' },
-    { id: 'artist', label: 'Artist' },
-    { id: 'promoter', label: 'Promoter' },
-    { id: 'outlet', label: 'Outlet Provider' },
+    { id: 'CUSTOMER', label: 'Customer' },
+    { id: 'ARTIST', label: 'Artist' },
+    { id: 'PROMOTER', label: 'Promoter' },
+    { id: 'ORGANIZER', label: 'Organizer' },
   ];
 
   const handleSendOTP = async (e: React.FormEvent) => {
@@ -114,11 +115,7 @@ export default function LoginPage() {
         setIsLoading(false);
       } else {
         const session = await getSession();
-        if (session?.user?.role === 'outlet') {
-          router.push('/outlet/profile');
-        } else {
-          router.push('/events');
-        }
+        router.push(getRoleHomePath(normalizeRole(session?.user?.role)));
         router.refresh();
       }
     } catch (err) {
@@ -145,11 +142,7 @@ export default function LoginPage() {
         setIsLoading(false);
       } else {
         const session = await getSession();
-        if (session?.user?.role === 'outlet') {
-          router.push('/outlet/profile');
-        } else {
-          router.push('/events');
-        }
+        router.push(getRoleHomePath(normalizeRole(session?.user?.role)));
         router.refresh();
       }
     } catch (err) {
@@ -161,7 +154,7 @@ export default function LoginPage() {
   const toggleMode = () => {
     setIsSignUp(!isSignUp);
     setSignupStep(1); // Reset to first step when toggling
-    setFormData({ email: '', otp: '', role: 'user', password: '', confirmPassword: '', name: '' });
+    setFormData({ email: '', otp: '', role: 'CUSTOMER', password: '', confirmPassword: '', name: '' });
     setError('');
   };
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { getSupabaseServerClient } from '@/lib/supabase';
+import { normalizeRole } from '@/lib/roles';
 import {
   getAllPublishedEvents,
   getPublishedEventById,
@@ -10,7 +11,7 @@ import {
   type PublicEventCouponRule,
 } from '@/lib/public-events-store';
 
-type EligibleRole = 'artist' | 'influencer' | 'promoter';
+type EligibleRole = 'artist' | 'promoter';
 
 type PromoterIdentity = {
   name?: string;
@@ -22,8 +23,12 @@ function normalizeCode(value: unknown): string {
 }
 
 function toSourceType(role: string): EligibleRole | null {
-  if (role === 'artist' || role === 'influencer' || role === 'promoter') {
-    return role;
+  const normalized = normalizeRole(role);
+  if (normalized === 'ARTIST') {
+    return 'artist';
+  }
+  if (normalized === 'PROMOTER') {
+    return 'promoter';
   }
   return null;
 }
@@ -63,7 +68,7 @@ function canManageEventForRole(
   userName?: string | null,
   promoterIdentity?: PromoterIdentity
 ): boolean {
-  if (role === 'artist' || role === 'influencer') {
+  if (role === 'artist') {
     return isArtistTagged(event, userId);
   }
 
@@ -101,7 +106,7 @@ function calculateBookingShare(
   ticketCategories: Array<Record<string, unknown>>,
   sourceType: EligibleRole
 ): number {
-  if (sourceType !== 'artist' && sourceType !== 'influencer') {
+  if (sourceType !== 'artist' && sourceType !== 'promoter') {
     return 0;
   }
 

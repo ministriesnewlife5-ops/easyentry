@@ -7,6 +7,7 @@ import { Mic2, Megaphone, Building2, Heart, History, UserCircle2, LogOut, Ticket
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { getWishlist, removeFromWishlist, type WishlistEvent } from '@/lib/wishlist-store';
+import { getRoleDashboardPath, getRoleDisplayName, isAdminRole, isCustomerRole, normalizeRole } from '@/lib/roles';
 
 type BookingHistoryItem = {
   id: string;
@@ -111,7 +112,8 @@ function ProfileContent() {
     return null;
   }
 
-  const isRegularUser = session.user.role === 'user';
+  const normalizedRole = normalizeRole(session.user.role);
+  const isRegularUser = isCustomerRole(normalizedRole);
 
   const handleRemoveFromWishlist = async (eventId: string) => {
     await removeFromWishlist(eventId);
@@ -213,26 +215,26 @@ function ProfileContent() {
               </div>
 
               {/* Special Role Dashboard Link */}
-              {session.user.role && session.user.role !== 'user' && session.user.role !== 'admin' && (
+              {normalizedRole && !isRegularUser && !isAdminRole(normalizedRole) && (
                 <div className="bg-[#E5A823]/10 border border-[#E5A823]/20 rounded-xl p-4">
                   <p className="text-sm text-[#F5F5DC]/80 mb-3">
-                    You are registered as a <span className="text-[#E5A823] font-bold capitalize">{session.user.role}</span>. 
+                    You are registered as a <span className="text-[#E5A823] font-bold capitalize">{getRoleDisplayName(normalizedRole)}</span>. 
                     Manage your specialized profile below.
                   </p>
                   <button
-                    onClick={() => router.push(`/${session.user.role}/profile`)}
+                    onClick={() => router.push(getRoleDashboardPath(normalizedRole))}
                     className="flex items-center gap-2 px-4 py-2 bg-[#E5A823] hover:bg-[#F5C542] rounded-lg text-[#0D0D0D] font-bold text-sm transition-colors"
                   >
-                    {session.user.role === 'artist' ? <Mic2 className="w-4 h-4" /> :
-                     session.user.role === 'promoter' ? <Megaphone className="w-4 h-4" /> :
+                    {normalizedRole === 'ARTIST' ? <Mic2 className="w-4 h-4" /> :
+                     normalizedRole === 'PROMOTER' ? <Megaphone className="w-4 h-4" /> :
                      <Building2 className="w-4 h-4" />}
-                    Go to {session.user.role.charAt(0).toUpperCase() + session.user.role.slice(1)} Dashboard
+                    Go to {getRoleDisplayName(normalizedRole)} Dashboard
                   </button>
                 </div>
               )}
 
               {/* Admin Dashboard Link */}
-              {session.user.role === 'admin' && (
+              {normalizedRole === 'ADMIN' && (
                 <div className="bg-[#EB4D4B]/10 border border-[#EB4D4B]/20 rounded-xl p-4">
                   <p className="text-sm text-[#F5F5DC]/80 mb-3">You have admin privileges.</p>
                   <button

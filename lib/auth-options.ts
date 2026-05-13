@@ -2,8 +2,9 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare, hash } from "bcryptjs";
 import { addUser, AppRole, consumeOtpVerification, getUserByEmail, isEmailOtpVerified } from "@/lib/auth-store";
+import { normalizeRole } from "@/lib/roles";
 
-const signUpRoles: AppRole[] = ["user", "artist", "promoter", "outlet"];
+const signUpRoles: AppRole[] = ["CUSTOMER", "ARTIST", "PROMOTER", "ORGANIZER"];
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -35,8 +36,8 @@ export const authOptions: NextAuthOptions = {
           }
 
           const hashedPassword = await hash(credentials.password, 10);
-          const requestedRole = (credentials.role ?? "user") as AppRole;
-          const role = signUpRoles.includes(requestedRole) ? requestedRole : "user";
+          const requestedRole = normalizeRole(credentials.role) ?? "CUSTOMER";
+          const role = signUpRoles.includes(requestedRole as AppRole) ? requestedRole : "CUSTOMER";
           const name = normalizedEmail.split("@")[0];
 
           const newUser = await addUser({
@@ -52,7 +53,7 @@ export const authOptions: NextAuthOptions = {
             id: newUser.id,
             name: newUser.name,
             email: newUser.email,
-            role: newUser.role as AppRole,
+            role: normalizeRole(newUser.role) ?? "CUSTOMER",
           };
         } else {
           const user = await getUserByEmail(normalizedEmail);
@@ -72,7 +73,7 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             name: user.name || user.email.split("@")[0],
             email: user.email,
-            role: user.role as AppRole,
+            role: normalizeRole(user.role) ?? "CUSTOMER",
           };
         }
       },
@@ -82,14 +83,14 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }: any) {
       if (user) {
         token.id = user.id;
-        token.role = user.role;
+        token.role = normalizeRole(user.role) ?? "CUSTOMER";
       }
       return token;
     },
     async session({ session, token }: any) {
       if (session.user) {
         session.user.id = token.id;
-        session.user.role = token.role;
+        session.user.role = normalizeRole(token.role) ?? "CUSTOMER";
       }
       return session;
     },

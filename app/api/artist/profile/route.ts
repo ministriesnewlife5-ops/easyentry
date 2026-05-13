@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getSupabaseServerClient } from '@/lib/supabase';
+import { isAdminRole, normalizeRole } from '@/lib/roles';
 
 type ArtistSocialPayload = {
   realName?: string;
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (token.role !== 'artist' && token.role !== 'admin') {
+    if (normalizeRole(token.role) !== 'ARTIST' && !isAdminRole(token.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (token.role !== 'artist' && token.role !== 'admin') {
+    if (normalizeRole(token.role) !== 'ARTIST' && !isAdminRole(token.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

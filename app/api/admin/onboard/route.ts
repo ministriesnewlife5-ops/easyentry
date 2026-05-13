@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { createUser, type AppRole } from '@/lib/auth-store';
 import bcrypt from 'bcryptjs';
+import { isAdminRole } from '@/lib/roles';
 
 // POST /api/admin/onboard - Admin creates users with specific roles
 export async function POST(request: NextRequest) {
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (session.user.role !== 'admin') {
+    if (!isAdminRole(session.user.role)) {
       return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
@@ -34,8 +35,8 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const allowedRoles: AppRole[] = ['sub_admin', 'artist', 'promoter', 'outlet'];
-    const role: AppRole = allowedRoles.includes(requestedRole) ? requestedRole : 'sub_admin';
+    const allowedRoles: AppRole[] = ['SUB_ADMIN', 'ARTIST', 'PROMOTER', 'ORGANIZER'];
+    const role: AppRole = allowedRoles.includes(requestedRole) ? requestedRole : 'SUB_ADMIN';
 
     const supabase = getSupabaseServerClient();
 

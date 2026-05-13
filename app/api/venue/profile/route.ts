@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getVenueByUserId, updateVenueByUserId } from '@/lib/venue-store';
 import { getToken } from 'next-auth/jwt';
+import { isAdminRole, isOrganizerRole } from '@/lib/roles';
 
 // Max size in bytes for a single base64 image stored in DB (300KB each)
 const MAX_IMAGE_SIZE = 300 * 1024;
@@ -43,8 +44,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (token.role !== 'outlet' && token.role !== 'admin') {
-      return NextResponse.json({ error: 'Only outlet providers can create venue profiles' }, { status: 403 });
+    if (!isOrganizerRole(token.role) && !isAdminRole(token.role)) {
+      return NextResponse.json({ error: 'Only organizers can create venue profiles' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -94,8 +95,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (token.role !== 'outlet' && token.role !== 'admin') {
-      return NextResponse.json({ error: 'Only outlet providers can update venue profiles' }, { status: 403 });
+    if (!isOrganizerRole(token.role) && !isAdminRole(token.role)) {
+      return NextResponse.json({ error: 'Only organizers can update venue profiles' }, { status: 403 });
     }
 
     const body = await request.json();

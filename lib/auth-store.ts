@@ -1,7 +1,8 @@
 import { supabase, type AppUser, type OtpRecord } from './supabase';
 import { randomInt } from 'crypto';
+import { normalizeRole, type AppRole, type RoleValue } from './roles';
 
-export type AppRole = 'artist' | 'promoter' | 'outlet' | 'user' | 'admin' | 'sub_admin' | 'outlet_provider';
+export type { AppRole } from './roles';
 
 /**
  * Find a user by their email address
@@ -49,7 +50,7 @@ export async function findUserById(id: string): Promise<AppUser | null> {
 export async function createUser(
   email: string,
   hashedPassword: string,
-  role: AppRole = 'user',
+  role: RoleValue = 'CUSTOMER',
   name?: string
 ): Promise<AppUser> {
   const { data, error } = await supabase
@@ -57,7 +58,7 @@ export async function createUser(
     .insert({
       email: email.toLowerCase().trim(),
       hashed_password: hashedPassword,
-      role,
+      role: normalizeRole(role) ?? 'CUSTOMER',
       name: name || null,
       is_verified: false,
     })
@@ -242,7 +243,7 @@ export async function deleteUser(id: string): Promise<void> {
 export async function updateUserRole(id: string, role: AppRole): Promise<void> {
   const { error } = await supabase
     .from('app_users')
-    .update({ role } as any)
+    .update({ role: normalizeRole(role) ?? 'CUSTOMER' } as any)
     .eq('id', id);
 
   if (error) {
@@ -255,7 +256,7 @@ export async function getUserByEmail(email: string): Promise<AppUser | null> {
   return findUserByEmail(email);
 }
 
-export async function addUser(user: { email: string; password: string; role: AppRole; name: string }): Promise<AppUser> {
+export async function addUser(user: { email: string; password: string; role: RoleValue; name: string }): Promise<AppUser> {
   return createUser(user.email, user.password, user.role, user.name);
 }
 

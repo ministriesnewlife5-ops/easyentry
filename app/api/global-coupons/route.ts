@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { getSupabaseServerClient } from '@/lib/supabase';
+import { normalizeRole } from '@/lib/roles';
 
 type EligibleRole = 'artist' | 'promoter';
 
@@ -10,8 +11,12 @@ function normalizeCode(value: unknown): string {
 }
 
 function toSourceType(role: string): EligibleRole | null {
-  if (role === 'artist' || role === 'promoter') {
-    return role;
+  const normalized = normalizeRole(role);
+  if (normalized === 'ARTIST') {
+    return 'artist';
+  }
+  if (normalized === 'PROMOTER') {
+    return 'promoter';
   }
   return null;
 }
