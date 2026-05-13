@@ -10,7 +10,11 @@ type Role = 'ARTIST' | 'PROMOTER' | 'ORGANIZER';
 
 function RegisterForm() {
   const searchParams = useSearchParams();
-  const initialRole = normalizeRole(searchParams.get('role')) ?? 'ARTIST';
+  const _normalizedRole = normalizeRole(searchParams.get('role'));
+  const initialRole: Role =
+    _normalizedRole === 'ARTIST' || _normalizedRole === 'PROMOTER' || _normalizedRole === 'ORGANIZER'
+      ? _normalizedRole
+      : 'ARTIST';
   const [selectedRole, setSelectedRole] = useState<Role>(initialRole);
   const [formData, setFormData] = useState({
     fullName: '',
@@ -36,7 +40,7 @@ function RegisterForm() {
     agreeTerms: false,
   });
 
-  const roles = [
+  const roles: { id: Role; label: string; icon: any; desc: string }[] = [
     { id: 'ARTIST', label: 'Artist', icon: Mic2, desc: 'Perform & grow your audience' },
     { id: 'PROMOTER', label: 'Promoter', icon: Megaphone, desc: 'Sell tickets & promote events' },
     { id: 'ORGANIZER', label: 'Organizer', icon: Building2, desc: 'Host events at your venue' },
