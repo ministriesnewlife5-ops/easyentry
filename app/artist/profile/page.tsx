@@ -1017,7 +1017,7 @@ export default function ArtistProfilePage() {
             {/* Promo Codes Tab */}
             {activeTab === 'promo' && (
               <PromoCodeSection
-                role="artist"
+                role="ARTIST"
                 promoForm={promoForm}
                 globalCoupons={globalCoupons}
                 promoSummary={promoSummary}
