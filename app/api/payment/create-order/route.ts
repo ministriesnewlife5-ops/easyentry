@@ -62,6 +62,15 @@ type CheckoutTicketCategory = {
   influencerShare?: number;
 };
 
+type DbTicketCategory = {
+  id: string;
+  name: string;
+  price: number;
+  quantity?: number | null;
+  available_from?: string | null;
+  available_until?: string | null;
+};
+
 function toFiniteNumber(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -157,6 +166,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    console.log('[payment/create-order] incoming request body', body);
     const { 
       eventId, 
       eventTitle, 
@@ -165,7 +175,10 @@ export async function POST(request: NextRequest) {
       currency = 'INR' 
     } = body;
 
-    if (!eventId || !ticketCategories || ticketCategories.length === 0) {
+    const normalizedEventId = typeof eventId === 'string' ? eventId.trim() : '';
+    console.log('[payment/create-order] received eventId', normalizedEventId);
+
+    if (!normalizedEventId || !ticketCategories || ticketCategories.length === 0) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -173,15 +186,98 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getSupabaseServerClient();
-    const { data: eventData, error: eventError } = await supabase
+    const eventQuery = supabase
       .from('published_events')
-      .select('title, social_links, ticket_categories, ticket_price')
-      .eq('id', eventId)
+      .select('id, title, social_links, ticket_price, date, time, venue, request_id')
+      .eq('id', normalizedEventId)
       .single();
 
+    console.log('[payment/create-order] published_events query', {
+      table: 'published_events',
+      filter: { id: normalizedEventId },
+      select: 'id, title, social_links, ticket_price, date, time, venue, request_id',
+    });
+
+    const { data: eventData, error: eventError } = await eventQuery;
+
+    console.log('[payment/create-order] published_events query result', {
+      eventId: normalizedEventId,
+      hasData: Boolean(eventData),
+      error: eventError
+        ? { message: eventError.message, code: eventError.code, details: eventError.details, hint: eventError.hint }
+        : null,
+      data: eventData
+        ? {
+            id: (eventData as { id?: string }).id,
+            title: (eventData as { title?: string }).title,
+            request_id: (eventData as { request_id?: string }).request_id,
+          }
+        : null,
+    });
+
     if (eventError || !eventData) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+      let alternateLookup: { table: string; found: boolean } | null = null;
+      if (normalizedEventId) {
+        const { data: requestRecord } = await supabase
+          .from('event_requests')
+          .select('id')
+          .eq('id', normalizedEventId)
+          .maybeSingle();
+        alternateLookup = {
+          table: 'event_requests',
+          found: Boolean(requestRecord),
+        };
+      }
+
+      const queryResult = {
+        data: eventData ?? null,
+        error: eventError
+          ? {
+              message: eventError.message,
+              code: eventError.code,
+              details: eventError.details,
+              hint: eventError.hint,
+            }
+          : null,
+        alternateLookup,
+      };
+
+      console.error('[payment/create-order] EVENT_NOT_FOUND', {
+        eventId: normalizedEventId,
+        searchedTable: 'published_events',
+        queryResult,
+      });
+
+      return NextResponse.json(
+        {
+          code: 'EVENT_NOT_FOUND',
+          eventId: normalizedEventId,
+          searchedTable: 'published_events',
+          queryResult,
+        },
+        { status: 404 }
+      );
     }
+
+    const { data: dbTicketCategories, error: ticketCategoriesError } = await supabase
+      .from('ticket_categories')
+      .select('id, name, price, quantity, available_from, available_until')
+      .eq('event_id', normalizedEventId)
+      .order('created_at', { ascending: true });
+
+    console.log('[payment/create-order] ticket_categories query', {
+      table: 'ticket_categories',
+      filter: { event_id: normalizedEventId },
+      select: 'id, name, price, quantity, available_from, available_until',
+      resultCount: Array.isArray(dbTicketCategories) ? dbTicketCategories.length : 0,
+      error: ticketCategoriesError
+        ? { message: ticketCategoriesError.message, code: ticketCategoriesError.code, details: ticketCategoriesError.details, hint: ticketCategoriesError.hint }
+        : null,
+    });
+
+    const eventTicketCategories = Array.isArray(dbTicketCategories)
+      ? (dbTicketCategories as DbTicketCategory[])
+      : [];
 
     const socialLinks = (eventData.social_links as Record<string, unknown> | null) || null;
     const couponRules = parseCouponRules(socialLinks);
@@ -252,7 +348,7 @@ export async function POST(request: NextRequest) {
       const { count, error: countError } = await supabase
         .from('ticket_bookings')
         .select('id', { count: 'exact', head: true })
-        .eq('event_id', eventId)
+        .eq('event_id', normalizedEventId)
         .eq('coupon_code', matchedRule.code);
 
       if (!countError) {
@@ -281,10 +377,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const eventTicketCategories = Array.isArray(eventData.ticket_categories)
-      ? (eventData.ticket_categories as Array<Record<string, unknown>>)
-      : [];
-
     const normalizedCategories: CheckoutTicketCategory[] = (ticketCategories as CheckoutTicketCategory[]).map((item) => {
       const itemId = String(item.id || '');
       const itemName = String(item.name || '').trim().toLowerCase();
@@ -299,8 +391,8 @@ export async function POST(request: NextRequest) {
         name: String(item.name || matchedEventCategory?.name || ''),
         quantity: Math.max(0, toFiniteNumber(item.quantity)),
         price: Math.max(0, toFiniteNumber(matchedEventCategory?.price ?? item.price ?? eventData.ticket_price)),
-        artistShare: clampPercent(toFiniteNumber(matchedEventCategory?.artistShare ?? item.artistShare)),
-        influencerShare: clampPercent(toFiniteNumber(matchedEventCategory?.influencerShare ?? item.influencerShare)),
+        artistShare: clampPercent(toFiniteNumber(item.artistShare)),
+        influencerShare: clampPercent(toFiniteNumber(item.influencerShare)),
       };
     });
 
@@ -341,7 +433,7 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           user_id: session.user.id,
-          event_id: eventId,
+          event_id: normalizedEventId,
           ticket_categories: normalizedCategories,
           subtotal: subtotal,
           discount_amount: discountAmount,
@@ -374,7 +466,7 @@ export async function POST(request: NextRequest) {
       receipt: String(intentId),
       notes: {
         intent_id: String(intentId),
-        eventId: String(eventId),
+        eventId: String(normalizedEventId),
       },
     };
 

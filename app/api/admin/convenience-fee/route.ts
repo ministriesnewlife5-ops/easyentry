@@ -17,11 +17,6 @@ function toFee(value: unknown): number {
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user || !isAdminRole(session.user.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const supabase = getSupabaseServerClient();
 
     // Get convenience fee from app_settings table
