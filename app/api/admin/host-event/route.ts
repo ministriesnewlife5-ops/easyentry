@@ -315,7 +315,7 @@ export async function POST(request: NextRequest) {
                 name: normalizeText(artist.name) || null,
                 email: normalizeText(artist.email) || undefined,
                     }))
-              .filter((artist) => Boolean(artist.id))
+                    .filter((artist: { id?: string }) => Boolean(artist.id))
           : [],
         couponRules: couponRules.length > 0 ? couponRules : undefined,
       }
