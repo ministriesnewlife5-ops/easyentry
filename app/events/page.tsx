@@ -377,21 +377,22 @@ export default function EventsPage() {
       {/* Content Section - Appears after scrolling */}
       <section ref={containerRef} className="relative z-20 bg-[#0D0D0D]">
         <div className="container mx-auto px-4 pt-2 pb-20">
-          {/* Browse Filters at bottom of hero */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.3, duration: 0.5 }}
-          className="absolute bottom-0 left-0 right-0 z-20 px-6 md:px-12 lg:px-20 pb-6"
-        >
-          <BrowseFilters 
-            events={allEvents}
-            onFilterStateChange={handleFilterStateChange}
-            onCategorySelect={handleCategorySelect}
-            selectedCategory={selectedCategory}
-            onFiltersChange={setActiveFilters}
-          />
-        </motion.div>
+          {/* Browse Filters - Now properly positioned inside content flow */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.3, duration: 0.5 }}
+            className="relative z-20 px-6 md:px-12 lg:px-20 mb-8"
+          >
+            <BrowseFilters 
+              events={allEvents}
+              onFilterStateChange={handleFilterStateChange}
+              onCategorySelect={handleCategorySelect}
+              selectedCategory={selectedCategory}
+              onFiltersChange={setActiveFilters}
+            />
+          </motion.div>
+          
           {/* Promo Banner */}
           {showPromoBanner && (
             <div className="mt-8">

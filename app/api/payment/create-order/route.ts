@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import Razorpay from 'razorpay';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { getSupabaseServerClient } from '@/lib/supabase';
+import { respondError, respondSuccess, logStructured } from '@/lib/api-utils';
 
 function normalizeEnvValue(value?: string) {
   return value?.trim().replace(/^['\"]|['\"]$/g, '');
@@ -159,10 +160,8 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
     
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      logStructured('payment/create-order', 'Unauthorized create-order attempt');
+      return respondError('UNAUTHORIZED', 'Unauthorized', null, 401);
     }
 
     const body = await request.json();
@@ -179,10 +178,8 @@ export async function POST(request: NextRequest) {
     console.log('[payment/create-order] received eventId', normalizedEventId);
 
     if (!normalizedEventId || !ticketCategories || ticketCategories.length === 0) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+      logStructured('payment/create-order', 'Missing required fields', { normalizedEventId: Boolean(normalizedEventId), ticketCategoriesLength: Array.isArray(ticketCategories) ? ticketCategories.length : 0 });
+      return respondError('MISSING_REQUIRED_FIELDS', 'Missing required fields', null, 400);
     }
 
     const supabase = getSupabaseServerClient();
@@ -340,11 +337,13 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
 
       if (globalCouponError) {
-        return NextResponse.json({ error: 'Failed to validate coupon code' }, { status: 500 });
+        logStructured('payment/create-order', 'Global coupon validation failed', { error: globalCouponError });
+        return respondError('COUPON_VALIDATION_FAILED', 'Failed to validate coupon code', { error: (globalCouponError as any)?.message || String(globalCouponError) }, 500);
       }
 
       if (!globalCoupon) {
-        return NextResponse.json({ error: 'Invalid coupon code' }, { status: 400 });
+        logStructured('payment/create-order', 'Invalid global coupon code', { requestedCouponCode });
+        return respondError('INVALID_COUPON', 'Invalid coupon code', { code: requestedCouponCode }, 400);
       }
 
       matchedGlobalRule = {
@@ -362,7 +361,8 @@ export async function POST(request: NextRequest) {
     if (matchedRule) {
       const status = getCouponStatus(matchedRule);
       if (!status.valid) {
-        return NextResponse.json({ error: status.reason || 'Coupon is not valid right now' }, { status: 400 });
+        logStructured('payment/create-order', 'Coupon rule not valid', { rule: matchedRule, reason: status.reason });
+        return respondError('COUPON_NOT_ACTIVE', status.reason || 'Coupon is not valid right now', null, 400);
       }
     }
 
@@ -379,7 +379,8 @@ export async function POST(request: NextRequest) {
       });
 
       if (!status.valid) {
-        return NextResponse.json({ error: status.reason || 'Coupon is not valid right now' }, { status: 400 });
+        logStructured('payment/create-order', 'Global coupon not active', { matchedGlobalRule, reason: status.reason });
+        return respondError('COUPON_NOT_ACTIVE', status.reason || 'Coupon is not valid right now', null, 400);
       }
     }
 
@@ -396,7 +397,8 @@ export async function POST(request: NextRequest) {
       }
 
       if (usedCount >= matchedRule.maxUses) {
-        return NextResponse.json({ error: 'Coupon usage limit has been reached' }, { status: 400 });
+        logStructured('payment/create-order', 'Coupon max uses reached', { code: matchedRule.code, maxUses: matchedRule.maxUses, usedCount });
+        return respondError('COUPON_MAX_USES', 'Coupon usage limit has been reached', { code: matchedRule.code }, 400);
       }
     }
 
@@ -413,7 +415,8 @@ export async function POST(request: NextRequest) {
       }
 
       if (usedCount >= matchedGlobalRule.maxUses) {
-        return NextResponse.json({ error: 'Coupon usage limit has been reached' }, { status: 400 });
+        logStructured('payment/create-order', 'Global coupon max uses reached', { code: matchedGlobalRule.code, maxUses: matchedGlobalRule.maxUses, usedCount });
+        return respondError('COUPON_MAX_USES', 'Coupon usage limit has been reached', { code: matchedGlobalRule.code }, 400);
       }
     }
 
@@ -461,9 +464,10 @@ export async function POST(request: NextRequest) {
 
     const finalAmount = Math.max(subtotal - discountAmount + convenienceFees, 0);
 
-    if (!Number.isFinite(finalAmount) || finalAmount <= 0) {
-      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
-    }
+      if (!Number.isFinite(finalAmount) || finalAmount <= 0) {
+        logStructured('payment/create-order', 'Invalid final amount', { finalAmount });
+        return respondError('INVALID_AMOUNT', 'Invalid amount', { finalAmount }, 400);
+      }
 
     // Persist canonical checkout intent (server authoritative)
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutes
@@ -492,7 +496,8 @@ export async function POST(request: NextRequest) {
 
     if (intentError || !intentCreated) {
       console.error('Failed to create checkout intent:', intentError);
-      return NextResponse.json({ error: 'Failed to create checkout intent' }, { status: 500 });
+        logStructured('payment/create-order', 'Failed to create checkout intent', { intentError });
+        return respondError('INTENT_CREATE_FAILED', 'Failed to create checkout intent', { error: (intentError as any)?.message || String(intentError) }, 500);
     }
 
     const intentId = intentCreated.id;
@@ -520,14 +525,7 @@ export async function POST(request: NextRequest) {
       .update({ razorpay_order_id: order.id, updated_at: new Date().toISOString() })
       .eq('id', intentId);
 
-    return NextResponse.json({
-      success: true,
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      keyId,
-      intentId,
-    });
+    return respondSuccess({ orderId: order.id, amount: order.amount, currency: order.currency, keyId, intentId }, 'ORDER_CREATED', 'Payment order created', 200);
 
   } catch (error: unknown) {
     const err = error as {
@@ -544,25 +542,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (err.message === 'Missing Razorpay credentials in environment') {
-      return NextResponse.json(
-        { error: 'Payment gateway is not configured on server' },
-        { status: 500 }
-      );
+      logStructured('payment/create-order', 'Razorpay credentials missing');
+      return respondError('PAYMENT_GATEWAY_NOT_CONFIGURED', 'Payment gateway is not configured on server', null, 500);
     }
 
     if (err.statusCode === 401) {
-      return NextResponse.json(
-        {
-          error: 'Payment gateway authentication failed. Please contact support.',
-          errorCode: 'RAZORPAY_AUTH_FAILED',
-        },
-        { status: 502 }
-      );
+      logStructured('payment/create-order', 'Razorpay authentication failed', { statusCode: err.statusCode });
+      return respondError('RAZORPAY_AUTH_FAILED', 'Payment gateway authentication failed. Please contact support.', { statusCode: err.statusCode }, 502);
     }
 
-    return NextResponse.json(
-      { error: 'Failed to create payment order' },
-      { status: 500 }
-    );
+    logStructured('payment/create-order', 'Failed to create payment order', { error: (err as any)?.message || String(err) });
+    return respondError('ORDER_CREATION_FAILED', 'Failed to create payment order', { error: (err as any)?.message || String(err) }, 500);
   }
 }

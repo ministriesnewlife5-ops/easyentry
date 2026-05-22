@@ -249,20 +249,22 @@ function OutletDashboardContent() {
         const totalEvents = upcoming.length + completed.length + waiting.length;
         const upcomingEvents = upcoming.length;
         
-        // Calculate revenue and tickets from completed/upcoming events
-        // For now, using placeholder calculation - replace with actual ticket data when available
+        // Calculate revenue and tickets only from authoritative event data.
+        // If ticket-level sales are not available yet, keep the dashboard at zero rather than guessing.
         let totalRevenue = 0;
         let totalTickets = 0;
-        
+        let eventsWithSales = 0;
+
         [...upcoming, ...completed].forEach((event: OutletEventItem) => {
-          // Extract numeric price from price string (e.g., "₹500 onwards" or "Free")
-          const priceMatch = event.price?.match(/₹?([\d,]+)/);
-          const price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : 0;
-          
-          // Use ticketsSold from event data if available, otherwise estimate
-          const tickets = event.ticketsSold || Math.floor(Math.random() * 50) + 10; // Replace with real data
+          const tickets = Number(event.ticketsSold || 0);
+          const revenue = Number(event.revenue || 0);
+
+          if (tickets > 0) {
+            eventsWithSales += 1;
+          }
+
           totalTickets += tickets;
-          totalRevenue += price * tickets;
+          totalRevenue += revenue;
         });
         
         // Generate activities based on real events
@@ -314,8 +316,8 @@ function OutletDashboardContent() {
           upcomingEvents,
           totalRevenue,
           totalTickets,
-          viewsThisMonth: Math.floor(Math.random() * 5000) + 1000, // Placeholder - replace with analytics API
-          conversionRate: totalEvents > 0 ? Math.round((totalTickets / (totalEvents * 100)) * 100) / 100 : 0,
+          viewsThisMonth: 0,
+          conversionRate: totalEvents > 0 ? Math.round((eventsWithSales / totalEvents) * 10000) / 100 : 0,
         });
         
         setRecentEvents(formattedRecentEvents);
@@ -407,7 +409,7 @@ function OutletDashboardContent() {
           <StatCard
             title="Views This Month"
             value={stats.viewsThisMonth.toLocaleString('en-IN')}
-            change="Estimated"
+            change={stats.viewsThisMonth > 0 ? 'From analytics' : 'Analytics unavailable'}
             changeType="up"
             icon={Eye}
             color="bg-orange-500"
@@ -415,7 +417,7 @@ function OutletDashboardContent() {
           <StatCard
             title="Conversion Rate"
             value={`${stats.conversionRate}%`}
-            change={stats.conversionRate > 0 ? 'Tickets/Events ratio' : 'No data yet'}
+            change={stats.conversionRate > 0 ? 'Events with sales' : 'No sales data yet'}
             changeType="up"
             icon={TrendingUp}
             color="bg-pink-500"

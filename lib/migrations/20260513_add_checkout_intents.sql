@@ -141,6 +141,21 @@ BEGIN
     SET status = 'completed', razorpay_order_id = in_razorpay_order_id, razorpay_payment_id = in_razorpay_payment_id, updated_at = now()
     WHERE id = in_intent_id;
 
+  -- Post ledger entries for the booking (only if ledger tables exist)
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'ledger_transactions') THEN
+    PERFORM post_booking_confirmed(
+      booking_rec.id,
+      in_razorpay_payment_id,
+      intent_row.final_amount,
+      intent_row.convenience_fee,
+      NULL, -- organizer_id (would need to be joined from event)
+      0,    -- organizer_share (would need to be calculated)
+      NULL, -- promoter_id (would need to be joined from event)
+      0,    -- promoter_share (would need to be calculated)
+      0     -- gst_amount (would need to be calculated from policy)
+    );
+  END IF;
+
   booking_id := booking_rec.id;
   RETURN NEXT;
 END;
