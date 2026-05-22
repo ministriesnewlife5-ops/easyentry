@@ -124,19 +124,22 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
       );
     }
 
-    // Get the coupon
+    // Normalize code and lookup coupon (case-insensitive). Use maybeSingle
+    // to avoid errors if duplicate rows exist; we'll treat not-found the same.
+    const lookupCode = String(code || '').trim();
     const { data: coupon, error: couponError } = await supabase
       .from('global_coupons')
       .select('*')
-      .ilike('code', code)
+      .ilike('code', lookupCode)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
     if (couponError || !coupon) {
+      console.warn('global-coupons/preview: coupon lookup failed', { code: lookupCode, couponError });
       return NextResponse.json(
         {
           valid: false,
-          code,
+          code: lookupCode,
           message: 'Coupon code not found or inactive'
         },
         { status: 404 }
@@ -301,7 +304,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
 export async function GET(request: NextRequest): Promise<NextResponse<CouponQuickValidationResponse>> {
   try {
     const supabase = getSupabaseServerClient();
-    const code = request.nextUrl.searchParams.get('code');
+    const code = String(request.nextUrl.searchParams.get('code') || '').trim();
 
     if (!code) {
       return NextResponse.json(
@@ -317,9 +320,10 @@ export async function GET(request: NextRequest): Promise<NextResponse<CouponQuic
       .from('global_coupons')
       .select('code, is_active, usage_count, max_uses, starts_at, ends_at')
       .ilike('code', code)
-      .single();
+      .maybeSingle();
 
     if (error || !coupon) {
+      console.warn('global-coupons/preview GET: coupon lookup failed', { code, error });
       return NextResponse.json({
         valid: false,
         code,
