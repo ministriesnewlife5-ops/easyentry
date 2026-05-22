@@ -586,19 +586,21 @@ export default function EventDetailsPage() {
       const orderData = await orderResponse.json();
       console.log('Order data:', orderData);
 
+      const { orderId, amount, currency, keyId, intentId, couponAudit } = orderData.details;
+
       if (!orderResponse.ok || !orderData.success) {
         throw new Error(orderData.error || `Failed to create order (${orderResponse.status})`);
       }
 
       // Open Razorpay checkout
-      console.log('Opening Razorpay with key:', orderData.keyId);
+      console.log('Opening Razorpay with key:', keyId);
       const options = {
-        key: orderData.keyId,
-        amount: orderData.amount,
-        currency: orderData.currency,
+        key: keyId,
+        amount: amount,
+        currency: currency,
         name: 'Easy Entry',
         description: `${event.title} - ${totalTickets} Ticket(s)`,
-        order_id: orderData.orderId,
+        order_id: orderId,
         handler: async (response: any) => {
           console.log('Payment handler response:', response);
           try {
@@ -612,9 +614,9 @@ export default function EventDetailsPage() {
                 razorpay_signature: response.razorpay_signature,
                 eventId: event.id,
                 ticketCategories: selectedCategories,
-                amount: orderData.amount,
+                amount: amount,
                 couponCode: appliedCoupon?.code || '',
-                couponAudit: orderData.couponAudit || null,
+                couponAudit: couponAudit || null,
                 eventSnapshot: {
                   title: event.title,
                   date: event.date,
@@ -647,7 +649,7 @@ export default function EventDetailsPage() {
                 eventTime: event.time,
                 venue: event.venue,
                 tickets: selectedCategories,
-                totalAmount: orderData.amount / 100,
+                totalAmount: amount / 100,
                 userName: session.user.name || '',
                 userEmail: session.user.email || '',
                 bookedAt: new Date().toISOString(),
