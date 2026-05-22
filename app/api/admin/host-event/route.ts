@@ -310,11 +310,11 @@ export async function POST(request: NextRequest) {
         taggedArtists: Array.isArray(eventData.taggedArtists)
           ? eventData.taggedArtists
               .filter((item: unknown): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
-              .map((artist) => ({
+              .map((artist: Record<string, unknown>) => ({
                 id: normalizeText(artist.id),
                 name: normalizeText(artist.name) || null,
                 email: normalizeText(artist.email) || undefined,
-              }))
+                    }))
               .filter((artist) => Boolean(artist.id))
           : [],
         couponRules: couponRules.length > 0 ? couponRules : undefined,
