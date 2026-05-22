@@ -35,10 +35,17 @@ function normalizeGoogleMapsLink(value: unknown, venue: string): string | undefi
 type HostEventTicketCategory = {
   id?: string;
   name?: string;
+  tagline?: string;
   price?: number | string;
+  originalPrice?: number | string;
   quantity?: number | string;
   availableFrom?: string;
   availableUntil?: string;
+  discount?: number | string;
+  platformFee?: number | string;
+  paymentGatewayFee?: number | string;
+  artistShare?: number | string;
+  influencerShare?: number | string;
 };
 
 type HostEventCouponRule = {
@@ -231,10 +238,17 @@ export async function POST(request: NextRequest) {
           .map((cat) => ({
             id: normalizeText(cat.id) || crypto.randomUUID(),
             name: normalizeText(cat.name).toUpperCase(),
+            tagline: normalizeText(cat.tagline) || undefined,
             price: Number(cat.price) || 0,
+            originalPrice: cat.originalPrice == null ? undefined : Number(cat.originalPrice) || undefined,
             quantity: Number(cat.quantity) || 0,
             availableFrom: normalizeText(cat.availableFrom) || undefined,
             availableUntil: normalizeText(cat.availableUntil) || undefined,
+            discount: cat.discount == null ? undefined : Number(cat.discount) || undefined,
+            platformFee: cat.platformFee == null ? undefined : Number(cat.platformFee) || undefined,
+            paymentGatewayFee: cat.paymentGatewayFee == null ? undefined : Number(cat.paymentGatewayFee) || undefined,
+            artistShare: cat.artistShare == null ? undefined : Number(cat.artistShare) || undefined,
+            influencerShare: cat.influencerShare == null ? undefined : Number(cat.influencerShare) || undefined,
           }))
       : [];
 
@@ -268,6 +282,9 @@ export async function POST(request: NextRequest) {
         date,
         time,
         venue,
+        locationState: normalizeText(eventData.locationState) || undefined,
+        locationDistrict: normalizeText(eventData.locationDistrict) || undefined,
+        locationArea: normalizeText(eventData.locationArea) || undefined,
         category,
         subcategory,
         price: normalizePrice(eventData.price ?? minPrice),
@@ -290,6 +307,16 @@ export async function POST(request: NextRequest) {
         entryAge: normalizeText(eventData.entryAge) || '18+',
         layout: normalizeText(eventData.layout) || 'Standing',
         seating: normalizeText(eventData.seating) || 'General Admission',
+        taggedArtists: Array.isArray(eventData.taggedArtists)
+          ? eventData.taggedArtists
+              .filter((item: unknown): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+              .map((artist) => ({
+                id: normalizeText(artist.id),
+                name: normalizeText(artist.name) || null,
+                email: normalizeText(artist.email) || undefined,
+              }))
+              .filter((artist) => Boolean(artist.id))
+          : [],
         couponRules: couponRules.length > 0 ? couponRules : undefined,
       }
     );

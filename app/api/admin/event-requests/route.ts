@@ -229,8 +229,8 @@ export async function POST(request: NextRequest) {
   try {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
 
-    if (!token || !isOrganizerRole(token.role)) {
-      return NextResponse.json({ error: 'Unauthorized - Outlet provider access required' }, { status: 403 });
+    if (!token || (!isOrganizerRole(token.role) && !isAdminRole(token.role))) {
+      return NextResponse.json({ error: 'Unauthorized - Outlet provider or admin access required' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -250,15 +250,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: dateTimeError }, { status: 400 });
     }
 
-    const outletName = token.name || 'Unknown Outlet';
+    const isAdmin = isAdminRole(token.role);
+    const outletUserId = isAdmin
+      ? String(eventData.hostCompanyOwnerId || eventData.hostCompanyId || token.sub || '')
+      : token.sub || '';
+    const outletName = isAdmin
+      ? String(eventData.hostCompanyName || token.name || 'Unknown Outlet')
+      : token.name || 'Unknown Outlet';
+
     const newRequest = await createEventRequest(
-      token.sub || '',
+      outletUserId,
       outletName,
       eventData,
       typeof token.email === 'string' ? token.email : undefined
     );
 
     await upsertBrowseCategoryFromEvent(eventData.category, eventData.subcategory);
+
+    if (isAdmin) {
+      const approvedRequest = await updateEventRequestStatus(newRequest.id, 'approved', token.sub as string);
+      if (!approvedRequest) {
+        return NextResponse.json({ error: 'Failed to approve admin event request' }, { status: 500 });
+      }
+
+      const event = await publishEventFromRequest(approvedRequest);
+      return NextResponse.json({ request: approvedRequest, event, adminNotificationSent: false }, { status: 201 });
+    }
 
     let adminNotificationSent = false;
 

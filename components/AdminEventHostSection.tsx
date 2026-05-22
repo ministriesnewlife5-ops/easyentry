@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { useSearchParams } from 'next/navigation';
 import { 
   Calendar, 
   MapPin, 
@@ -45,15 +46,39 @@ type BrowseCategory = {
   subFilters: string[];
 };
 
+type BrowseLocationCity = {
+  name: string;
+  icon: string;
+  areas: string[];
+};
+
+type BrowseLocationState = {
+  state: string;
+  cities: BrowseLocationCity[];
+};
+
+type Artist = {
+  id: string;
+  email: string;
+  name: string | null;
+};
+
 type TicketCategory = {
   id: string;
   name: string;
   price: number;
   quantity: number;
+  tagline?: string;
+  originalPrice?: number;
   availableFromDate?: string;
   availableFromTime?: string;
   availableUntilDate?: string;
   availableUntilTime?: string;
+  discount?: number;
+  platformFee?: number;
+  paymentGatewayFee?: number;
+  artistShare?: number;
+  influencerShare?: number;
 };
 
 const sectionVariants: Variants = {
@@ -113,10 +138,13 @@ async function compressImageForUpload(file: File): Promise<File> {
 }
 
 export default function AdminEventHostSection() {
+  const searchParams = useSearchParams();
+  const editEventId = (searchParams.get('editEventId') || '').trim();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const artistDropdownRef = useRef<HTMLDivElement>(null);
   
   // Form states
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -124,10 +152,14 @@ export default function AdminEventHostSection() {
     title: '',
     subtitle: '',
     description: '',
+    fullDescription: '',
     date: '',
     startTime: '',
     endTime: '',
     location: '',
+    locationState: '',
+    locationDistrict: '',
+    locationArea: '',
     googleMapsLink: '',
     about: '',
     category: '',
@@ -138,6 +170,11 @@ export default function AdminEventHostSection() {
     seating: 'General Admission',
   });
   const [categories, setCategories] = useState<BrowseCategory[]>([]);
+  const [locationFilters, setLocationFilters] = useState<BrowseLocationState[]>([]);
+  const [artists, setArtists] = useState<Artist[]>([]);
+  const [selectedArtists, setSelectedArtists] = useState<Artist[]>([]);
+  const [artistSearchQuery, setArtistSearchQuery] = useState('');
+  const [showArtistDropdown, setShowArtistDropdown] = useState(false);
   
   const [ticketCategories, setTicketCategories] = useState<TicketCategory[]>([]);
   const [promoForm, setPromoForm] = useState({
@@ -160,6 +197,7 @@ export default function AdminEventHostSection() {
   useEffect(() => {
     fetchCompanies();
     fetchBrowseFilters();
+    fetchArtists();
   }, []);
 
   const normalizeCategories = (raw: unknown): BrowseCategory[] => {
@@ -184,14 +222,49 @@ export default function AdminEventHostSection() {
       .filter((item): item is BrowseCategory => item !== null);
   };
 
+  const normalizeLocationFilters = (raw: unknown): BrowseLocationState[] => {
+    if (!Array.isArray(raw)) return [];
+
+    return raw
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const record = item as Record<string, unknown>;
+        const state = typeof record.state === 'string' ? record.state.trim() : '';
+        const cities = Array.isArray(record.cities)
+          ? record.cities
+              .map((city) => {
+                if (!city || typeof city !== 'object') return null;
+                const cityRecord = city as Record<string, unknown>;
+                const name = typeof cityRecord.name === 'string' ? cityRecord.name.trim() : '';
+                if (!name) return null;
+                const icon = typeof cityRecord.icon === 'string' && cityRecord.icon.trim() ? cityRecord.icon : 'MapPin';
+                const areas = Array.isArray(cityRecord.areas)
+                  ? cityRecord.areas
+                      .filter((area): area is string => typeof area === 'string')
+                      .map((area) => area.trim())
+                      .filter(Boolean)
+                  : [];
+                return { name, icon, areas };
+              })
+              .filter((city): city is BrowseLocationCity => city !== null)
+          : [];
+
+        if (!state) return null;
+        return { state, cities };
+      })
+      .filter((item): item is BrowseLocationState => item !== null);
+  };
+
   const fetchBrowseFilters = async () => {
     try {
       let loadedCategories: BrowseCategory[] = [];
+      let loadedLocationFilters: BrowseLocationState[] = [];
 
       const adminFiltersResponse = await fetch('/api/admin/filters', { cache: 'no-store' });
       if (adminFiltersResponse.ok) {
         const data = await adminFiltersResponse.json();
         loadedCategories = normalizeCategories(data?.filters?.categories);
+        loadedLocationFilters = normalizeLocationFilters(data?.filters?.locationFilters || []);
       }
 
       if (loadedCategories.length === 0) {
@@ -203,11 +276,142 @@ export default function AdminEventHostSection() {
       }
 
       setCategories(loadedCategories);
+      setLocationFilters(loadedLocationFilters);
     } catch (error) {
       console.error('Error loading browse categories:', error);
       setCategories([]);
+      setLocationFilters([]);
     }
   };
+
+  const fetchArtists = async () => {
+    try {
+      const response = await fetch('/api/artists');
+      const data = await response.json();
+      if (data.artists) {
+        setArtists(data.artists);
+      }
+    } catch (error) {
+      console.error('Error fetching artists:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!editEventId) return;
+
+    let cancelled = false;
+
+    const loadEventForEdit = async () => {
+      try {
+        const response = await fetch(`/api/events/${encodeURIComponent(editEventId)}`, { cache: 'no-store' });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload?.error || 'Failed to load event for editing.');
+        }
+
+        const event = payload?.event as Record<string, unknown> | undefined;
+        if (!event || cancelled) return;
+
+        setFormData((prev) => ({
+          ...prev,
+          title: typeof event.title === 'string' ? event.title : '',
+          subtitle: typeof event.subtitle === 'string' ? event.subtitle : '',
+          description: typeof event.description === 'string' ? event.description : '',
+          fullDescription: typeof event.fullDescription === 'string' ? event.fullDescription : '',
+          date: typeof event.date === 'string' ? event.date : '',
+          startTime: typeof event.time === 'string' ? event.time.split(' - ')[0] || '' : '',
+          endTime: typeof event.time === 'string' ? event.time.split(' - ')[1] || '' : '',
+          location: typeof event.venue === 'string' ? event.venue : '',
+          locationState: typeof event.locationState === 'string' ? event.locationState : '',
+          locationDistrict: typeof event.locationDistrict === 'string' ? event.locationDistrict : '',
+          locationArea: typeof event.locationArea === 'string' ? event.locationArea : '',
+          googleMapsLink: typeof event.googleMapsLink === 'string' ? event.googleMapsLink : '',
+          about: typeof event.fullDescription === 'string' ? event.fullDescription : (typeof event.description === 'string' ? event.description : ''),
+          category: typeof event.category === 'string' ? event.category : '',
+          subcategory: typeof event.subcategory === 'string' ? event.subcategory : '',
+          gatesOpen: typeof event.gatesOpen === 'string' ? event.gatesOpen : '',
+          entryAge: typeof event.entryAge === 'string' ? event.entryAge : '18+',
+          layout: typeof event.layout === 'string' ? event.layout : 'Standing',
+          seating: typeof event.seating === 'string' ? event.seating : 'General Admission',
+        }));
+
+        setSelectedArtists(
+          Array.isArray(event.taggedArtists)
+            ? (event.taggedArtists as Array<Record<string, unknown>>)
+                .map((artist) => ({
+                  id: typeof artist.id === 'string' ? artist.id : '',
+                  email: typeof artist.email === 'string' ? artist.email : '',
+                  name: typeof artist.name === 'string' ? artist.name : null,
+                }))
+                .filter((artist) => Boolean(artist.id))
+            : []
+        );
+
+        setRules(
+          Array.isArray(event.rules) && event.rules.length > 0
+            ? (event.rules as unknown[])
+                .filter((rule): rule is string => typeof rule === 'string')
+                .map((text, index) => ({ id: `${index + 1}-${Math.random().toString(36).slice(2, 6)}`, text }))
+            : [{ id: '1', text: '' }]
+        );
+
+        setTicketCategories(
+          Array.isArray(event.ticketCategories) && event.ticketCategories.length > 0
+            ? (event.ticketCategories as Array<Record<string, unknown>>).map((cat, index) => ({
+                id: typeof cat.id === 'string' && cat.id ? cat.id : `ticket-${index + 1}`,
+                name: typeof cat.name === 'string' ? cat.name : '',
+                price: Number(cat.price || 0),
+                quantity: Number(cat.quantity || 0),
+                tagline: typeof cat.tagline === 'string' ? cat.tagline : '',
+                originalPrice: cat.originalPrice != null ? Number(cat.originalPrice) : undefined,
+                availableFromDate: typeof cat.availableFrom === 'string' ? cat.availableFrom.slice(0, 10) : undefined,
+                availableFromTime: typeof cat.availableFrom === 'string' ? cat.availableFrom.slice(11, 16) : undefined,
+                availableUntilDate: typeof cat.availableUntil === 'string' ? cat.availableUntil.slice(0, 10) : undefined,
+                availableUntilTime: typeof cat.availableUntil === 'string' ? cat.availableUntil.slice(11, 16) : undefined,
+                discount: Number(cat.discount || 0),
+                platformFee: Number(cat.platformFee || 5),
+                paymentGatewayFee: Number(cat.paymentGatewayFee || 5),
+                artistShare: Number(cat.artistShare || 0),
+                influencerShare: Number(cat.influencerShare || 0),
+              }))
+            : []
+        );
+
+        setCoverImageUrl(typeof event.image === 'string' ? event.image : '');
+        setMediaFileUrls(
+          Array.isArray(event.mediaFiles)
+            ? (event.mediaFiles as unknown[])
+                .filter((item): item is string => typeof item === 'string')
+                .map((url, index) => ({
+                  url,
+                  type: /\.(mp4|webm|ogg|mov|m4v|avi)(\?|#|$)/i.test(url) ? 'video/mp4' : 'image/jpeg',
+                  name: `existing-${index + 1}`,
+                }))
+            : []
+        );
+      } catch (error) {
+        console.error('Failed to load admin event for edit:', error);
+      }
+    };
+
+    loadEventForEdit();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editEventId]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (artistDropdownRef.current && !artistDropdownRef.current.contains(event.target as Node)) {
+        setShowArtistDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   
   const fetchCompanies = async () => {
     try {
@@ -300,6 +504,13 @@ export default function AdminEventHostSection() {
       name: '',
       price: 0,
       quantity: 0,
+      tagline: '',
+      originalPrice: undefined,
+      discount: 0,
+      platformFee: 5,
+      paymentGatewayFee: 5,
+      artistShare: 0,
+      influencerShare: 0,
     };
     setTicketCategories(prev => [...prev, newCategory]);
   };
@@ -381,6 +592,9 @@ export default function AdminEventHostSection() {
         startTime: formData.startTime,
         endTime: formData.endTime,
         venue: formData.location,
+        locationState: formData.locationState || undefined,
+        locationDistrict: formData.locationDistrict || undefined,
+        locationArea: formData.locationArea || undefined,
         googleMapsLink: formData.googleMapsLink || undefined,
         category: formData.category || 'General',
         subcategory: formData.subcategory || undefined,
@@ -391,12 +605,13 @@ export default function AdminEventHostSection() {
         numberOfTickets: ticketCategories.reduce((sum, cat) => sum + (cat.quantity || 0), 0),
         mediaFiles: mediaFileUrls.map(m => m.url),
         description: formData.description,
-        fullDescription: formData.about,
+        fullDescription: formData.fullDescription || formData.about,
         gatesOpen: formData.gatesOpen || formData.startTime,
         entryAge: formData.entryAge,
         layout: formData.layout,
         seating: formData.seating,
         rules: rules.filter(r => r.text.trim()).map(r => r.text),
+        taggedArtists: selectedArtists.map((artist) => ({ id: artist.id, name: artist.name, email: artist.email })),
         couponRules: promoForm.couponCode
           ? [
               {
@@ -413,6 +628,9 @@ export default function AdminEventHostSection() {
           : undefined,
         ticketCategories: ticketCategories.map(cat => ({
           ...cat,
+          tagline: (cat.tagline || '').trim() || undefined,
+          originalPrice: cat.originalPrice || cat.price,
+          paymentGatewayFee: cat.paymentGatewayFee ?? 5,
           availableFrom: cat.availableFromDate && cat.availableFromTime 
             ? `${cat.availableFromDate}T${cat.availableFromTime}` 
             : (cat.availableFromDate || undefined),
@@ -428,7 +646,7 @@ export default function AdminEventHostSection() {
         hostCompanyName: selectedCompany.name,
       };
       
-      const response = await fetch('/api/admin/host-event', {
+      const response = await fetch('/api/admin/event-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ eventData }),
@@ -442,10 +660,14 @@ export default function AdminEventHostSection() {
           title: '',
           subtitle: '',
           description: '',
+          fullDescription: '',
           date: '',
           startTime: '',
           endTime: '',
           location: '',
+          locationState: '',
+          locationDistrict: '',
+          locationArea: '',
           googleMapsLink: '',
           about: '',
           category: '',
@@ -457,6 +679,9 @@ export default function AdminEventHostSection() {
         });
         setTicketCategories([]);
         setRules([{ id: '1', text: '' }]);
+        setSelectedArtists([]);
+        setArtistSearchQuery('');
+        setShowArtistDropdown(false);
         setCoverImage(null);
         setCoverImageUrl('');
         setMediaFiles([]);
@@ -484,6 +709,15 @@ export default function AdminEventHostSection() {
   
   const selectedCategoryData = categories.find((item) => item.name === formData.category);
   const subcategoryOptions = selectedCategoryData?.subFilters || [];
+  const selectedStateData = locationFilters.find((state) => state.state === formData.locationState);
+  const districtOptions = selectedStateData?.cities || [];
+  const selectedDistrictData = selectedStateData?.cities.find((city) => city.name === formData.locationDistrict);
+  const areaOptions = selectedDistrictData?.areas || [];
+  const filteredArtists = artists.filter((artist) => {
+    const search = artistSearchQuery.trim().toLowerCase();
+    if (!search) return true;
+    return (artist.name || '').toLowerCase().includes(search) || artist.email.toLowerCase().includes(search);
+  });
 
   const isFormValid =
     Boolean(selectedCompany) &&
@@ -493,6 +727,9 @@ export default function AdminEventHostSection() {
     Boolean(formData.date) &&
     Boolean(formData.startTime) &&
     Boolean(formData.location) &&
+    Boolean(formData.locationState) &&
+    Boolean(formData.locationDistrict) &&
+    Boolean(formData.locationArea) &&
     Boolean(formData.category) &&
     ticketCategories.length > 0;
   
@@ -787,6 +1024,73 @@ export default function AdminEventHostSection() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">State <span className="text-[#E5A823]">*</span></label>
+                    <select
+                      name="locationState"
+                      value={formData.locationState}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFormData((prev) => ({
+                          ...prev,
+                          locationState: value,
+                          locationDistrict: '',
+                          locationArea: '',
+                        }));
+                      }}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all appearance-none"
+                      required
+                    >
+                      <option value="">Select state</option>
+                      {locationFilters.map((state) => (
+                        <option key={state.state} value={state.state}>{state.state}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">District / City <span className="text-[#E5A823]">*</span></label>
+                    <select
+                      name="locationDistrict"
+                      value={formData.locationDistrict}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFormData((prev) => ({
+                          ...prev,
+                          locationDistrict: value,
+                          locationArea: '',
+                        }));
+                      }}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all appearance-none disabled:opacity-60"
+                      disabled={!selectedStateData}
+                      required
+                    >
+                      <option value="">Select district</option>
+                      {districtOptions.map((district) => (
+                        <option key={district.name} value={district.name}>{district.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Area <span className="text-[#E5A823]">*</span></label>
+                    <select
+                      name="locationArea"
+                      value={formData.locationArea}
+                      onChange={handleInputChange}
+                      className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all appearance-none disabled:opacity-60"
+                      disabled={!selectedDistrictData}
+                      required
+                    >
+                      <option value="">Select area</option>
+                      {areaOptions.map((area) => (
+                        <option key={area} value={area}>{area}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-sm font-medium text-[#F5F5DC]/80">Google Maps Link</label>
@@ -806,6 +1110,73 @@ export default function AdminEventHostSection() {
                     className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
                     placeholder="https://maps.google.com/..."
                   />
+                </div>
+
+                <div ref={artistDropdownRef}>
+                  <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Tag Performing Artists</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowArtistDropdown((prev) => !prev)}
+                    className="w-full flex items-center justify-between gap-3 bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-left"
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      {selectedArtists.length === 0 ? (
+                        <span className="text-[#F5F5DC]/40">Search and select artists</span>
+                      ) : (
+                        selectedArtists.map((artist) => (
+                          <span key={artist.id} className="inline-flex items-center gap-2 rounded-full bg-[#E5A823]/15 px-3 py-1 text-sm text-[#E5A823]">
+                            {artist.name || artist.email}
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedArtists((prev) => prev.filter((item) => item.id !== artist.id));
+                              }}
+                              className="text-[#E5A823] hover:text-[#F5C542]"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))
+                      )}
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-[#F5F5DC]/40" />
+                  </button>
+
+                  {showArtistDropdown && (
+                    <div className="mt-2 rounded-xl border border-[#2A2A2A] bg-[#0D0D0D] p-3">
+                      <input
+                        type="text"
+                        value={artistSearchQuery}
+                        onChange={(e) => setArtistSearchQuery(e.target.value)}
+                        placeholder="Search artists by name or email"
+                        className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-4 py-2.5 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                      />
+                      <div className="mt-3 max-h-52 overflow-y-auto space-y-2">
+                        {filteredArtists.map((artist) => (
+                          <button
+                            key={artist.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedArtists((prev) => [...prev, artist]);
+                              setArtistSearchQuery('');
+                              setShowArtistDropdown(false);
+                            }}
+                            className="w-full flex items-center justify-between rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2 text-left hover:border-[#E5A823]"
+                          >
+                            <div>
+                              <p className="font-medium text-[#F5F5DC]">{artist.name || 'Artist'}</p>
+                              <p className="text-xs text-[#F5F5DC]/50">{artist.email}</p>
+                            </div>
+                            <span className="text-xs text-[#E5A823]">Add</span>
+                          </button>
+                        ))}
+                        {filteredArtists.length === 0 && (
+                          <p className="py-4 text-center text-sm text-[#F5F5DC]/50">No artists found</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Description */}
@@ -896,6 +1267,56 @@ export default function AdminEventHostSection() {
               </div>
             </motion.div>
 
+            {/* Event Rules Card */}
+            <motion.div
+              className="bg-gradient-to-br from-[#1A1A1A] to-[#141414] rounded-2xl border border-[#2A2A2A] overflow-hidden"
+              variants={sectionVariants}
+              initial="hidden"
+              animate="visible"
+              transition={{ delay: 0.25 }}
+            >
+              <div className="p-5 border-b border-[#2A2A2A] bg-[#1A1A1A]/50">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-[#E5A823]" />
+                  <h2 className="font-semibold text-[#F5F5DC]">Event Rules & Guidelines</h2>
+                </div>
+              </div>
+              <div className="p-5 space-y-4">
+                {rules.map((rule, index) => (
+                  <div key={rule.id} className="flex items-start gap-3">
+                    <span className="mt-3 w-6 shrink-0 text-center text-sm font-bold text-[#E5A823]">{index + 1}.</span>
+                    <input
+                      type="text"
+                      value={rule.text}
+                      onChange={(e) => {
+                        const text = e.target.value;
+                        setRules((prev) => prev.map((item) => (item.id === rule.id ? { ...item, text } : item)));
+                      }}
+                      className="flex-1 bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all"
+                      placeholder={`Rule ${index + 1}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setRules((prev) => prev.filter((item) => item.id !== rule.id))}
+                      disabled={rules.length <= 1}
+                      className="mt-1 p-2 rounded-lg border border-[#2A2A2A] hover:border-[#EB4D4B] hover:bg-[#EB4D4B]/10 disabled:opacity-40"
+                    >
+                      <Trash2 className="w-4 h-4 text-[#F5F5DC]/70" />
+                    </button>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setRules((prev) => [...prev, { id: Math.random().toString(36).slice(2), text: '' }])}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#2A2A2A] text-sm text-[#F5F5DC] hover:border-[#E5A823]"
+                >
+                  <Plus className="w-4 h-4 text-[#E5A823]" />
+                  Add Rule
+                </button>
+              </div>
+            </motion.div>
+
             {/* Ticket Categories Card */}
             <motion.div 
               className="bg-gradient-to-br from-[#1A1A1A] to-[#141414] rounded-2xl border border-[#2A2A2A] overflow-hidden"
@@ -939,7 +1360,18 @@ export default function AdminEventHostSection() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {ticketCategories.map((cat, index) => (
+                    {ticketCategories.map((cat, index) => {
+                      const gross = cat.price || 0;
+                      const discountAmt = gross * ((cat.discount || 0) / 100);
+                      const customerPays = Math.max(gross - discountAmt, 0);
+                      const pgFee = customerPays * ((cat.paymentGatewayFee ?? 5) / 100);
+                      const platformFeeAmt = customerPays * ((cat.platformFee ?? 0) / 100);
+                      const artistAmt = gross * ((cat.artistShare || 0) / 100);
+                      const influencerAmt = gross * ((cat.influencerShare || 0) / 100);
+                      const outletNet = Math.max(customerPays - pgFee - platformFeeAmt - artistAmt - influencerAmt, 0);
+                      const fmt = (value: number) => `₹${value.toFixed(0)}`;
+
+                      return (
                       <motion.div 
                         key={cat.id} 
                         className="bg-[#0D0D0D] rounded-xl p-4 border border-[#2A2A2A]"
@@ -1038,8 +1470,95 @@ export default function AdminEventHostSection() {
                             </div>
                           </div>
                         </div>
+                        <div className="mt-4 rounded-xl border border-[#2A2A2A] bg-[#111111] p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-semibold text-[#E5A823]">Per-ticket Money Flow</h3>
+                            <span className="text-[11px] text-[#F5F5DC]/50">{cat.name || `Category ${index + 1}`}</span>
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                            <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                              <p className="text-[10px] text-[#F5F5DC]/50">Customer Pays</p>
+                              <p className="text-sm font-bold text-[#F5F5DC]">{fmt(customerPays)}</p>
+                            </div>
+                            <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                              <p className="text-[10px] text-[#F5F5DC]/50">PG Fee</p>
+                              <p className="text-sm font-bold text-[#F5F5DC]">{fmt(pgFee)}</p>
+                            </div>
+                            <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                              <p className="text-[10px] text-[#F5F5DC]/50">Platform Fee</p>
+                              <p className="text-sm font-bold text-[#F5F5DC]">{fmt(platformFeeAmt)}</p>
+                            </div>
+                            <div className="rounded-lg border border-[#3E83B6]/50 bg-[#3E83B6]/10 p-2">
+                              <p className="text-[10px] text-[#3E83B6]">Outlet Net</p>
+                              <p className="text-sm font-bold text-[#3E83B6]">{fmt(outletNet)}</p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                              <label className="text-[11px] text-[#F5F5DC]/60">Discount for Customer %</label>
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={0.5}
+                                value={cat.discount || ''}
+                                onChange={(e) => updateTicketCategory(cat.id, 'discount', Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                                className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                              />
+                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(discountAmt)}</p>
+                            </div>
+
+                            <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                              <label className="text-[11px] text-[#F5F5DC]/60">Discount for Artist / Influencer %</label>
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={0.5}
+                                value={cat.artistShare || ''}
+                                onChange={(e) => updateTicketCategory(cat.id, 'artistShare', Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                                className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                              />
+                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Artist Amount: {fmt(artistAmt)}</p>
+                            </div>
+
+                            <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                              <label className="text-[11px] text-[#F5F5DC]/60">Payment Gateway Fees %</label>
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={0.5}
+                                value={cat.paymentGatewayFee ?? 5}
+                                onChange={(e) => updateTicketCategory(cat.id, 'paymentGatewayFee', Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                                className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                              />
+                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(pgFee)}</p>
+                            </div>
+
+                            <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                              <label className="text-[11px] text-[#F5F5DC]/60">Platform Fees %</label>
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={0.5}
+                                value={cat.platformFee ?? 0}
+                                onChange={(e) => updateTicketCategory(cat.id, 'platformFee', Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                                className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                              />
+                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(platformFeeAmt)}</p>
+                            </div>
+                          </div>
+                          <div className="mt-3 text-xs text-[#F5F5DC]/50">
+                            Influencer Amount: {fmt(influencerAmt)}
+                          </div>
+                        </div>
                       </motion.div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

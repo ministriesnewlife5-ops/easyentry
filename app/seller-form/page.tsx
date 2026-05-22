@@ -105,16 +105,23 @@ function SellerFormPage() {
   const isEditMode = Boolean(editEventId);
   const [formData, setFormData] = useState({
     title: '',
+    subtitle: '',
     description: '',
+    fullDescription: '',
     price: '',
     organizer: '',
     location: '',
     locationState: '',
     locationDistrict: '',
     locationArea: '',
+    googleMapsLink: '',
     date: '',
     startTime: '',
     endTime: '',
+    gatesOpen: '',
+    entryAge: '',
+    layout: '',
+    seating: '',
     about: '',
     rules: '',
     category: '',
@@ -161,6 +168,7 @@ function SellerFormPage() {
     availableUntilTime?: string;
     discount: number;
     platformFee: number;
+    paymentGatewayFee: number;
     artistShare: number;
     influencerShare: number;
   }>>([]);
@@ -516,7 +524,9 @@ function SellerFormPage() {
         setFormData((prev) => ({
           ...prev,
           title: typeof event.title === 'string' ? event.title : '',
-          description: typeof event.subtitle === 'string' ? event.subtitle : '',
+          subtitle: typeof event.subtitle === 'string' ? event.subtitle : '',
+          description: typeof event.description === 'string' ? event.description : (typeof event.subtitle === 'string' ? event.subtitle : ''),
+          fullDescription: typeof event.fullDescription === 'string' ? event.fullDescription : (typeof event.description === 'string' ? event.description : ''),
           price: typeof event.price === 'string' ? event.price : '',
           organizer: typeof event.promoterName === 'string' ? event.promoterName : '',
           location: typeof event.venue === 'string' ? event.venue : '',
@@ -527,8 +537,13 @@ function SellerFormPage() {
           startTime: eventTime.startTime,
           endTime: eventTime.endTime,
           about:
-            (typeof event.fullDescription === 'string' && event.fullDescription) ||
+            (typeof event.about === 'string' && event.about) || (typeof event.fullDescription === 'string' && event.fullDescription) ||
             (typeof event.description === 'string' ? event.description : ''),
+          googleMapsLink: typeof event.googleMapsLink === 'string' ? event.googleMapsLink : '',
+          gatesOpen: typeof event.gatesOpen === 'string' ? event.gatesOpen : (eventTime.startTime || ''),
+          entryAge: typeof event.entryAge === 'string' ? event.entryAge : '',
+          layout: typeof event.layout === 'string' ? event.layout : '',
+          seating: typeof event.seating === 'string' ? event.seating : '',
           category: categorySelection.categorySelection,
           subcategory: categorySelection.subcategorySelection,
         }));
@@ -624,6 +639,7 @@ function SellerFormPage() {
                 availableUntilTime: availableUntil.time,
                 discount: Number(cat.discount || 0),
                 platformFee: Number(cat.platformFee || 5),
+                paymentGatewayFee: Number(cat.paymentGatewayFee || 5),
                 artistShare: Number(cat.artistShare || 0),
                 influencerShare: Number(cat.influencerShare || 0),
               };
@@ -859,7 +875,7 @@ function SellerFormPage() {
       
       const eventData = {
         title: formData.title,
-        subtitle: formData.description,
+        subtitle: formData.subtitle || formData.description,
         date: formData.date,
         time: formData.startTime,
         startTime: formData.startTime,
@@ -872,14 +888,15 @@ function SellerFormPage() {
         subcategory: resolvedSubcategory || undefined,
         price: `₹${minPrice}`,
         image: coverImageUrlToUse,
+        googleMapsLink: formData.googleMapsLink || undefined,
         numberOfTickets: ticketCategories.reduce((sum, cat) => sum + (cat.quantity || 0), 0),
         mediaFiles: mediaFilesBase64,
-        description: formData.about,
-        fullDescription: formData.about,
-        gatesOpen: formData.startTime,
-        entryAge: '18+',
-        layout: 'Standing',
-        seating: 'General Admission',
+        description: formData.about || formData.description,
+        fullDescription: formData.fullDescription || formData.about || formData.description,
+        gatesOpen: formData.gatesOpen || formData.startTime,
+        entryAge: formData.entryAge || '18+',
+        layout: formData.layout || 'Standing',
+        seating: formData.seating || 'General Admission',
         rules: rules.filter(r => r.text.trim()).map(r => r.text),
         taggedArtists: selectedArtists.map(a => ({ id: a.id, name: a.name, email: a.email })),
         couponRules: promoForm.couponCode ? [
@@ -898,6 +915,7 @@ function SellerFormPage() {
           ...cat,
           tagline: (cat.tagline || '').trim() || undefined,
           originalPrice: cat.originalPrice || cat.price,
+          paymentGatewayFee: cat.paymentGatewayFee || 5,
           availableFrom: cat.availableFromDate && cat.availableFromTime 
             ? `${cat.availableFromDate}T${cat.availableFromTime}` 
             : (cat.availableFromDate || undefined),
@@ -1240,6 +1258,18 @@ function SellerFormPage() {
                         className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                         placeholder="e.g. Summer Music Festival 2026"
                         required
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-3">Subtitle / Tagline</label>
+                      <input
+                        type="text"
+                        name="subtitle"
+                        value={formData.subtitle}
+                        onChange={handleInputChange}
+                        className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                        placeholder="Short subtitle shown under title"
                       />
                     </div>
 
@@ -1645,6 +1675,69 @@ function SellerFormPage() {
                   </div>
                 </div>
 
+                {/* Extra Venue Fields (maps, gates, age, layout) */}
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-3">
+                    <label className="block text-sm font-medium mb-2">Google Maps Link</label>
+                    <input
+                      type="url"
+                      name="googleMapsLink"
+                      value={formData.googleMapsLink}
+                      onChange={handleInputChange}
+                      placeholder="https://maps.google.com/... or venue name"
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Gates Open</label>
+                    <input
+                      type="text"
+                      name="gatesOpen"
+                      value={formData.gatesOpen}
+                      onChange={handleInputChange}
+                      placeholder="e.g. 21:30"
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Entry Allowed (age)</label>
+                    <input
+                      type="text"
+                      name="entryAge"
+                      value={formData.entryAge}
+                      onChange={handleInputChange}
+                      placeholder="e.g. 18+"
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Layout</label>
+                    <input
+                      type="text"
+                      name="layout"
+                      value={formData.layout}
+                      onChange={handleInputChange}
+                      placeholder="e.g. Indoor Club"
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Seating</label>
+                    <input
+                      type="text"
+                      name="seating"
+                      value={formData.seating}
+                      onChange={handleInputChange}
+                      placeholder="e.g. General Admission"
+                      className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                    />
+                  </div>
+                </div>
+
                 {/* Details & Rules Section */}
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
                   <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
@@ -1740,7 +1833,7 @@ function SellerFormPage() {
                           const gross = cat.price || 0;
                           const discountAmt = gross * (cat.discount / 100);
                           const customerPays = Math.max(gross - discountAmt, 0);
-                          const pgFee = customerPays * 0.05;
+                          const pgFee = customerPays * ((cat.paymentGatewayFee ?? 5) / 100);
                           const platformFeeAmt = customerPays * (cat.platformFee / 100);
                           const artistAmt = gross * (cat.artistShare / 100);
                           const influencerAmt = gross * (cat.influencerShare / 100);
@@ -2047,6 +2140,25 @@ function SellerFormPage() {
                                     />
                                     <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(platformFeeAmt)}</p>
                                   </div>
+
+                                  <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                                    <label className="text-[11px] text-[#F5F5DC]/60">Payment Gateway Fees %</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      step={0.5}
+                                      value={cat.paymentGatewayFee || ''}
+                                      onChange={(e) => {
+                                        const num = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                        setTicketCategories((prev) =>
+                                          prev.map((c) => (c.id === cat.id ? { ...c, paymentGatewayFee: num } : c))
+                                        );
+                                      }}
+                                      className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                    />
+                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(pgFee)}</p>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -2064,6 +2176,7 @@ function SellerFormPage() {
                               quantity: 0,
                               discount: 0,
                               platformFee: 5,
+                              paymentGatewayFee: 5,
                               artistShare: 0,
                               influencerShare: 0
                             }]);

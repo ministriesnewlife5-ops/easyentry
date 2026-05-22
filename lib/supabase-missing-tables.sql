@@ -147,10 +147,17 @@ CREATE TABLE IF NOT EXISTS ticket_categories (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   event_id UUID NOT NULL REFERENCES published_events(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  tagline TEXT,
   price NUMERIC(10, 2) NOT NULL DEFAULT 0,
+  original_price NUMERIC(10, 2),
   quantity INTEGER,
   available_from TIMESTAMPTZ,
   available_until TIMESTAMPTZ,
+  discount NUMERIC(5, 2),
+  platform_fee NUMERIC(5, 2),
+  payment_gateway_fee NUMERIC(5, 2),
+  artist_share NUMERIC(5, 2),
+  influencer_share NUMERIC(5, 2),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

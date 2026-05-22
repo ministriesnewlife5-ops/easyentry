@@ -7,11 +7,17 @@ export type TicketCategory = {
   name: string;
   tagline?: string;
   price: number;
+  originalPrice?: number;
   quantity?: number;
   commissionPercent?: number;
   commissionAmount?: number;
   availableFrom?: string;
   availableUntil?: string;
+  discount?: number;
+  platformFee?: number;
+  paymentGatewayFee?: number;
+  artistShare?: number;
+  influencerShare?: number;
 };
 
 export type EventCouponRule = {

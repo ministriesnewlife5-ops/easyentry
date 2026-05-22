@@ -13,6 +13,7 @@ type PublicEventTicketCategory = {
   availableUntil?: string;
   discount?: number;
   platformFee?: number;
+  paymentGatewayFee?: number;
   artistShare?: number;
   influencerShare?: number;
 };
@@ -322,7 +323,7 @@ function mapDbToEvent(
 async function getTicketCategoriesByEventId(eventId: string): Promise<PublicEventTicketCategory[]> {
   const { data, error } = await supabase
     .from('ticket_categories')
-    .select('id, name, price, quantity, available_from, available_until')
+    .select('id, name, tagline, price, original_price, quantity, available_from, available_until, discount, platform_fee, payment_gateway_fee, artist_share, influencer_share')
     .eq('event_id', eventId)
     .order('created_at', { ascending: true });
 
@@ -336,10 +337,17 @@ async function getTicketCategoriesByEventId(eventId: string): Promise<PublicEven
   return (data as Array<Record<string, unknown>>).map((row) => ({
     id: String(row.id || ''),
     name: String(row.name || 'General Admission'),
+    tagline: typeof row.tagline === 'string' ? row.tagline : undefined,
     price: Number(row.price || 0),
+    originalPrice: row.original_price == null ? undefined : Number(row.original_price),
     quantity: row.quantity == null ? undefined : Number(row.quantity),
     availableFrom: typeof row.available_from === 'string' ? row.available_from : undefined,
     availableUntil: typeof row.available_until === 'string' ? row.available_until : undefined,
+    discount: row.discount == null ? undefined : Number(row.discount),
+    platformFee: row.platform_fee == null ? undefined : Number(row.platform_fee),
+    paymentGatewayFee: row.payment_gateway_fee == null ? undefined : Number(row.payment_gateway_fee),
+    artistShare: row.artist_share == null ? undefined : Number(row.artist_share),
+    influencerShare: row.influencer_share == null ? undefined : Number(row.influencer_share),
   }));
 }
 
@@ -794,10 +802,17 @@ export async function publishEventFromRequest(request: EventRequest): Promise<Pu
       const ticketInsertData = categories.map((cat) => ({
         event_id: publishedEventId,
         name: cat.name,
+        tagline: cat.tagline ?? null,
         price: cat.price,
+        original_price: cat.originalPrice ?? null,
         quantity: cat.quantity ?? null,
         available_from: cat.availableFrom ?? null,
         available_until: cat.availableUntil ?? null,
+        discount: cat.discount ?? null,
+        platform_fee: cat.platformFee ?? null,
+        payment_gateway_fee: cat.paymentGatewayFee ?? null,
+        artist_share: cat.artistShare ?? null,
+        influencer_share: cat.influencerShare ?? null,
         created_at: new Date().toISOString(),
       }));
 
@@ -914,6 +929,44 @@ export async function updatePublishedEvent(
       return undefined;
     }
     throw new Error(`Failed to update published event: ${error.message}`);
+  }
+
+  if (Array.isArray(merged.ticketCategories)) {
+    const { error: deleteTicketsError } = await supabase
+      .from('ticket_categories')
+      .delete()
+      .eq('event_id', id);
+
+    if (deleteTicketsError) {
+      throw new Error(`Failed to refresh ticket categories: ${deleteTicketsError.message}`);
+    }
+
+    if (merged.ticketCategories.length > 0) {
+      const ticketInsertData = merged.ticketCategories.map((cat) => ({
+        event_id: id,
+        name: cat.name,
+        tagline: cat.tagline ?? null,
+        price: cat.price,
+        original_price: cat.originalPrice ?? null,
+        quantity: cat.quantity ?? null,
+        available_from: cat.availableFrom ?? null,
+        available_until: cat.availableUntil ?? null,
+        discount: cat.discount ?? null,
+        platform_fee: cat.platformFee ?? null,
+        payment_gateway_fee: cat.paymentGatewayFee ?? null,
+        artist_share: cat.artistShare ?? null,
+        influencer_share: cat.influencerShare ?? null,
+        created_at: new Date().toISOString(),
+      }));
+
+      const { error: insertTicketsError } = await supabase
+        .from('ticket_categories')
+        .insert(ticketInsertData);
+
+      if (insertTicketsError) {
+        throw new Error(`Failed to store ticket categories: ${insertTicketsError.message}`);
+      }
+    }
   }
 
   return mapDbToEvent(data as Record<string, unknown>);
