@@ -158,7 +158,9 @@ export async function POST(request: NextRequest) {
     const code = normalizeCode(body.code || body.promoCode);
     const startsAt = typeof body.startsAt === 'string' ? body.startsAt : null;
     const endsAt = typeof body.endsAt === 'string' ? body.endsAt : null;
-    const maxUses = Number.isFinite(Number(body.maxUses)) ? Number(body.maxUses) : null;
+    const maxUses = body.maxUses != null && body.maxUses !== '' && Number.isFinite(Number(body.maxUses))
+      ? Number(body.maxUses)
+      : null;
 
     // Validation
     if (!code || !/^[A-Z0-9_-]{3,24}$/.test(code)) {
@@ -260,7 +262,9 @@ export async function PATCH(request: NextRequest) {
     const code = normalizeCode(body.code || body.promoCode);
     const startsAt = typeof body.startsAt === 'string' ? body.startsAt : null;
     const endsAt = typeof body.endsAt === 'string' ? body.endsAt : null;
-    const maxUses = Number.isFinite(Number(body.maxUses)) ? Number(body.maxUses) : null;
+    const maxUses = body.maxUses != null && body.maxUses !== '' && Number.isFinite(Number(body.maxUses))
+      ? Number(body.maxUses)
+      : null;
     const isActive = typeof body.isActive === 'boolean' ? body.isActive : true;
 
     // Validation
