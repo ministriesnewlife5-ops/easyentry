@@ -94,13 +94,7 @@ export default function PromoCodeSection({
             Create Your Promo Code
           </h3>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              onSubmitPromo(e);
-            }}
-            className="space-y-6"
-          >
+          <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium mb-3">Coupon Code</label>
               <div className="flex gap-3">
@@ -152,7 +146,8 @@ export default function PromoCodeSection({
             </div>
 
             <motion.button
-              type="submit"
+              type="button"
+              onClick={(e) => onSubmitPromo(e as unknown as React.FormEvent)}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className="w-full py-4 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg flex items-center justify-center gap-2"
@@ -160,7 +155,7 @@ export default function PromoCodeSection({
               <Send className="w-5 h-5" />
               Create Promo Code
             </motion.button>
-          </form>
+          </div>
         </div>
       ) : (
         // Active Coupon Card with Edit
@@ -173,14 +168,7 @@ export default function PromoCodeSection({
           </div>
 
           {isEditing ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                onSubmitPromo(e);
-                setIsEditing(false);
-              }}
-              className="space-y-4"
-            >
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Code</label>
                 <input
@@ -244,7 +232,11 @@ export default function PromoCodeSection({
 
               <div className="flex gap-3">
                 <motion.button
-                  type="submit"
+                  type="button"
+                  onClick={(e) => {
+                    onSubmitPromo(e as unknown as React.FormEvent);
+                    setIsEditing(false);
+                  }}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   className="flex-1 py-3 bg-gradient-to-r from-[#E5A823] to-[#F5C542] text-[#0D0D0D] font-bold rounded-lg"
@@ -259,7 +251,7 @@ export default function PromoCodeSection({
                   <X className="w-5 h-5" />
                 </button>
               </div>
-            </form>
+            </div>
           ) : (
             <div className="space-y-4">
                 <div className="p-4 bg-[#2A2A2A] rounded-lg">

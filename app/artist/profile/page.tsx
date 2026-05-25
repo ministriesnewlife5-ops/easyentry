@@ -497,7 +497,7 @@ export default function ArtistProfilePage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {message && (
           <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${message.type === 'success' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-[#EB4D4B]/30 bg-[#EB4D4B]/10 text-[#EB4D4B]'}`}>
             {message.text}
@@ -1120,7 +1120,7 @@ export default function ArtistProfilePage() {
             </div>
           </div>
         </div>
-      </form>
+      </div>
     </div>
   );
 }
