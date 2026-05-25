@@ -167,6 +167,8 @@ export default function ArtistProfilePage() {
     code: '',
     maxUses: '',
     isActive: true,
+    startsAt: '',
+    endsAt: '',
   });
   const [globalCoupons, setGlobalCoupons] = useState<GlobalCouponRow[]>([]);
   const [promoSummary, setPromoSummary] = useState<{
@@ -207,6 +209,48 @@ export default function ArtistProfilePage() {
     }
   };
 
+  const refreshGlobalCoupons = async () => {
+    const response = await fetch('/api/global-coupons', { cache: 'no-store' });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data?.error || 'Failed to load global coupons');
+    }
+
+    const couponData = await response.json();
+    const coupons = Array.isArray(couponData?.coupons)
+      ? couponData.coupons.map((coupon: GlobalCouponRow) => ({
+          id: coupon.id,
+          code: coupon.code,
+          is_active: coupon.is_active,
+          starts_at: coupon.starts_at,
+          ends_at: coupon.ends_at,
+          max_uses: coupon.max_uses,
+          usage_count: coupon.usage_count,
+          created_at: coupon.created_at,
+        }))
+      : [];
+
+    setGlobalCoupons(coupons);
+    if (coupons.length > 0) {
+      const primary = coupons[0];
+      setPromoForm((prev) => ({
+        ...prev,
+        code: primary.code,
+        maxUses: primary.max_uses ? String(primary.max_uses) : '',
+        isActive: primary.is_active,
+        startsAt: primary.starts_at || '',
+        endsAt: primary.ends_at || '',
+      }));
+      saveStoredCoupon(primary);
+    }
+
+    setPromoSummary({
+      totalShareAmount: Number(couponData?.earnings?.totalShareAmount || 0),
+      totalBookedAmount: Number(couponData?.earnings?.totalBookedAmount || 0),
+      totalBookings: Number(couponData?.earnings?.totalBookings || 0),
+    });
+  };
+
   const clearStoredCoupon = () => {
     if (typeof window === 'undefined') return;
 
@@ -227,64 +271,23 @@ export default function ArtistProfilePage() {
         ]);
 
         if (globalCouponsResponse.ok) {
-          const couponData = await globalCouponsResponse.json();
-          const coupons = Array.isArray(couponData?.coupons)
-            ? couponData.coupons.map((coupon: GlobalCouponRow) => ({
-                id: coupon.id,
-                code: coupon.code,
-                is_active: coupon.is_active,
-                starts_at: coupon.starts_at,
-                ends_at: coupon.ends_at,
-                max_uses: coupon.max_uses,
-                usage_count: coupon.usage_count,
-                created_at: coupon.created_at,
-              }))
-            : [];
-
-          let activeCoupons = coupons.length > 0 ? coupons : [];
-
-          // If no coupons from API, check URL `code` param and localStorage fallback
-          if (activeCoupons.length === 0) {
-            try {
-              const params = new URLSearchParams(window.location.search);
-              const codeParam = params.get('code');
-              if (codeParam) {
-                const couponFromUrl: GlobalCouponRow = {
-                  id: '',
-                  code: String(codeParam).toUpperCase(),
-                  is_active: true,
-                  starts_at: null,
-                  ends_at: null,
-                  max_uses: null,
-                  usage_count: 0,
-                  created_at: new Date().toISOString(),
-                };
-                activeCoupons = [couponFromUrl];
-                setPromoForm(prev => ({ ...prev, code: couponFromUrl.code }));
-              } else {
-                activeCoupons = readStoredCoupon();
-              }
-            } catch {
-              activeCoupons = readStoredCoupon();
+          try {
+            await refreshGlobalCoupons();
+          } catch {
+            const fallbackCoupons = readStoredCoupon();
+            if (fallbackCoupons.length > 0) {
+              const primary = fallbackCoupons[0];
+              setGlobalCoupons(fallbackCoupons);
+              setPromoForm((prev) => ({
+                ...prev,
+                code: primary.code,
+                maxUses: primary.max_uses ? String(primary.max_uses) : '',
+                isActive: primary.is_active,
+                startsAt: primary.starts_at || '',
+                endsAt: primary.ends_at || '',
+              }));
             }
           }
-
-          setGlobalCoupons(activeCoupons);
-          if (activeCoupons.length > 0) {
-            const primary = activeCoupons[0];
-            setPromoForm((prev) => ({
-              ...prev,
-              code: primary.code,
-              maxUses: primary.max_uses ? String(primary.max_uses) : '',
-              isActive: primary.is_active,
-            }));
-            saveStoredCoupon(primary);
-          }
-          setPromoSummary({
-            totalShareAmount: Number(couponData?.earnings?.totalShareAmount || 0),
-            totalBookedAmount: Number(couponData?.earnings?.totalBookedAmount || 0),
-            totalBookings: Number(couponData?.earnings?.totalBookings || 0),
-          });
         } else {
           const fallbackCoupons = readStoredCoupon();
           if (fallbackCoupons.length > 0) {
@@ -295,6 +298,8 @@ export default function ArtistProfilePage() {
               code: primary.code,
               maxUses: primary.max_uses ? String(primary.max_uses) : '',
               isActive: primary.is_active,
+              startsAt: primary.starts_at || '',
+              endsAt: primary.ends_at || '',
             }));
           }
         }
@@ -367,48 +372,28 @@ export default function ArtistProfilePage() {
     }
 
     try {
-      const hasCoupon = globalCoupons.length > 0;
       const response = await fetch('/api/global-coupons', {
-        method: hasCoupon ? 'PATCH' : 'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: promoForm.code,
           maxUses: promoForm.maxUses ? Number(promoForm.maxUses) : null,
           isActive: promoForm.isActive,
+          startsAt: promoForm.startsAt || null,
+          endsAt: promoForm.endsAt || null,
         }),
       });
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data?.error || 'Failed to create global coupon');
+        throw new Error(data?.error || data?.message || 'Failed to create global coupon');
       }
 
-      setGlobalCoupons([
-        {
-          id: data?.coupon?.id || '',
-          code: String(data?.coupon?.code || promoForm.code).toUpperCase(),
-          is_active: data?.coupon?.is_active ?? true,
-          starts_at: data?.coupon?.starts_at ?? null,
-          ends_at: data?.coupon?.ends_at ?? null,
-          max_uses: data?.coupon?.max_uses ?? null,
-          usage_count: Number(data?.coupon?.usage_count || 0),
-          created_at: data?.coupon?.created_at || new Date().toISOString(),
-        },
-      ]);
-      saveStoredCoupon({
-        id: data?.coupon?.id || '',
-        code: String(data?.coupon?.code || promoForm.code).toUpperCase(),
-        is_active: data?.coupon?.is_active ?? true,
-        starts_at: data?.coupon?.starts_at ?? null,
-        ends_at: data?.coupon?.ends_at ?? null,
-        max_uses: data?.coupon?.max_uses ?? null,
-        usage_count: Number(data?.coupon?.usage_count || 0),
-        created_at: data?.coupon?.created_at || new Date().toISOString(),
-      });
-      setPromoForm({ code: '', maxUses: '', isActive: true });
+      await refreshGlobalCoupons();
+      setPromoForm({ code: '', maxUses: '', isActive: true, startsAt: '', endsAt: '' });
       setMessage({
         type: 'success',
-        text: `Global coupon ${hasCoupon ? 'updated' : 'created'} successfully. Discount will be computed per event ticket settings.`,
+        text: 'Global coupon created successfully. Discount will be computed per event ticket settings.',
       });
     } catch (err) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to manage global coupon' });

@@ -25,6 +25,8 @@ interface PromoForm {
   code: string;
   maxUses?: string;
   isActive?: boolean;
+  startsAt?: string;
+  endsAt?: string;
 }
 
 interface Message {
@@ -92,7 +94,13 @@ export default function PromoCodeSection({
             Create Your Promo Code
           </h3>
 
-          <form onSubmit={onSubmitPromo} className="space-y-6">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSubmitPromo(e);
+            }}
+            className="space-y-6"
+          >
             <div>
               <label className="block text-sm font-medium mb-3">Coupon Code</label>
               <div className="flex gap-3">
@@ -120,6 +128,29 @@ export default function PromoCodeSection({
               Discount is event-based and auto-calculated from each event's artist/influencer ticket discount settings.
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Coupon Starts At (Optional)</label>
+                <input
+                  type="datetime-local"
+                  name="startsAt"
+                  value={promoForm.startsAt || ''}
+                  onChange={onPromoInputChange}
+                  className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Coupon Ends At (Optional)</label>
+                <input
+                  type="datetime-local"
+                  name="endsAt"
+                  value={promoForm.endsAt || ''}
+                  onChange={onPromoInputChange}
+                  className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                />
+              </div>
+            </div>
+
             <motion.button
               type="submit"
               whileHover={{ scale: 1.02 }}
@@ -142,7 +173,14 @@ export default function PromoCodeSection({
           </div>
 
           {isEditing ? (
-            <form onSubmit={(e) => { e.preventDefault(); onSubmitPromo(e); setIsEditing(false); }} className="space-y-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                onSubmitPromo(e);
+                setIsEditing(false);
+              }}
+              className="space-y-4"
+            >
               <div>
                 <label className="block text-sm font-medium mb-2">Code</label>
                 <input
@@ -166,6 +204,29 @@ export default function PromoCodeSection({
                   placeholder="e.g. 100"
                   min="1"
                 />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Coupon Starts At (Optional)</label>
+                  <input
+                    type="datetime-local"
+                    name="startsAt"
+                    value={promoForm.startsAt || ''}
+                    onChange={onPromoInputChange}
+                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Coupon Ends At (Optional)</label>
+                  <input
+                    type="datetime-local"
+                    name="endsAt"
+                    value={promoForm.endsAt || ''}
+                    onChange={onPromoInputChange}
+                    className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                  />
+                </div>
               </div>
 
               <div>
