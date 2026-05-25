@@ -371,13 +371,19 @@ export default function ArtistProfilePage() {
       return;
     }
 
+    const rawMaxUses = promoForm.maxUses?.trim();
+    const parsedMaxUses = rawMaxUses ? Number(rawMaxUses) : null;
+    const maxUses = parsedMaxUses !== null && Number.isFinite(parsedMaxUses) && parsedMaxUses > 0
+      ? parsedMaxUses
+      : null;
+
     try {
       const response = await fetch('/api/global-coupons', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: promoForm.code,
-          maxUses: promoForm.maxUses ? Number(promoForm.maxUses) : null,
+          maxUses,
           isActive: promoForm.isActive,
           startsAt: promoForm.startsAt || null,
           endsAt: promoForm.endsAt || null,
