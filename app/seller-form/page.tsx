@@ -2115,9 +2115,10 @@ function SellerFormPage() {
                                       <>
                                         <input
                                           type="number"
+                                          inputMode="numeric"
                                           min={0}
                                           max={100}
-                                          step={0.5}
+                                          step={1}
                                           value={cat.gstPercent || ''}
                                           onChange={(e) => {
                                             const gstPercent = Math.min(100, Math.max(0, Number(e.target.value) || 0));
@@ -2125,7 +2126,7 @@ function SellerFormPage() {
                                               prev.map((c) => (c.id === cat.id ? { ...c, gstPercent } : c))
                                             );
                                           }}
-                                          className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                          className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         />
                                         <p className="text-[10px] text-[#F5F5DC]/50 mt-1">GST Amount: {fmt(gstAmt)}</p>
                                       </>
