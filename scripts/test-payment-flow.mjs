@@ -18,7 +18,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   realtime: { transport: ws },
 });
 
-const EVENT_ID = 'ec9f292d-a350-48a6-b099-80086fc5bee5';
+const EVENT_ID = 'aa219a44-99df-4bc0-9b4a-cb1536c1db4b';
 const QUANTITY = 1;
 const PRICE = 100; // as requested
 const CONVENIENCE_FEE_PER_TICKET = 175;
@@ -53,6 +53,20 @@ function fmt(n) {
 
     console.log('Using user:', user.id, user.email || 'no-email');
 
+    // Fetch published event to ensure it exists and obtain canonical id
+    const { data: event, error: eventErr } = await supabase
+      .from('published_events')
+      .select('*')
+      .eq('id', EVENT_ID)
+      .maybeSingle();
+
+    if (eventErr || !event) {
+      console.error('Event not found:', EVENT_ID);
+      process.exit(1);
+    }
+
+    console.log('Using event:', event.id, event.title || 'no-title');
+
     // Fetch first active global coupon
     const { data: coupons, error: couponErr } = await supabase
       .from('global_coupons')
@@ -79,7 +93,7 @@ function fmt(n) {
     const { data: cats, error: catsErr } = await supabase
       .from('ticket_categories')
       .select('*')
-      .eq('event_id', EVENT_ID)
+      .eq('event_id', event.id)
       .limit(10);
 
     if (catsErr) throw catsErr;
@@ -131,6 +145,9 @@ function fmt(n) {
     console.log('Influencer commission:', fmt(influencerCommission));
     console.log('Organizer amount:', fmt(organizerAmount));
     console.log('Platform revenue/fee:', fmt(platformFee));
+
+    // Show raw ticket category row for debugging
+    if (category) console.log('\nRaw ticket category row:', category);
 
     // Insert ticket_booking record
     const ticketCategoriesPayload = [
