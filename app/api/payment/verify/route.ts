@@ -77,6 +77,13 @@ export async function POST(request: NextRequest) {
       in_razorpay_payment_id: razorpay_payment_id,
     });
 
+    // Booking finalization is handled inside finalize_checkout_intent().
+    // The ticket_bookings insert there uses the same commission mapping as the test script:
+    // - source_type 'artist'   -> artist_share%
+    // - source_type 'promoter' -> influencer_share%
+    // - coupon_source_commission = discount amount
+    // - coupon_discount_percent = actual percent used
+
     if (finalizeError) {
       logStructured('payment/verify', 'Failed to finalize checkout intent', { finalizeError });
       return respondError('FINALIZE_FAILED', 'Failed to finalize booking', { finalizeError: (finalizeError as any)?.message || String(finalizeError) }, 500);

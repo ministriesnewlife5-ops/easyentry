@@ -27,6 +27,55 @@ function fmt(n) {
   return `₹${Number(n || 0).toFixed(2)}`;
 }
 
+function computeBreakdown({
+  basePrice,
+  artistSharePercent,
+  influencerSharePercent,
+  gstPercent,
+  platformFeePerTicket,
+  coupon,
+}) {
+  let commissionPercent = 0;
+  if (coupon) {
+    if (String(coupon.source_type) === 'artist') commissionPercent = artistSharePercent;
+    else if (String(coupon.source_type) === 'promoter') commissionPercent = influencerSharePercent;
+  }
+
+  const couponDiscount = coupon ? (basePrice * commissionPercent) / 100 : 0;
+  const customerPaysBeforeFees = Math.max(0, basePrice - couponDiscount);
+  const platformFee = platformFeePerTicket;
+  const gstAmount = (basePrice * gstPercent) / 100;
+  const customerPaid = customerPaysBeforeFees + platformFee + gstAmount;
+  const artistCommission = coupon && String(coupon.source_type) === 'artist' ? couponDiscount : 0;
+  const influencerCommission = coupon && String(coupon.source_type) === 'promoter' ? couponDiscount : 0;
+  const organizerAmount = customerPaysBeforeFees - platformFee;
+
+  return {
+    commissionPercent,
+    couponDiscount,
+    customerPaysBeforeFees,
+    platformFee,
+    gstAmount,
+    customerPaid,
+    artistCommission,
+    influencerCommission,
+    organizerAmount,
+  };
+}
+
+function printBreakdown(label, breakdown, basePrice) {
+  console.log(`\n--- ${label} ---`);
+  console.log('Base price:', fmt(basePrice));
+  console.log('Coupon discount:', fmt(breakdown.couponDiscount));
+  console.log('Customer pays (ticket - discount):', fmt(breakdown.customerPaysBeforeFees));
+  console.log('Platform fee:', fmt(breakdown.platformFee));
+  console.log('GST:', fmt(breakdown.gstAmount));
+  console.log('Customer paid (final):', fmt(breakdown.customerPaid));
+  console.log('Artist commission (coupon amount):', fmt(breakdown.artistCommission));
+  console.log('Influencer commission:', fmt(breakdown.influencerCommission));
+  console.log('Organizer amount:', fmt(breakdown.organizerAmount));
+}
+
 (async function main() {
   try {
     console.log('\n=== EasyEntry: test-payment-flow ===\n');
@@ -123,41 +172,17 @@ function fmt(n) {
 
     // Compute amounts
     const basePrice = PRICE * QUANTITY;
-    // Determine commission percent based on coupon source_type
-    let commissionPercent = 0;
-    if (coupon) {
-      if (String(coupon.source_type) === 'artist') commissionPercent = artistSharePercent;
-      else if (String(coupon.source_type) === 'promoter') commissionPercent = influencerSharePercent;
-      else commissionPercent = 0;
-    }
-
-    // Business rule: coupon discount is basePrice * commissionPercent
-    const couponDiscount = coupon ? (basePrice * commissionPercent) / 100 : 0;
-    // Customer pays before fees (ticket price minus discount)
-    const customerPaysBeforeFees = Math.max(0, basePrice - couponDiscount);
-    const convenienceFee = platformFeePerTicket * QUANTITY;
-    const gstAmount = (customerPaysBeforeFees * gstPercent) / 100;
-    // Final amount customer pays (includes convenience fee and GST)
-    const customerPaid = customerPaysBeforeFees + convenienceFee + gstAmount;
-
-    // Only one commission applies based on coupon owner
-    const artistCommission = coupon && String(coupon.source_type) === 'artist' ? couponDiscount : 0;
-    const influencerCommission = coupon && String(coupon.source_type) === 'promoter' ? couponDiscount : 0;
-    // Organizer receives customer pays before fees minus platform fee
-    const platformFee = convenienceFee;
-    const organizerAmount = customerPaysBeforeFees - platformFee;
+    const breakdown = computeBreakdown({
+      basePrice,
+      artistSharePercent,
+      influencerSharePercent,
+      gstPercent: 0,
+      platformFeePerTicket,
+      coupon,
+    });
 
     console.log('\n--- Money breakdown (computed) ---');
-    console.log('Base price:', fmt(basePrice));
-    console.log('Coupon discount:', fmt(couponDiscount));
-    console.log('Customer pays (ticket - discount):', fmt(customerPaysBeforeFees));
-    console.log('Convenience/platform fee:', fmt(convenienceFee));
-    console.log('GST:', fmt(gstAmount));
-    console.log('Customer paid (final):', fmt(customerPaid));
-    console.log('Artist commission (coupon amount):', fmt(artistCommission));
-    console.log('Influencer commission:', fmt(influencerCommission));
-    console.log('Organizer amount:', fmt(organizerAmount));
-    console.log('Platform revenue/fee:', fmt(platformFee));
+    printBreakdown('WITHOUT GST', breakdown, basePrice);
 
     // Show raw ticket category row for debugging
     if (category) console.log('\nRaw ticket category row:', category);
@@ -188,16 +213,16 @@ function fmt(n) {
       event_venue: event.location || null,
       ticket_categories: ticketCategoriesPayload,
       total_tickets: QUANTITY,
-      amount_paid: customerPaid,
+      amount_paid: breakdown.customerPaid,
       coupon_code: coupon ? coupon.code : null,
       coupon_source_type: coupon ? coupon.source_type : null,
       coupon_source_id: coupon ? coupon.source_id : null,
       coupon_source_name: coupon ? coupon.source_name : null,
       // Record the actual percent used for discount (based on ticket category share)
-      coupon_discount_percent: coupon ? commissionPercent : null,
-      coupon_discount_amount: couponDiscount,
+      coupon_discount_percent: coupon ? breakdown.commissionPercent : null,
+      coupon_discount_amount: breakdown.couponDiscount,
       // Commission earned by coupon source (artist/promoter)
-      coupon_source_commission: coupon ? couponDiscount : 0,
+      coupon_source_commission: coupon ? breakdown.couponDiscount : 0,
       payment_id: paymentId,
       order_id: orderId,
       status: 'confirmed',
@@ -242,10 +267,24 @@ function fmt(n) {
     console.log('Customer paid:', fmt(insertedBooking.amount_paid));
     console.log('Coupon used:', insertedBooking.coupon_code || 'None');
     console.log('Coupon discount amount:', fmt(insertedBooking.coupon_discount_amount || 0));
-    console.log('Artist commission:', fmt(artistCommission));
-    console.log('Organizer amount:', fmt(organizerAmount));
-    console.log('Platform fee:', fmt(platformFee));
-    console.log('GST:', fmt(gstAmount));
+    console.log('Artist commission:', fmt(breakdown.artistCommission));
+    console.log('Organizer amount:', fmt(breakdown.organizerAmount));
+    console.log('Platform fee:', fmt(breakdown.platformFee));
+    console.log('GST:', fmt(breakdown.gstAmount));
+
+    // GST validation case: reuse the same booking inputs, but simulate GST at 18%
+    const gst18Breakdown = computeBreakdown({
+      basePrice,
+      artistSharePercent,
+      influencerSharePercent,
+      gstPercent: 18,
+      platformFeePerTicket,
+      coupon,
+    });
+
+    printBreakdown('WITH GST (18%)', gst18Breakdown, basePrice);
+    console.log('GST formula check:', `${fmt(basePrice)} × 18% = ${fmt(gst18Breakdown.gstAmount)}`);
+    console.log('Customer pays formula check:', `(${fmt(basePrice)} - ${fmt(gst18Breakdown.couponDiscount)}) + ${fmt(gst18Breakdown.platformFee)} + ${fmt(gst18Breakdown.gstAmount)} = ${fmt(gst18Breakdown.customerPaid)}`);
 
     console.log('\nDone.');
     process.exit(0);
