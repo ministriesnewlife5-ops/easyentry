@@ -123,25 +123,30 @@ function fmt(n) {
 
     // Compute amounts
     const basePrice = PRICE * QUANTITY;
-    const couponDiscount = coupon ? (basePrice * Number(coupon.discount_percent || 0)) / 100 : 0;
-    const subtotalAfterDiscount = Math.max(0, basePrice - couponDiscount);
+    // Business rule: coupon discount is determined by the ticket category artist_share%
+    const couponDiscount = coupon ? (basePrice * artistSharePercent) / 100 : 0;
+    // Customer pays before fees (ticket price minus discount)
+    const customerPaysBeforeFees = Math.max(0, basePrice - couponDiscount);
     const convenienceFee = platformFeePerTicket * QUANTITY;
-    const gstAmount = (subtotalAfterDiscount * gstPercent) / 100;
-    const customerPaid = subtotalAfterDiscount + convenienceFee + gstAmount;
+    const gstAmount = (customerPaysBeforeFees * gstPercent) / 100;
+    // Final amount customer pays (includes convenience fee and GST)
+    const customerPaid = customerPaysBeforeFees + convenienceFee + gstAmount;
 
-    const artistCommission = (subtotalAfterDiscount * artistSharePercent) / 100;
-    const influencerCommission = (subtotalAfterDiscount * influencerSharePercent) / 100;
-    const organizerAmount = subtotalAfterDiscount - artistCommission - influencerCommission;
+    // Artist commission equals the coupon discount amount
+    const artistCommission = coupon ? couponDiscount : 0;
+    const influencerCommission = (customerPaysBeforeFees * influencerSharePercent) / 100;
+    // Organizer receives customer pays before fees minus platform fee
     const platformFee = convenienceFee;
+    const organizerAmount = customerPaysBeforeFees - platformFee;
 
     console.log('\n--- Money breakdown (computed) ---');
     console.log('Base price:', fmt(basePrice));
     console.log('Coupon discount:', fmt(couponDiscount));
-    console.log('Subtotal after discount:', fmt(subtotalAfterDiscount));
+    console.log('Customer pays (ticket - discount):', fmt(customerPaysBeforeFees));
     console.log('Convenience/platform fee:', fmt(convenienceFee));
     console.log('GST:', fmt(gstAmount));
-    console.log('Customer paid:', fmt(customerPaid));
-    console.log('Artist commission:', fmt(artistCommission));
+    console.log('Customer paid (final):', fmt(customerPaid));
+    console.log('Artist commission (coupon amount):', fmt(artistCommission));
     console.log('Influencer commission:', fmt(influencerCommission));
     console.log('Organizer amount:', fmt(organizerAmount));
     console.log('Platform revenue/fee:', fmt(platformFee));
@@ -170,7 +175,9 @@ function fmt(n) {
       user_email: user.email || null,
       user_name: user.name || null,
       event_id: EVENT_ID,
-      event_title: null,
+      event_title: event.title || null,
+      event_date: event.date || null,
+      event_venue: event.location || null,
       ticket_categories: ticketCategoriesPayload,
       total_tickets: QUANTITY,
       amount_paid: customerPaid,
