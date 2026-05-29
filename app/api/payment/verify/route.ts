@@ -9,6 +9,77 @@ function normalizeEnvValue(value?: string) {
   return value?.trim().replace(/^['\"]|['\"]$/g, '');
 }
 
+function toFiniteNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
+type IntentTicketCategory = {
+  quantity?: number;
+  price?: number;
+  artistShare?: number;
+  influencerShare?: number;
+  platformFee?: number;
+  paymentGatewayFee?: number;
+  gstPercent?: number;
+};
+
+function computeMoneySplit(
+  ticketCategories: IntentTicketCategory[],
+  couponSourceType?: string | null
+) {
+  let basePrice = 0;
+  let discountAmount = 0;
+  let subtotal = 0;
+  let paymentGatewayFeeAmount = 0;
+  let platformFeeAmount = 0;
+  let gstAmount = 0;
+
+  for (const item of ticketCategories) {
+    const qty = Math.max(0, toFiniteNumber(item.quantity));
+    const price = Math.max(0, toFiniteNumber(item.price));
+    const lineBase = qty * price;
+
+    const couponSharePercent = couponSourceType === 'artist'
+      ? clampPercent(toFiniteNumber(item.artistShare))
+      : (couponSourceType === 'promoter'
+          ? clampPercent(toFiniteNumber(item.influencerShare))
+          : 0);
+
+    const lineDiscount = lineBase * (couponSharePercent / 100);
+    const lineSubtotal = Math.max(0, lineBase - lineDiscount);
+    const linePaymentGatewayFee = lineSubtotal * (clampPercent(toFiniteNumber(item.paymentGatewayFee)) / 100);
+    const linePlatformFee = lineSubtotal * (clampPercent(toFiniteNumber(item.platformFee)) / 100);
+    const lineGst = lineBase * (clampPercent(toFiniteNumber(item.gstPercent)) / 100);
+
+    basePrice += lineBase;
+    discountAmount += lineDiscount;
+    subtotal += lineSubtotal;
+    paymentGatewayFeeAmount += linePaymentGatewayFee;
+    platformFeeAmount += linePlatformFee;
+    gstAmount += lineGst;
+  }
+
+  const finalAmount = subtotal + platformFeeAmount + paymentGatewayFeeAmount + gstAmount;
+  const discountPercent = basePrice > 0 ? (discountAmount / basePrice) * 100 : 0;
+
+  return {
+    basePrice,
+    discountAmount,
+    discountPercent,
+    subtotal,
+    paymentGatewayFeeAmount,
+    platformFeeAmount,
+    gstAmount,
+    finalAmount,
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -69,6 +140,42 @@ export async function POST(request: NextRequest) {
     if ((intent as any).status && (intent as any).status !== 'pending') {
       logStructured('payment/verify', 'Checkout intent not pending', { intentId: intent.id, status: (intent as any).status });
       return respondError('INTENT_NOT_PENDING', 'Checkout intent already processed or not pending', { status: (intent as any).status }, 409);
+    }
+
+    // Recompute authoritative money split before finalization to ensure consistency.
+    const intentTickets = Array.isArray((intent as any).ticket_categories)
+      ? ((intent as any).ticket_categories as IntentTicketCategory[])
+      : [];
+
+    const split = computeMoneySplit(intentTickets, (intent as any).coupon_source_type || null);
+    const currentFinal = toFiniteNumber((intent as any).final_amount);
+    const tolerance = 0.01;
+
+    if (Math.abs(currentFinal - split.finalAmount) > tolerance) {
+      const { error: patchIntentError } = await supabase
+        .from('checkout_intents')
+        .update({
+          discount_amount: split.discountAmount,
+          discount_percent: split.discountPercent || null,
+          subtotal: split.basePrice,
+          convenience_fee: split.platformFeeAmount, // backward compatibility field
+          final_amount: split.finalAmount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', (intent as any).id);
+
+      if (patchIntentError) {
+        logStructured('payment/verify', 'Failed to sync checkout intent split', { patchIntentError, intentId: (intent as any).id });
+        return respondError('INTENT_SPLIT_SYNC_FAILED', 'Failed to synchronize checkout intent split', { error: (patchIntentError as any)?.message || String(patchIntentError) }, 500);
+      }
+
+      logStructured('payment/verify', 'Checkout intent money split synchronized', {
+        intentId: (intent as any).id,
+        oldFinal: currentFinal,
+        newFinal: split.finalAmount,
+        discountAmount: split.discountAmount,
+        discountPercent: split.discountPercent,
+      });
     }
 
     const { data: finalizeResult, error: finalizeError } = await supabase.rpc('finalize_checkout_intent', {

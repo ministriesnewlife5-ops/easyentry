@@ -61,12 +61,20 @@ type CheckoutTicketCategory = {
   price?: number;
   artistShare?: number;
   influencerShare?: number;
+  platformFee?: number;
+  paymentGatewayFee?: number;
+  gstPercent?: number;
 };
 
 type DbTicketCategory = {
   id: string;
   name: string;
   price: number;
+  artist_share?: number | null;
+  influencer_share?: number | null;
+  platform_fee?: number | null;
+  payment_gateway_fee?: number | null;
+  gst_percent?: number | null;
   quantity?: number | null;
   available_from?: string | null;
   available_until?: string | null;
@@ -103,7 +111,9 @@ function computeEventBasedDiscount(
     const linePercent =
       sourceType === 'artist'
         ? clampPercent(toFiniteNumber(item.artistShare))
-        : clampPercent(toFiniteNumber(item.influencerShare));
+        : (sourceType === 'promoter'
+            ? clampPercent(toFiniteNumber(item.influencerShare))
+            : 0);
 
     return sum + lineSubtotal * (linePercent / 100);
   }, 0);
@@ -112,6 +122,73 @@ function computeEventBasedDiscount(
   return {
     discountAmount: safeDiscount,
     effectiveDiscountPercent: (safeDiscount / subtotal) * 100,
+  };
+}
+
+function computeMoneySplit(
+  ticketCategories: CheckoutTicketCategory[],
+  couponSourceType?: string | null
+): {
+  basePrice: number;
+  discountAmount: number;
+  discountPercent: number;
+  subtotal: number;
+  paymentGatewayFeeAmount: number;
+  platformFeeAmount: number;
+  gstAmount: number;
+  customerPaysTotal: number;
+  commissionAmount: number;
+  organizerAmount: number;
+} {
+  let basePrice = 0;
+  let discountAmount = 0;
+  let subtotal = 0;
+  let paymentGatewayFeeAmount = 0;
+  let platformFeeAmount = 0;
+  let gstAmount = 0;
+
+  for (const item of ticketCategories) {
+    const qty = Math.max(0, toFiniteNumber(item.quantity));
+    const price = Math.max(0, toFiniteNumber(item.price));
+    const lineBase = qty * price;
+
+    const couponSharePercent = couponSourceType === 'artist'
+      ? clampPercent(toFiniteNumber(item.artistShare))
+      : (couponSourceType === 'promoter'
+          ? clampPercent(toFiniteNumber(item.influencerShare))
+          : 0);
+
+    const lineDiscount = lineBase * (couponSharePercent / 100);
+    const lineSubtotal = Math.max(0, lineBase - lineDiscount);
+
+    const linePgFee = lineSubtotal * (clampPercent(toFiniteNumber(item.paymentGatewayFee)) / 100);
+    const linePlatformFee = lineSubtotal * (clampPercent(toFiniteNumber(item.platformFee)) / 100);
+    const lineGst = lineBase * (clampPercent(toFiniteNumber(item.gstPercent)) / 100);
+
+    basePrice += lineBase;
+    discountAmount += lineDiscount;
+    subtotal += lineSubtotal;
+    paymentGatewayFeeAmount += linePgFee;
+    platformFeeAmount += linePlatformFee;
+    gstAmount += lineGst;
+  }
+
+  const customerPaysTotal = Math.max(0, subtotal + platformFeeAmount + paymentGatewayFeeAmount + gstAmount);
+  const commissionAmount = discountAmount;
+  const organizerAmount = subtotal - commissionAmount;
+  const discountPercent = basePrice > 0 ? (discountAmount / basePrice) * 100 : 0;
+
+  return {
+    basePrice,
+    discountAmount,
+    discountPercent,
+    subtotal,
+    paymentGatewayFeeAmount,
+    platformFeeAmount,
+    gstAmount,
+    customerPaysTotal,
+    commissionAmount,
+    organizerAmount,
   };
 }
 
@@ -296,10 +373,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const resolvedPublishedEventId = String((resolvedEventData as { id?: string }).id || normalizedEventId);
+
     const { data: dbTicketCategories, error: ticketCategoriesError } = await supabase
       .from('ticket_categories')
-      .select('id, name, price, quantity, available_from, available_until')
-      .eq('event_id', normalizedEventId)
+      .select('id, name, price, artist_share, influencer_share, platform_fee, payment_gateway_fee, gst_percent, quantity, available_from, available_until')
+      .eq('event_id', resolvedPublishedEventId)
       .order('created_at', { ascending: true });
 
     console.log('[payment/create-order] ticket_categories query', {
@@ -434,12 +513,15 @@ export async function POST(request: NextRequest) {
         name: String(item.name || matchedEventCategory?.name || ''),
         quantity: Math.max(0, toFiniteNumber(item.quantity)),
         price: Math.max(0, toFiniteNumber(matchedEventCategory?.price ?? item.price ?? resolvedEventData.ticket_price)),
-        artistShare: clampPercent(toFiniteNumber(item.artistShare)),
-        influencerShare: clampPercent(toFiniteNumber(item.influencerShare)),
+        artistShare: clampPercent(toFiniteNumber(matchedEventCategory?.artist_share ?? item.artistShare)),
+        influencerShare: clampPercent(toFiniteNumber(matchedEventCategory?.influencer_share ?? item.influencerShare)),
+        platformFee: clampPercent(toFiniteNumber(matchedEventCategory?.platform_fee ?? item.platformFee)),
+        paymentGatewayFee: clampPercent(toFiniteNumber(matchedEventCategory?.payment_gateway_fee ?? item.paymentGatewayFee)),
+        gstPercent: clampPercent(toFiniteNumber(matchedEventCategory?.gst_percent ?? item.gstPercent)),
       };
     });
 
-    const subtotal = normalizedCategories.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0);
+    const basePrice = normalizedCategories.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0);
     const totalTickets = normalizedCategories.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
     // Read authoritative convenience fee from app_settings (fallback to 175)
@@ -449,20 +531,25 @@ export async function POST(request: NextRequest) {
       .eq('key', 'convenience_fee')
       .maybeSingle();
 
-    const feeValue = feeSetting && feeSetting.value != null ? Number(feeSetting.value) : 175;
-    const convenienceFees = totalTickets > 0 ? totalTickets * (Number.isFinite(feeValue) ? Math.round(feeValue) : 175) : 0;
+    const configuredFlatFee = feeSetting && feeSetting.value != null ? Number(feeSetting.value) : 175;
+    const legacyFlatConvenienceFee = totalTickets > 0 ? totalTickets * (Number.isFinite(configuredFlatFee) ? Math.round(configuredFlatFee) : 175) : 0;
 
-    let discountPercent = matchedRule ? matchedRule.discountPercent : 0;
-    let discountAmount = Math.min(subtotal * (discountPercent / 100), subtotal);
+    const activeCouponSourceType: string | null = matchedRule?.sourceType || matchedGlobalRule?.sourceType || null;
+    const split = computeMoneySplit(normalizedCategories, activeCouponSourceType);
 
-    if (matchedGlobalRule) {
-      const sourceForDiscount = matchedGlobalRule.sourceType === 'artist' ? 'artist' : 'influencer';
-      const eventBasedDiscount = computeEventBasedDiscount(normalizedCategories, sourceForDiscount);
-      discountAmount = eventBasedDiscount.discountAmount;
-      discountPercent = eventBasedDiscount.effectiveDiscountPercent;
+    let discountAmount = split.discountAmount;
+    let discountPercent = split.discountPercent;
+    let subtotal = split.subtotal;
+    let paymentGatewayFeeAmount = split.paymentGatewayFeeAmount;
+    let platformFeeAmount = split.platformFeeAmount;
+    let gstAmount = split.gstAmount;
+    let finalAmount = split.customerPaysTotal;
+
+    // Keep legacy fallback only when no percentage-based fees are configured.
+    if (platformFeeAmount === 0 && paymentGatewayFeeAmount === 0 && gstAmount === 0) {
+      finalAmount = Math.max(subtotal + legacyFlatConvenienceFee, 0);
+      platformFeeAmount = legacyFlatConvenienceFee;
     }
-
-    const finalAmount = Math.max(subtotal - discountAmount + convenienceFees, 0);
 
       if (!Number.isFinite(finalAmount) || finalAmount <= 0) {
         logStructured('payment/create-order', 'Invalid final amount', { finalAmount });
@@ -477,15 +564,16 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           user_id: session.user.id,
-          event_id: String((resolvedEventData as { id?: string }).id || normalizedEventId),
+          event_id: resolvedPublishedEventId,
           ticket_categories: normalizedCategories,
-          subtotal: subtotal,
+          subtotal: basePrice,
           discount_amount: discountAmount,
           discount_percent: discountPercent || null,
           coupon_code: matchedRule?.code || matchedGlobalRule?.code || null,
           coupon_source_type: matchedRule?.sourceType || matchedGlobalRule?.sourceType || null,
           coupon_source_id: matchedRule?.sourceId || matchedGlobalRule?.sourceId || null,
-          convenience_fee: convenienceFees,
+          // Store platform fee in convenience_fee for backward compatibility
+          convenience_fee: platformFeeAmount,
           final_amount: finalAmount,
           currency,
           expires_at: expiresAt,
@@ -511,8 +599,14 @@ export async function POST(request: NextRequest) {
       receipt: String(intentId),
       notes: {
         intent_id: String(intentId),
-        eventId: String((resolvedEventData as { id?: string }).id || normalizedEventId),
-        publishedEventId: String((resolvedEventData as { id?: string }).id || normalizedEventId),
+        eventId: resolvedPublishedEventId,
+        publishedEventId: resolvedPublishedEventId,
+        basePrice: String(Math.round(basePrice * 100) / 100),
+        subtotal: String(Math.round(subtotal * 100) / 100),
+        discountAmount: String(Math.round(discountAmount * 100) / 100),
+        platformFee: String(Math.round(platformFeeAmount * 100) / 100),
+        paymentGatewayFee: String(Math.round(paymentGatewayFeeAmount * 100) / 100),
+        gstAmount: String(Math.round(gstAmount * 100) / 100),
         resolvedFrom: resolvedSource || 'id',
       },
     };

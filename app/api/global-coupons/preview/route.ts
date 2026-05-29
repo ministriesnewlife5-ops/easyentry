@@ -8,6 +8,9 @@ type TicketCategory = {
   influencerShare?: number;
   artist_share?: number;
   influencer_share?: number;
+  platform_fee?: number;
+  payment_gateway_fee?: number;
+  gst_percent?: number;
 };
 
 type PublishedEventRow = {
@@ -51,6 +54,17 @@ interface CouponPreviewResponse {
       sharePercent: number;
       discountAmount: number;
     }>;
+  };
+  moneySplit?: {
+    basePrice: number;
+    discountAmount: number;
+    subtotal: number;
+    platformFeeAmount: number;
+    paymentGatewayFeeAmount: number;
+    gstAmount: number;
+    customerPaysTotal: number;
+    couponSourceCommission: number;
+    organizerAmount: number;
   };
 }
 
@@ -165,7 +179,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
     // Fetch normalized ticket categories from dedicated table (authoritative source)
     const { data: ticketCategoryRows, error: ticketCategoryError } = await supabase
       .from('ticket_categories')
-      .select('id, name, artist_share, influencer_share')
+      .select('id, name, artist_share, influencer_share, platform_fee, payment_gateway_fee, gst_percent')
       .eq('event_id', resolvedEventId);
 
     if (ticketCategoryError) {
@@ -221,12 +235,20 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
           name: typeof row.name === 'string' ? row.name : undefined,
           artist_share: Number(row.artist_share || 0),
           influencer_share: Number(row.influencer_share || 0),
+          platform_fee: Number(row.platform_fee || 0),
+          payment_gateway_fee: Number(row.payment_gateway_fee || 0),
+          gst_percent: Number(row.gst_percent || 0),
         }))
       : [];
 
     const ticketCategories: TicketCategory[] = tableCategories;
 
+    let basePrice = 0;
     let totalDiscount = 0;
+    let subtotal = 0;
+    let platformFeeAmount = 0;
+    let paymentGatewayFeeAmount = 0;
+    let gstAmount = 0;
     const breakdown: NonNullable<CouponPreviewResponse['discount']>['breakdown'] = [];
 
     for (const ticket of tickets) {
@@ -260,7 +282,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
       const lineTotal = ticket.quantity * ticket.price;
       const lineDiscount = lineTotal * (sharePercent / 100);
 
+      const lineSubtotal = Math.max(0, lineTotal - lineDiscount);
+      const linePlatformFee = lineSubtotal * (Number(category.platform_fee || 0) / 100);
+      const linePaymentGatewayFee = lineSubtotal * (Number(category.payment_gateway_fee || 0) / 100);
+      const lineGst = lineTotal * (Number(category.gst_percent || 0) / 100);
+
+      basePrice += lineTotal;
       totalDiscount += lineDiscount;
+      subtotal += lineSubtotal;
+      platformFeeAmount += linePlatformFee;
+      paymentGatewayFeeAmount += linePaymentGatewayFee;
+      gstAmount += lineGst;
 
       breakdown.push({
         ticketCategoryId: ticket.ticketCategoryId,
@@ -274,6 +306,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
     // Calculate overall discount percentage
     const cartTotal = tickets.reduce((sum, t) => sum + (t.quantity * t.price), 0);
     const discountPercent = cartTotal > 0 ? (totalDiscount / cartTotal) * 100 : 0;
+    const customerPaysTotal = Math.max(0, subtotal + platformFeeAmount + paymentGatewayFeeAmount + gstAmount);
+    const couponSourceCommission = totalDiscount;
+    const organizerAmount = subtotal - couponSourceCommission;
 
     if (totalDiscount <= 0) {
       return NextResponse.json(
@@ -294,6 +329,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
         percent: Math.round(discountPercent * 100) / 100,
         amount: Math.round(totalDiscount * 100) / 100,
         breakdown
+      },
+      moneySplit: {
+        basePrice: Math.round(basePrice * 100) / 100,
+        discountAmount: Math.round(totalDiscount * 100) / 100,
+        subtotal: Math.round(subtotal * 100) / 100,
+        platformFeeAmount: Math.round(platformFeeAmount * 100) / 100,
+        paymentGatewayFeeAmount: Math.round(paymentGatewayFeeAmount * 100) / 100,
+        gstAmount: Math.round(gstAmount * 100) / 100,
+        customerPaysTotal: Math.round(customerPaysTotal * 100) / 100,
+        couponSourceCommission: Math.round(couponSourceCommission * 100) / 100,
+        organizerAmount: Math.round(organizerAmount * 100) / 100,
       }
     });
 
