@@ -13,7 +13,6 @@ type TicketCategory = {
 type PublishedEventRow = {
   id: string;
   title?: string;
-  ticket_categories?: TicketCategory[] | null;
 };
 
 type GlobalCouponRow = {
@@ -110,7 +109,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
     // Fetch event core row (published event id)
     const { data: eventById, error: eventByIdError } = await supabase
       .from('published_events')
-      .select('id, title, ticket_categories')
+      .select('id, title')
       .eq('id', normalizedEventId)
       .maybeSingle();
 
@@ -118,7 +117,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
     const { data: eventByRequestId, error: eventByRequestIdError } = !eventById
       ? await supabase
           .from('published_events')
-          .select('id, title, ticket_categories')
+          .select('id, title')
           .eq('request_id', normalizedEventId)
           .maybeSingle()
       : { data: null, error: null };
@@ -225,8 +224,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
         }))
       : [];
 
-    const fallbackCategories = Array.isArray(typedEvent.ticket_categories) ? typedEvent.ticket_categories : [];
-    const ticketCategories: TicketCategory[] = tableCategories.length > 0 ? tableCategories : fallbackCategories;
+    const ticketCategories: TicketCategory[] = tableCategories;
 
     let totalDiscount = 0;
     const breakdown: NonNullable<CouponPreviewResponse['discount']>['breakdown'] = [];
