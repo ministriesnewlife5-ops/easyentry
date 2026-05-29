@@ -94,8 +94,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
     const supabase = getSupabaseServerClient();
     const body: PreviewRequest = await request.json();
     const { code, eventId, tickets } = body;
+    const normalizedEventId = String(eventId || '').trim();
 
-    if (!code || !eventId || !tickets || tickets.length === 0) {
+    if (!code || !normalizedEventId || !tickets || tickets.length === 0) {
       return NextResponse.json(
         {
           valid: false,
@@ -106,12 +107,24 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
       );
     }
 
-    // Fetch event core row
-    const { data: event, error: eventError } = await supabase
+    // Fetch event core row (published event id)
+    const { data: eventById, error: eventByIdError } = await supabase
       .from('published_events')
       .select('id, title, ticket_categories')
-      .eq('id', eventId)
-      .single();
+      .eq('id', normalizedEventId)
+      .maybeSingle();
+
+    // Fallback: frontend may pass event request id; resolve via published_events.request_id
+    const { data: eventByRequestId, error: eventByRequestIdError } = !eventById
+      ? await supabase
+          .from('published_events')
+          .select('id, title, ticket_categories')
+          .eq('request_id', normalizedEventId)
+          .maybeSingle()
+      : { data: null, error: null };
+
+    const event = eventById || eventByRequestId;
+    const eventError = eventByIdError || eventByRequestIdError;
 
     if (eventError || !event) {
       return NextResponse.json(
@@ -148,12 +161,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
 
     const typedCoupon = coupon as GlobalCouponRow;
     const typedEvent = event as PublishedEventRow;
+    const resolvedEventId = String(typedEvent.id || '');
 
     // Fetch normalized ticket categories from dedicated table (authoritative source)
     const { data: ticketCategoryRows, error: ticketCategoryError } = await supabase
       .from('ticket_categories')
       .select('id, name, artist_share, influencer_share')
-      .eq('event_id', eventId);
+      .eq('event_id', resolvedEventId);
 
     if (ticketCategoryError) {
       return NextResponse.json(
