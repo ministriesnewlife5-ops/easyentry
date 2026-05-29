@@ -57,7 +57,7 @@ function fmt(n) {
     const { data: coupons, error: couponErr } = await supabase
       .from('global_coupons')
       .select('*')
-      .eq('status', 'active')
+      .eq('is_active', true)
       .order('created_at', { ascending: true })
       .limit(1);
 
