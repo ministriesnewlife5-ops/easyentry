@@ -156,6 +156,7 @@ CREATE TABLE IF NOT EXISTS ticket_categories (
   discount NUMERIC(5, 2),
   platform_fee NUMERIC(5, 2),
   payment_gateway_fee NUMERIC(5, 2),
+  gst_percent NUMERIC(5, 2) DEFAULT 0,
   artist_share NUMERIC(5, 2),
   influencer_share NUMERIC(5, 2),
   created_at TIMESTAMPTZ DEFAULT NOW()

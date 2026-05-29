@@ -77,6 +77,7 @@ type TicketCategory = {
   discount?: number;
   platformFee?: number;
   paymentGatewayFee?: number;
+  gstPercent?: number;
   artistShare?: number;
   influencerShare?: number;
 };
@@ -372,6 +373,7 @@ export default function AdminEventHostSection() {
                 discount: Number(cat.discount || 0),
                 platformFee: Number(cat.platformFee || 5),
                 paymentGatewayFee: Number(cat.paymentGatewayFee || 5),
+                gstPercent: Number(cat.gstPercent || 0),
                 artistShare: Number(cat.artistShare || 0),
                 influencerShare: Number(cat.influencerShare || 0),
               }))
@@ -509,6 +511,7 @@ export default function AdminEventHostSection() {
       discount: 0,
       platformFee: 5,
       paymentGatewayFee: 5,
+      gstPercent: 0,
       artistShare: 0,
       influencerShare: 0,
     };
@@ -631,6 +634,7 @@ export default function AdminEventHostSection() {
           tagline: (cat.tagline || '').trim() || undefined,
           originalPrice: cat.originalPrice || cat.price,
           paymentGatewayFee: cat.paymentGatewayFee ?? 5,
+          gstPercent: cat.gstPercent ?? 0,
           availableFrom: cat.availableFromDate && cat.availableFromTime 
             ? `${cat.availableFromDate}T${cat.availableFromTime}` 
             : (cat.availableFromDate || undefined),
@@ -1363,7 +1367,9 @@ export default function AdminEventHostSection() {
                     {ticketCategories.map((cat, index) => {
                       const gross = cat.price || 0;
                       const discountAmt = gross * ((cat.discount || 0) / 100);
-                      const customerPays = Math.max(gross - discountAmt, 0);
+                      const taxableBase = Math.max(gross - discountAmt, 0);
+                      const gstAmt = taxableBase * ((cat.gstPercent || 0) / 100);
+                      const customerPays = Math.max(taxableBase + gstAmt, 0);
                       const pgFee = customerPays * ((cat.paymentGatewayFee ?? 5) / 100);
                       const platformFeeAmt = customerPays * ((cat.platformFee ?? 0) / 100);
                       const artistAmt = gross * ((cat.artistShare || 0) / 100);
@@ -1478,7 +1484,7 @@ export default function AdminEventHostSection() {
 
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
                             <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
-                              <p className="text-[10px] text-[#F5F5DC]/50">Customer Pays</p>
+                              <p className="text-[10px] text-[#F5F5DC]/50">Base + GST</p>
                               <p className="text-sm font-bold text-[#F5F5DC]">{fmt(customerPays)}</p>
                             </div>
                             <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
@@ -1508,6 +1514,34 @@ export default function AdminEventHostSection() {
                                 className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                               />
                               <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(discountAmt)}</p>
+                            </div>
+
+                            <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <label className="text-[11px] text-[#F5F5DC]/60">Enable GST</label>
+                                <input
+                                  type="checkbox"
+                                  checked={(cat.gstPercent || 0) > 0}
+                                  onChange={(e) => updateTicketCategory(cat.id, 'gstPercent', e.target.checked ? (cat.gstPercent || 5) : 0)}
+                                  className="h-4 w-4 rounded border-[#2A2A2A] bg-[#2A2A2A] text-[#E5A823] focus:ring-[#E5A823]"
+                                />
+                              </div>
+                              {(cat.gstPercent || 0) > 0 ? (
+                                <>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    step={0.5}
+                                    value={cat.gstPercent || ''}
+                                    onChange={(e) => updateTicketCategory(cat.id, 'gstPercent', Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                                    className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                                  />
+                                  <p className="text-[10px] text-[#F5F5DC]/50 mt-1">GST Amount: {fmt(gstAmt)}</p>
+                                </>
+                              ) : (
+                                <p className="text-[10px] text-[#F5F5DC]/50 mt-1">GST disabled</p>
+                              )}
                             </div>
 
                             <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">

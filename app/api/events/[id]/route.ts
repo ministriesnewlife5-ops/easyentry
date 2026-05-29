@@ -29,6 +29,7 @@ type EventTicketCategory = {
   discount?: number;
   platformFee?: number;
   paymentGatewayFee?: number;
+  gstPercent?: number;
   artistShare?: number;
   influencerShare?: number;
 };
@@ -174,6 +175,10 @@ function parseTicketCategories(value: unknown): { categories?: EventTicketCatego
         category.paymentGatewayFee == null || category.paymentGatewayFee === ''
           ? undefined
           : Number(category.paymentGatewayFee),
+      gstPercent:
+        category.gstPercent == null || category.gstPercent === ''
+          ? undefined
+          : Number(category.gstPercent),
       artistShare:
         category.artistShare == null || category.artistShare === ''
           ? undefined

@@ -14,6 +14,7 @@ type PublicEventTicketCategory = {
   discount?: number;
   platformFee?: number;
   paymentGatewayFee?: number;
+  gstPercent?: number;
   artistShare?: number;
   influencerShare?: number;
 };
@@ -323,7 +324,7 @@ function mapDbToEvent(
 async function getTicketCategoriesByEventId(eventId: string): Promise<PublicEventTicketCategory[]> {
   const { data, error } = await supabase
     .from('ticket_categories')
-    .select('id, name, tagline, price, original_price, quantity, available_from, available_until, discount, platform_fee, payment_gateway_fee, artist_share, influencer_share')
+    .select('id, name, tagline, price, original_price, quantity, available_from, available_until, discount, platform_fee, payment_gateway_fee, gst_percent, artist_share, influencer_share')
     .eq('event_id', eventId)
     .order('created_at', { ascending: true });
 
@@ -346,6 +347,7 @@ async function getTicketCategoriesByEventId(eventId: string): Promise<PublicEven
     discount: row.discount == null ? undefined : Number(row.discount),
     platformFee: row.platform_fee == null ? undefined : Number(row.platform_fee),
     paymentGatewayFee: row.payment_gateway_fee == null ? undefined : Number(row.payment_gateway_fee),
+    gstPercent: row.gst_percent == null ? undefined : Number(row.gst_percent),
     artistShare: row.artist_share == null ? undefined : Number(row.artist_share),
     influencerShare: row.influencer_share == null ? undefined : Number(row.influencer_share),
   }));
@@ -385,6 +387,7 @@ async function getTicketCategoriesFromSourceRequest(requestId: string): Promise<
     platformFee: cat.platformFee == null ? undefined : Number(cat.platformFee),
     artistShare: cat.artistShare == null ? undefined : Number(cat.artistShare),
     influencerShare: cat.influencerShare == null ? undefined : Number(cat.influencerShare),
+    gstPercent: cat.gstPercent == null ? undefined : Number(cat.gstPercent),
   }));
 }
 
@@ -811,6 +814,7 @@ export async function publishEventFromRequest(request: EventRequest): Promise<Pu
         discount: cat.discount ?? null,
         platform_fee: cat.platformFee ?? null,
         payment_gateway_fee: cat.paymentGatewayFee ?? null,
+        gst_percent: cat.gstPercent ?? null,
         artist_share: cat.artistShare ?? null,
         influencer_share: cat.influencerShare ?? null,
         created_at: new Date().toISOString(),

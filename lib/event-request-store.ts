@@ -16,6 +16,7 @@ export type TicketCategory = {
   discount?: number;
   platformFee?: number;
   paymentGatewayFee?: number;
+  gstPercent?: number;
   artistShare?: number;
   influencerShare?: number;
 };
