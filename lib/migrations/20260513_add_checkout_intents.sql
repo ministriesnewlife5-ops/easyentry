@@ -93,7 +93,7 @@ BEGIN
   INSERT INTO ticket_bookings(
     user_id, user_email, user_name, event_id, event_title, event_date, event_venue, event_image,
     ticket_categories, total_tickets, amount_paid, coupon_code, coupon_source_type, coupon_source_id,
-    coupon_discount_percent, coupon_discount_amount, payment_id, order_id, status, booked_at
+    coupon_discount_percent, coupon_discount_amount, coupon_source_commission, payment_id, order_id, status, booked_at
   )
   VALUES (
     intent_row.user_id,
@@ -112,6 +112,7 @@ BEGIN
     intent_row.coupon_source_id,
     intent_row.discount_percent,
     intent_row.discount_amount,
+    COALESCE(intent_row.discount_amount, 0), -- coupon_source_commission: commission earned equals discount amount
     in_razorpay_payment_id,
     in_razorpay_order_id,
     'confirmed',

@@ -253,7 +253,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
       // Determine share percentage based on event creator type
       const sharePercent = typedCoupon.source_type === 'artist'
         ? Number(category.artist_share ?? category.artistShare ?? 0)
-        : Number(category.influencer_share ?? category.influencerShare ?? 0);
+        : (typedCoupon.source_type === 'promoter'
+            ? Number(category.influencer_share ?? category.influencerShare ?? 0)
+            : 0);
 
       const lineTotal = ticket.quantity * ticket.price;
       const lineDiscount = lineTotal * (sharePercent / 100);

@@ -123,8 +123,16 @@ function fmt(n) {
 
     // Compute amounts
     const basePrice = PRICE * QUANTITY;
-    // Business rule: coupon discount is determined by the ticket category artist_share%
-    const couponDiscount = coupon ? (basePrice * artistSharePercent) / 100 : 0;
+    // Determine commission percent based on coupon source_type
+    let commissionPercent = 0;
+    if (coupon) {
+      if (String(coupon.source_type) === 'artist') commissionPercent = artistSharePercent;
+      else if (String(coupon.source_type) === 'promoter') commissionPercent = influencerSharePercent;
+      else commissionPercent = 0;
+    }
+
+    // Business rule: coupon discount is basePrice * commissionPercent
+    const couponDiscount = coupon ? (basePrice * commissionPercent) / 100 : 0;
     // Customer pays before fees (ticket price minus discount)
     const customerPaysBeforeFees = Math.max(0, basePrice - couponDiscount);
     const convenienceFee = platformFeePerTicket * QUANTITY;
@@ -132,9 +140,9 @@ function fmt(n) {
     // Final amount customer pays (includes convenience fee and GST)
     const customerPaid = customerPaysBeforeFees + convenienceFee + gstAmount;
 
-    // Artist commission equals the coupon discount amount
-    const artistCommission = coupon ? couponDiscount : 0;
-    const influencerCommission = (customerPaysBeforeFees * influencerSharePercent) / 100;
+    // Only one commission applies based on coupon owner
+    const artistCommission = coupon && String(coupon.source_type) === 'artist' ? couponDiscount : 0;
+    const influencerCommission = coupon && String(coupon.source_type) === 'promoter' ? couponDiscount : 0;
     // Organizer receives customer pays before fees minus platform fee
     const platformFee = convenienceFee;
     const organizerAmount = customerPaysBeforeFees - platformFee;
@@ -185,8 +193,11 @@ function fmt(n) {
       coupon_source_type: coupon ? coupon.source_type : null,
       coupon_source_id: coupon ? coupon.source_id : null,
       coupon_source_name: coupon ? coupon.source_name : null,
-      coupon_discount_percent: coupon ? coupon.discount_percent : null,
+      // Record the actual percent used for discount (based on ticket category share)
+      coupon_discount_percent: coupon ? commissionPercent : null,
       coupon_discount_amount: couponDiscount,
+      // Commission earned by coupon source (artist/promoter)
+      coupon_source_commission: coupon ? couponDiscount : 0,
       payment_id: paymentId,
       order_id: orderId,
       status: 'confirmed',
