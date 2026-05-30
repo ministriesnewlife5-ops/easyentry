@@ -511,6 +511,8 @@ function SellerFormPage() {
         });
         const payload = await response.json();
 
+        console.log('Edit event payload:', payload);
+
         if (!response.ok) {
           throw new Error(payload?.error || 'Failed to load event for editing.');
         }
@@ -518,7 +520,28 @@ function SellerFormPage() {
         const event = payload?.event as Record<string, unknown> | undefined;
         if (!event || isCancelled) return;
 
-        const eventTime = parseTimeRange(typeof event.time === 'string' ? event.time : '');
+        const eventTimeLabel = typeof event.time === 'string' ? event.time : '';
+        const parsedTimeRange = parseTimeRange(eventTimeLabel);
+        const startDateValue =
+          typeof event.date === 'string'
+            ? event.date
+            : typeof event.startDate === 'string'
+              ? event.startDate
+              : typeof event.start_date === 'string'
+                ? event.start_date
+                : '';
+        const startTimeValue =
+          typeof event.startTime === 'string'
+            ? event.startTime
+            : typeof event.start_time === 'string'
+              ? event.start_time
+              : parsedTimeRange.startTime;
+        const endTimeValue =
+          typeof event.endTime === 'string'
+            ? event.endTime
+            : typeof event.end_time === 'string'
+              ? event.end_time
+              : parsedTimeRange.endTime;
 
         const categorySelection = resolveCategorySelection(event.category, event.subcategory);
         const locationSelection = resolveLocationSelection(event.locationDistrict, event.locationArea, event.locationState);
@@ -535,14 +558,14 @@ function SellerFormPage() {
           locationState: locationSelection.stateSelection,
           locationDistrict: locationSelection.districtSelection,
           locationArea: locationSelection.areaSelection,
-          date: typeof event.date === 'string' ? event.date : '',
-          startTime: eventTime.startTime,
-          endTime: eventTime.endTime,
+          date: startDateValue,
+          startTime: startTimeValue,
+          endTime: endTimeValue,
           about:
             (typeof event.about === 'string' && event.about) || (typeof event.fullDescription === 'string' && event.fullDescription) ||
             (typeof event.description === 'string' ? event.description : ''),
           googleMapsLink: typeof event.googleMapsLink === 'string' ? event.googleMapsLink : '',
-          gatesOpen: typeof event.gatesOpen === 'string' ? event.gatesOpen : (eventTime.startTime || ''),
+          gatesOpen: typeof event.gatesOpen === 'string' ? event.gatesOpen : (startTimeValue || ''),
           entryAge: typeof event.entryAge === 'string' ? event.entryAge : '',
           layout: typeof event.layout === 'string' ? event.layout : '',
           seating: typeof event.seating === 'string' ? event.seating : '',
