@@ -1,16 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { isAdminRole } from '@/lib/roles';
 import { getSupabaseServerClient } from '@/lib/supabase';
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, context: any) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!isAdminRole(session.user.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
-    const id = params.id;
+    // params may be a Promise in some Next.js types; support both
+    const resolvedParams = context?.params && typeof context.params.then === 'function' ? await context.params : context?.params;
+    const id = resolvedParams?.id;
     const body = await request.json();
     const convenienceFee = Number(body?.convenienceFee ?? 0);
 
