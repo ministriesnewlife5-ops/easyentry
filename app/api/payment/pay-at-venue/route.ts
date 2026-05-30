@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseServerClient();
     const { data: event, error: eventError } = await supabase
       .from('published_events')
-      .select('id, title, date, time, location, image_url, convenience_fee, pay_at_venue_enabled')
+      .select('id, title, date, time, social_links, image_url, convenience_fee, pay_at_venue_enabled')
       .eq('id', eventId)
       .maybeSingle();
 
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
             event_id: eventId,
             event_title: eventTitle || (event as any).title || '',
             event_date: eventDate || (event as any).date || null,
-            event_venue: eventVenue || (event as any).location || '',
+            event_venue: eventVenue || (event as any).social_links?.venue || '',
             event_image: eventImage || (event as any).image_url || null,
             ticket_categories: ticketCategories,
             total_tickets: totalTickets,

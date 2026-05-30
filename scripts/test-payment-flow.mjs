@@ -230,7 +230,7 @@ function printBreakdown(label, breakdown, basePrice) {
       event_id: EVENT_ID,
       event_title: event.title || null,
       event_date: event.date || null,
-      event_venue: event.location || null,
+      event_venue: (event && event.social_links && event.social_links.venue) || '',
       ticket_categories: ticketCategoriesPayload,
       total_tickets: QUANTITY,
       amount_paid: breakdown.customerPaid,

@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
       const supabase = getSupabaseServerClient();
       const { data: event, error: eventError } = await supabase
         .from('published_events')
-        .select('id, title, date, location, image_url, convenience_fee, pay_at_venue_enabled')
+        .select('id, title, date, social_links, image_url, convenience_fee, pay_at_venue_enabled')
         .eq('id', eventId)
         .maybeSingle();
 
@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
           eventId,
           eventTitle: eventTitle || (event as any).title || '',
           eventDate: eventDate || (event as any).date || undefined,
-          eventVenue: eventVenue || (event as any).location || '',
+          eventVenue: eventVenue || (event as any).social_links?.venue || '',
           eventImage: eventImage || (event as any).image_url || '',
           ticketCategories,
           amountPaid,
@@ -274,7 +274,7 @@ export async function POST(request: NextRequest) {
         eventId: eventId || String(eventSnapshot.eventId || ''),
         eventTitle: eventTitle || String(eventSnapshot.title || ''),
         eventDate: eventDate || String(eventSnapshot.date || ''),
-        eventVenue: eventVenue || String(eventSnapshot.location || ''),
+        eventVenue: eventVenue || String(((eventSnapshot as any).social_links as any)?.venue || ''),
         eventImage: eventImage || String(eventSnapshot.image || ''),
         ticketCategories,
         paymentId: razorpay_payment_id,
