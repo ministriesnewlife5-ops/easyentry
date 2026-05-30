@@ -86,6 +86,7 @@ export type PublicEvent = {
   locationArea?: string;
   googleMapsLink?: string;
   convenienceFee?: number;
+  payAtVenueEnabled?: boolean;
   distance: string;
   gatesOpen: string;
   price: string;
@@ -199,6 +200,7 @@ function mapEventToDb(event: Partial<PublicEvent> & { sourceRequestId?: string }
     status: 'upcoming',
     social_links: Object.keys(socialLinks).length > 0 ? socialLinks : null,
     convenience_fee: Number.isFinite(Number(event.convenienceFee)) ? Number(event.convenienceFee) : 0,
+    pay_at_venue_enabled: Boolean(event.payAtVenueEnabled ?? false),
     request_id: event.sourceRequestId || null,
   };
 }
@@ -274,6 +276,7 @@ function mapDbToEvent(
   const promoterName = socialLinks && typeof socialLinks.promoterName === 'string' ? socialLinks.promoterName : '';
   const promoterLabel =
     socialLinks && typeof socialLinks.promoterLabel === 'string' ? socialLinks.promoterLabel : 'Published Event';
+  const payAtVenueEnabled = Boolean(record.pay_at_venue_enabled ?? false);
   const subtitle = socialLinks && typeof socialLinks.subtitle === 'string'
     ? socialLinks.subtitle
     : (record.description as string)?.substring(0, 100) || '';
@@ -299,6 +302,7 @@ function mapDbToEvent(
     locationArea,
     googleMapsLink,
     convenienceFee: Number(record.convenience_fee || 0),
+    payAtVenueEnabled,
     distance,
     gatesOpen,
     price: (record.ticket_price as number)?.toString() || '0',
@@ -628,6 +632,7 @@ function createApprovedEvent(request: EventRequest): Partial<PublicEvent> {
     locationArea: request.eventData.locationArea,
     googleMapsLink: request.eventData.googleMapsLink,
     convenienceFee: request.eventData.convenienceFee,
+    payAtVenueEnabled: request.eventData.payAtVenueEnabled,
     distance: 'Newly approved event',
     gatesOpen: request.eventData.gatesOpen,
     price: request.eventData.price,

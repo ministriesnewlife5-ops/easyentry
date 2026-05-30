@@ -29,6 +29,13 @@ type IntentTicketCategory = {
   gstPercent?: number;
 };
 
+type BookingTicketCategory = {
+  id?: string;
+  name?: string;
+  quantity?: number;
+  price?: number;
+};
+
 function computeMoneySplit(
   ticketCategories: IntentTicketCategory[],
   couponSourceType?: string | null,
@@ -84,6 +91,59 @@ function computeMoneySplit(
   };
 }
 
+async function insertPayAtVenueBooking(
+  supabase: ReturnType<typeof getSupabaseServerClient>,
+  input: {
+    userId: string;
+    userEmail?: string | null;
+    userName?: string | null;
+    eventId: string;
+    eventTitle: string;
+    eventDate?: string;
+    eventVenue?: string;
+    eventImage?: string;
+    ticketCategories: BookingTicketCategory[];
+    paymentId?: string;
+    orderId?: string;
+    amountPaid: number;
+    remainingAmount: number;
+  }
+) {
+  const totalTickets = input.ticketCategories.reduce((sum, item) => sum + Math.max(0, toFiniteNumber(item.quantity)), 0);
+  const now = new Date().toISOString();
+  const paymentId = input.paymentId || `PAYATVENUE-${crypto.randomUUID()}`;
+  const orderId = input.orderId || `PAYATVENUE-${crypto.randomUUID()}`;
+
+  const { data: booking, error: bookingError } = await supabase
+    .from('ticket_bookings')
+    .insert([
+      {
+        user_id: input.userId,
+        user_email: input.userEmail || null,
+        user_name: input.userName || null,
+        event_id: input.eventId,
+        event_title: input.eventTitle,
+        event_date: input.eventDate || null,
+        event_venue: input.eventVenue || '',
+        event_image: input.eventImage || null,
+        ticket_categories: input.ticketCategories,
+        total_tickets: totalTickets,
+        amount_paid: Math.max(0, input.amountPaid),
+        remaining_amount: Math.max(0, input.remainingAmount),
+        payment_mode: 'pay_at_venue',
+        status: 'confirmed',
+        payment_id: paymentId,
+        order_id: orderId,
+        booked_at: now,
+        created_at: now,
+      },
+    ])
+    .select('id, payment_id')
+    .single();
+
+  return { booking, bookingError, paymentId, orderId };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -94,9 +154,81 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => null);
+    const paymentMode = typeof body?.payment_mode === 'string' ? body.payment_mode : 'online';
+    const ticketCategories = Array.isArray(body?.ticketCategories) ? (body.ticketCategories as BookingTicketCategory[]) : [];
+    const eventId = typeof body?.eventId === 'string' ? body.eventId.trim() : '';
+    const eventTitle = typeof body?.eventTitle === 'string' ? body.eventTitle.trim() : '';
+    const eventDate = typeof body?.eventDate === 'string' ? body.eventDate.trim() : '';
+    const eventVenue = typeof body?.eventVenue === 'string' ? body.eventVenue.trim() : '';
+    const eventImage = typeof body?.eventImage === 'string' ? body.eventImage.trim() : '';
+
+    if (paymentMode === 'pay_at_venue') {
+      if (!eventId || ticketCategories.length === 0) {
+        return respondError('MISSING_REQUIRED_FIELDS', 'Missing required fields', null, 400);
+      }
+
+      const supabase = getSupabaseServerClient();
+      const { data: event, error: eventError } = await supabase
+        .from('published_events')
+        .select('id, title, date, venue, image_url, convenience_fee, pay_at_venue_enabled')
+        .eq('id', eventId)
+        .maybeSingle();
+
+      if (eventError) {
+        return respondError('EVENT_LOOKUP_FAILED', 'Failed to load event', { error: eventError.message }, 500);
+      }
+
+      if (!event) {
+        return respondError('EVENT_NOT_FOUND', 'Event not found', { eventId }, 404);
+      }
+
+      const totalTickets = ticketCategories.reduce((sum, item) => sum + Math.max(0, toFiniteNumber(item.quantity)), 0);
+      const convenienceFeePerTicket = Math.max(0, toFiniteNumber((event as any).convenience_fee));
+      const amountPaid = convenienceFeePerTicket * totalTickets;
+      const remainingAmount = ticketCategories.reduce(
+        (sum, item) => sum + Math.max(0, toFiniteNumber(item.price)) * Math.max(0, toFiniteNumber(item.quantity)),
+        0
+      );
+
+      if (!body?.razorpay_order_id && !body?.razorpay_payment_id && !body?.razorpay_signature) {
+        const { booking, bookingError, paymentId } = await insertPayAtVenueBooking(supabase, {
+          userId: session.user.id,
+          userEmail: session.user.email || null,
+          userName: session.user.name || null,
+          eventId,
+          eventTitle: eventTitle || (event as any).title || '',
+          eventDate: eventDate || (event as any).date || undefined,
+          eventVenue: eventVenue || (event as any).venue || '',
+          eventImage: eventImage || (event as any).image_url || '',
+          ticketCategories,
+          amountPaid,
+          remainingAmount,
+        });
+
+        if (bookingError || !booking) {
+          return respondError('BOOKING_CREATE_FAILED', 'Failed to create booking', { error: bookingError?.message || 'Unknown error' }, 500);
+        }
+
+        return respondSuccess(
+          {
+            bookingId: booking.id,
+            paymentId,
+            paymentMode: 'pay_at_venue',
+            amountPaid,
+            remainingAmount,
+            direct: true,
+          },
+          'BOOKING_CREATED',
+          'Booking created successfully',
+          200
+        );
+      }
+    }
+
     const razorpay_order_id = typeof body?.razorpay_order_id === 'string' ? body.razorpay_order_id.trim() : '';
     const razorpay_payment_id = typeof body?.razorpay_payment_id === 'string' ? body.razorpay_payment_id.trim() : '';
     const razorpay_signature = typeof body?.razorpay_signature === 'string' ? body.razorpay_signature.trim() : '';
+    // Online payments continue below.
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       logStructured('payment/verify', 'Missing payment fields', {
@@ -121,6 +253,46 @@ export async function POST(request: NextRequest) {
     if (expectedSignature !== razorpay_signature) {
       logStructured('payment/verify', 'Invalid payment signature', { razorpay_order_id, paymentId: razorpay_payment_id });
       return respondError('INVALID_SIGNATURE', 'Invalid payment signature', null, 400);
+    }
+
+    if (paymentMode === 'pay_at_venue') {
+      const supabase = getSupabaseServerClient();
+      const totalTickets = ticketCategories.reduce((sum, item) => sum + Math.max(0, toFiniteNumber(item.quantity)), 0);
+      const eventSnapshot = body?.eventSnapshot && typeof body.eventSnapshot === 'object' ? body.eventSnapshot as Record<string, unknown> : {};
+      const fullAmount = ticketCategories.reduce(
+        (sum, item) => sum + Math.max(0, toFiniteNumber(item.price)) * Math.max(0, toFiniteNumber(item.quantity)),
+        0
+      );
+      const convenienceFeePerTicket = Math.max(0, toFiniteNumber(body?.convenienceFeePerTicket));
+      const amountPaid = Math.max(0, toFiniteNumber(body?.amountPaid, convenienceFeePerTicket * totalTickets));
+      const remainingAmount = Math.max(0, toFiniteNumber(body?.remainingAmount, fullAmount));
+
+      const { booking, bookingError } = await insertPayAtVenueBooking(supabase, {
+        userId: session.user.id,
+        userEmail: session.user.email || null,
+        userName: session.user.name || null,
+        eventId: eventId || String(eventSnapshot.eventId || ''),
+        eventTitle: eventTitle || String(eventSnapshot.title || ''),
+        eventDate: eventDate || String(eventSnapshot.date || ''),
+        eventVenue: eventVenue || String(eventSnapshot.venue || ''),
+        eventImage: eventImage || String(eventSnapshot.image || ''),
+        ticketCategories,
+        paymentId: razorpay_payment_id,
+        orderId: razorpay_order_id,
+        amountPaid,
+        remainingAmount,
+      });
+
+      if (bookingError || !booking) {
+        return respondError('BOOKING_CREATE_FAILED', 'Failed to create booking', { error: bookingError?.message || 'Unknown error' }, 500);
+      }
+
+      return respondSuccess(
+        { bookingId: booking.id, paymentId: razorpay_payment_id, paymentMode: 'pay_at_venue', amountPaid, remainingAmount },
+        'BOOKING_CREATED',
+        'Booking confirmed',
+        200
+      );
     }
 
     const supabase = getSupabaseServerClient();

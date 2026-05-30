@@ -54,6 +54,7 @@ export type EventRequest = {
     image: string;
     googleMapsLink?: string;
     convenienceFee?: number;
+    payAtVenueEnabled?: boolean;
     couponRules?: EventCouponRule[];
     mediaFiles?: string[];
     numberOfTickets?: string;
@@ -151,6 +152,7 @@ function mapRequestToDb(request: Partial<EventRequest> & {
       estimatedTotalCommission,
     } : null,
     convenience_fee: request.eventData?.convenienceFee ?? 0,
+    pay_at_venue_enabled: request.eventData?.payAtVenueEnabled ?? false,
     commission_percent: commissionPercent,
     ticket_categories: ticketCategories.length > 0 ? ticketCategories : null,
     estimated_total_revenue: estimatedTotalRevenue || null,
@@ -178,11 +180,13 @@ function mapDbToRequest(record: Record<string, unknown>): EventRequest {
   const storedEventData = normalizeStoredEventData(record.event_data);
   const ticketCategories = (record.ticket_categories as TicketCategory[]) || storedEventData?.ticketCategories || [];
   const convenienceFee = Number(record.convenience_fee || storedEventData?.convenienceFee || 0);
+  const payAtVenueEnabled = Boolean(record.pay_at_venue_enabled ?? storedEventData?.payAtVenueEnabled ?? false);
   const eventData = storedEventData
     ? {
         ...storedEventData,
         ticketCategories,
         convenienceFee,
+        payAtVenueEnabled,
       }
     : {
         title: (record.title as string) || '',
@@ -202,6 +206,7 @@ function mapDbToRequest(record: Record<string, unknown>): EventRequest {
         seating: '',
         ticketCategories,
         convenienceFee,
+        payAtVenueEnabled,
         commissionPercent: (record.commission_percent as number) || 0,
         estimatedTotalRevenue: (record.estimated_total_revenue as number) || 0,
         estimatedTotalCommission: (record.estimated_total_commission as number) || 0,
@@ -390,6 +395,7 @@ export async function updateEventRequest(
       estimatedTotalCommission,
     };
     updateData.convenience_fee = input.eventData.convenienceFee ?? 0;
+    updateData.pay_at_venue_enabled = input.eventData.payAtVenueEnabled ?? false;
 
     updateData.title = input.eventData.title;
     updateData.date = input.eventData.date;

@@ -56,7 +56,7 @@ export default async function AdminPage({
 
   const { data: recentBookings } = await supabase
     .from('ticket_bookings')
-    .select('event_title, amount_paid, total_tickets, booked_at')
+    .select('event_title, amount_paid, total_tickets, booked_at, payment_mode')
     .order('booked_at', { ascending: false })
     .limit(10);
   
@@ -155,7 +155,7 @@ export default async function AdminPage({
   const recentActivity = [
     ...(recentBookings || []).map((booking: any) => ({
       id: `booking-${booking.booked_at}-${booking.event_title}`,
-      text: `Booking: ${booking.event_title || 'Event'} · ₹${Number(booking.amount_paid || 0).toLocaleString('en-IN')}`,
+      text: `Booking: ${booking.event_title || 'Event'} · ₹${Number(booking.amount_paid || 0).toLocaleString('en-IN')} · ${String(booking.payment_mode || 'online').replace(/_/g, ' ')}`,
       timestamp: booking.booked_at,
     })),
     ...eventRequests.slice(0, 10).map((request) => ({

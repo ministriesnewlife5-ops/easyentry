@@ -126,6 +126,7 @@ function SellerFormPage() {
     rules: '',
     category: '',
     subcategory: '',
+    payAtVenueEnabled: false,
   });
 
   const [images, setImages] = useState<File[]>([]);
@@ -547,6 +548,7 @@ function SellerFormPage() {
           seating: typeof event.seating === 'string' ? event.seating : '',
           category: categorySelection.categorySelection,
           subcategory: categorySelection.subcategorySelection,
+          payAtVenueEnabled: Boolean(event.payAtVenueEnabled ?? false),
         }));
 
         setCustomCategory(categorySelection.categoryCustomValue);
@@ -899,6 +901,7 @@ function SellerFormPage() {
         entryAge: formData.entryAge || '18+',
         layout: formData.layout || 'Standing',
         seating: formData.seating || 'General Admission',
+        payAtVenueEnabled: Boolean(formData.payAtVenueEnabled),
         rules: rules.filter(r => r.text.trim()).map(r => r.text),
         taggedArtists: selectedArtists.map(a => ({ id: a.id, name: a.name, email: a.email })),
         couponRules: promoForm.couponCode ? [
@@ -993,6 +996,7 @@ function SellerFormPage() {
             rules: '',
             category: '',
             subcategory: '',
+            payAtVenueEnabled: false,
           });
           setCustomCategory('');
           setCustomSubcategory('');
@@ -1745,6 +1749,21 @@ function SellerFormPage() {
                       placeholder="e.g. General Admission"
                       className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                     />
+                  </div>
+
+                  <div className="md:col-span-3 rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/50 px-4 py-3">
+                    <label className="flex items-center gap-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(formData.payAtVenueEnabled)}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, payAtVenueEnabled: e.target.checked }))}
+                        className="h-4 w-4 rounded border-[#2A2A2A] bg-[#1A1A1A] text-[#E5A823] focus:ring-[#E5A823]"
+                      />
+                      <span>
+                        <span className="block text-sm font-medium">Enable Pay at Venue</span>
+                        <span className="block text-xs text-[#F5F5DC]/50">Allow buyers to reserve online and pay the balance at the venue.</span>
+                      </span>
+                    </label>
                   </div>
                 </div>
 

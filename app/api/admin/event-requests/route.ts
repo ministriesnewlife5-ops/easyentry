@@ -294,6 +294,7 @@ export async function POST(request: NextRequest) {
           endTime: eventData.endTime,
           venue: eventData.venue,
           convenienceFee: eventData.convenienceFee,
+          payAtVenueEnabled: eventData.payAtVenueEnabled,
           couponRules: eventData.couponRules,
           locationState: eventData.locationState,
           locationDistrict: eventData.locationDistrict,

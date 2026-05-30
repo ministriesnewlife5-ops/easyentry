@@ -120,6 +120,7 @@ export type PublishedEvent = {
   tags: string[] | null;
   is_featured: boolean;
   is_public: boolean;
+  pay_at_venue_enabled: boolean;
   status: string;
   social_links: Record<string, unknown> | null;
   request_id: string | null;

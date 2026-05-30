@@ -170,6 +170,7 @@ export default function AdminEventHostSection() {
     layout: 'Standing',
     seating: 'General Admission',
     convenienceFee: '',
+    payAtVenueEnabled: false,
   });
   const [categories, setCategories] = useState<BrowseCategory[]>([]);
   const [locationFilters, setLocationFilters] = useState<BrowseLocationState[]>([]);
@@ -337,6 +338,7 @@ export default function AdminEventHostSection() {
           layout: typeof event.layout === 'string' ? event.layout : 'Standing',
           seating: typeof event.seating === 'string' ? event.seating : 'General Admission',
           convenienceFee: typeof event.convenienceFee === 'number' ? String(event.convenienceFee) : '0',
+          payAtVenueEnabled: Boolean(event.payAtVenueEnabled ?? false),
         }));
 
         setSelectedArtists(
@@ -605,6 +607,7 @@ export default function AdminEventHostSection() {
         subcategory: formData.subcategory || undefined,
         price: `₹${minPrice}`,
         convenienceFee: Number(formData.convenienceFee || 0),
+        payAtVenueEnabled: Boolean(formData.payAtVenueEnabled),
         image: coverImageUrl || (mediaFileUrls.length > 0 && mediaFileUrls[0].type.startsWith('image/') 
           ? mediaFileUrls[0].url 
           : ''),
@@ -684,6 +687,7 @@ export default function AdminEventHostSection() {
           layout: 'Standing',
           seating: 'General Admission',
           convenienceFee: '',
+          payAtVenueEnabled: false,
         });
         setTicketCategories([]);
         setRules([{ id: '1', text: '' }]);
@@ -1133,6 +1137,21 @@ export default function AdminEventHostSection() {
                     placeholder="0"
                   />
                   <p className="mt-1 text-xs text-[#F5F5DC]/45">Per ticket. Leave blank or set 0 to disable.</p>
+                </div>
+
+                <div className="rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/50 px-4 py-3">
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.payAtVenueEnabled)}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, payAtVenueEnabled: e.target.checked }))}
+                      className="h-4 w-4 rounded border-[#2A2A2A] bg-[#1A1A1A] text-[#E5A823] focus:ring-[#E5A823]"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-[#F5F5DC]/80">Enable Pay at Venue</span>
+                      <span className="block text-xs text-[#F5F5DC]/45">Customers can reserve online and pay the ticket amount at entry.</span>
+                    </span>
+                  </label>
                 </div>
 
                 <div ref={artistDropdownRef}>

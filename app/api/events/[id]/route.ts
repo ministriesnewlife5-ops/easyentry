@@ -299,6 +299,7 @@ export async function PUT(
         body.convenienceFee == null || body.convenienceFee === ''
           ? undefined
           : Number(body.convenienceFee),
+      payAtVenueEnabled: typeof body.payAtVenueEnabled === 'boolean' ? body.payAtVenueEnabled : undefined,
       description: resolvedDescription,
       fullDescription: resolvedDescription,
       image: resolvedImage,
@@ -339,6 +340,7 @@ export async function PUT(
               category: updates.category ?? sourceRequest.eventData.category,
               subcategory: updates.subcategory ?? sourceRequest.eventData.subcategory,
               price: updates.price ?? sourceRequest.eventData.price,
+              payAtVenueEnabled: updates.payAtVenueEnabled ?? sourceRequest.eventData.payAtVenueEnabled,
               description: updates.description ?? sourceRequest.eventData.description,
               fullDescription: updates.description ?? sourceRequest.eventData.fullDescription,
               image: updates.image ?? sourceRequest.eventData.image,

@@ -36,6 +36,9 @@ interface BookingDetails {
   venue: string;
   tickets: TicketCategory[];
   totalAmount: number;
+  paymentMode?: 'online' | 'pay_at_venue';
+  remainingAmount?: number;
+  amountPaid?: number;
   userName: string;
   userEmail: string;
   bookedAt: string;
@@ -69,6 +72,7 @@ export default function EventDetailsPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [bookingDetails, setBookingDetails] = useState<BookingDetails | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [checkoutMode, setCheckoutMode] = useState<'online' | 'pay_at_venue'>('online');
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const ticketRef = useRef<HTMLDivElement>(null);
 
@@ -398,7 +402,25 @@ export default function EventDetailsPage() {
     };
   }, [ticketTypes, quantities, convenienceFee, appliedCoupon]);
 
+  const calculatePayAtVenueTotal = useCallback(() => {
+    const totalTickets = Object.values(quantities).reduce((sum, quantity) => sum + quantity, 0);
+    const convenienceFeeAmount = totalTickets > 0 ? convenienceFee * totalTickets : 0;
+    const remainingAmount = ticketTypes.reduce((sum, ticket) => sum + ticket.price * (quantities[ticket.id] || 0), 0);
+
+    return {
+      totalTickets,
+      convenienceFeeAmount,
+      remainingAmount,
+    };
+  }, [ticketTypes, quantities, convenienceFee]);
+
   const handleApplyCoupon = async () => {
+    if (checkoutMode === 'pay_at_venue') {
+      setCouponMessage('Coupons not available for Pay at Venue.');
+      setAppliedCoupon(null);
+      return;
+    }
+
     const enteredCoupon = couponCode.trim().toUpperCase();
 
     if (!enteredCoupon) {
@@ -691,6 +713,186 @@ export default function EventDetailsPage() {
       setIsProcessingPayment(false);
     }
   }, [session, event, ticketTypes, quantities, calculateTotal, loadRazorpayScript, appliedCoupon]);
+
+  const handlePayAtVenue = useCallback(async () => {
+    if (!session?.user) {
+      alert('Please log in to purchase tickets');
+      return;
+    }
+
+    if (!event) {
+      return;
+    }
+
+    const payAtVenueTotals = calculatePayAtVenueTotal();
+    if (payAtVenueTotals.totalTickets === 0) {
+      alert('Please select at least one ticket');
+      return;
+    }
+
+    const selectedCategories: TicketCategory[] = ticketTypes
+      .filter((ticket) => (quantities[ticket.id] || 0) > 0)
+      .map((ticket) => ({
+        id: ticket.id,
+        name: ticket.name,
+        quantity: quantities[ticket.id] || 0,
+        price: ticket.price,
+        artistShare: Number(ticket.artistShare || 0),
+        influencerShare: Number(ticket.influencerShare || 0),
+      }));
+
+    setIsProcessingPayment(true);
+    setPaymentError(null);
+
+    try {
+      const response = await fetch('/api/payment/pay-at-venue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: event.id,
+          eventTitle: event.title,
+          eventDate: event.date,
+          eventVenue: event.venue,
+          eventImage: event.image,
+          ticketCategories: selectedCategories,
+          currency: 'INR',
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to start Pay at Venue flow');
+      }
+
+      if (payload?.details?.direct) {
+        setBookingDetails({
+          bookingId: payload.details.bookingId,
+          paymentId: payload.details.paymentId,
+          eventTitle: event.title,
+          eventDate: event.date,
+          eventTime: event.time,
+          venue: event.venue,
+          tickets: selectedCategories,
+          totalAmount: Number(payload.details.amountPaid || 0),
+          remainingAmount: Number(payload.details.remainingAmount || 0),
+          amountPaid: Number(payload.details.amountPaid || 0),
+          paymentMode: 'pay_at_venue',
+          userName: session.user.name || '',
+          userEmail: session.user.email || '',
+          bookedAt: new Date().toISOString(),
+        });
+        setShowSuccessModal(true);
+        setQuantities({});
+        setShowTicketSection(false);
+        setCheckoutMode('online');
+        return;
+      }
+
+      const { orderId, amount, currency, keyId, convenienceFeeAmount, remainingAmount } = payload.details || {};
+
+      if (!orderId) {
+        throw new Error('Missing Razorpay order details');
+      }
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        throw new Error('Failed to load payment gateway script');
+      }
+
+      const options = {
+        key: keyId,
+        amount,
+        currency,
+        name: 'Easy Entry',
+        description: `${event.title} - Pay at Venue`,
+        order_id: orderId,
+        handler: async (response: any) => {
+          try {
+            const verifyResponse = await fetch('/api/payment/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                payment_mode: 'pay_at_venue',
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                eventId: event.id,
+                eventTitle: event.title,
+                eventDate: event.date,
+                eventVenue: event.venue,
+                eventImage: event.image,
+                ticketCategories: selectedCategories,
+                amountPaid: Number(convenienceFeeAmount || 0),
+                remainingAmount: Number(remainingAmount || 0),
+                convenienceFeePerTicket: Number(convenienceFee || 0),
+                eventSnapshot: {
+                  title: event.title,
+                  date: event.date,
+                  venue: event.venue,
+                  image: event.image,
+                },
+              }),
+            });
+
+            const verifyData = await verifyResponse.json();
+
+            if (verifyData.success) {
+              setBookingDetails({
+                bookingId: verifyData.bookingId,
+                paymentId: verifyData.paymentId || response.razorpay_payment_id,
+                eventTitle: event.title,
+                eventDate: event.date,
+                eventTime: event.time,
+                venue: event.venue,
+                tickets: selectedCategories,
+                totalAmount: Number(convenienceFeeAmount || 0),
+                remainingAmount: Number(remainingAmount || 0),
+                amountPaid: Number(convenienceFeeAmount || 0),
+                paymentMode: 'pay_at_venue',
+                userName: session.user.name || '',
+                userEmail: session.user.email || '',
+                bookedAt: new Date().toISOString(),
+              });
+
+              setShowSuccessModal(true);
+              setQuantities({});
+              setShowTicketSection(false);
+              setCheckoutMode('online');
+            } else {
+              throw new Error(verifyData.error || 'Pay at Venue verification failed');
+            }
+          } catch (error) {
+            console.error('Pay at Venue verification error:', error);
+            setPaymentError('Pay at Venue booking failed. Please contact support.');
+          }
+        },
+        prefill: {
+          name: session.user.name || '',
+          email: session.user.email || '',
+          contact: '',
+        },
+        theme: {
+          color: '#E5A823',
+        },
+        modal: {
+          ondismiss: () => setIsProcessingPayment(false),
+        },
+      };
+
+      if (!window.Razorpay) {
+        throw new Error('Razorpay not available on window');
+      }
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+    } catch (error) {
+      console.error('Pay at Venue error:', error);
+      setPaymentError(error instanceof Error ? error.message : 'Failed to start Pay at Venue');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  }, [session, event, ticketTypes, quantities, convenienceFee, calculatePayAtVenueTotal, loadRazorpayScript]);
 
   if (isLoading) {
     return (
@@ -1187,72 +1389,119 @@ export default function EventDetailsPage() {
                   </div>
 
                   {/* Coupon Code */}
-                  <div className="mt-5 rounded-xl border border-[#333333] bg-[#0D0D0D] p-3">
-                    <p className="text-xs font-medium text-[#F5F5DC]/50 mb-2">Have a coupon?</p>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={couponCode}
-                        onChange={(e) => {
-                          setCouponCode(e.target.value.toUpperCase());
-                          setCouponMessage(null);
-                          setAppliedCoupon(null);
-                        }}
-                        placeholder="Enter code"
-                        className="flex-1 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2 text-sm text-[#F5F5DC] placeholder:text-[#F5F5DC]/30 focus:border-[#E5A823] focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleApplyCoupon}
-                        disabled={isApplyingCoupon}
-                        className="rounded-lg bg-[#2A2A2A] px-4 py-2 text-xs font-semibold text-[#F5F5DC] border border-[#333333] hover:border-[#E5A823] hover:text-[#E5A823] transition-all"
-                      >
-                        {isApplyingCoupon ? 'Applying...' : 'Apply'}
-                      </button>
+                  {checkoutMode === 'pay_at_venue' ? (
+                    <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+                      Coupons not available for Pay at Venue.
                     </div>
-                    {couponMessage && (
-                      <p className="mt-2 text-xs text-[#F5F5DC]/60">{couponMessage}</p>
-                    )}
-                  </div>
+                  ) : (
+                    <div className="mt-5 rounded-xl border border-[#333333] bg-[#0D0D0D] p-3">
+                      <p className="text-xs font-medium text-[#F5F5DC]/50 mb-2">Have a coupon?</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={couponCode}
+                          onChange={(e) => {
+                            setCouponCode(e.target.value.toUpperCase());
+                            setCouponMessage(null);
+                            setAppliedCoupon(null);
+                          }}
+                          placeholder="Enter code"
+                          className="flex-1 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2 text-sm text-[#F5F5DC] placeholder:text-[#F5F5DC]/30 focus:border-[#E5A823] focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleApplyCoupon}
+                          disabled={isApplyingCoupon}
+                          className="rounded-lg bg-[#2A2A2A] px-4 py-2 text-xs font-semibold text-[#F5F5DC] border border-[#333333] hover:border-[#E5A823] hover:text-[#E5A823] transition-all"
+                        >
+                          {isApplyingCoupon ? 'Applying...' : 'Apply'}
+                        </button>
+                      </div>
+                      {couponMessage && (
+                        <p className="mt-2 text-xs text-[#F5F5DC]/60">{couponMessage}</p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Total Summary */}
                   <div className="mt-5 space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-[#F5F5DC]/60">Subtotal</span>
-                      <span className="text-[#F5F5DC]">₹{calculateTotal().subtotal.toFixed(0)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-[#F5F5DC]/60">Convenience Fee</span>
-                      <span className="text-[#F5F5DC]">₹{calculateTotal().convenienceFees.toFixed(0)}</span>
-                    </div>
-                    {calculateTotal().discountAmount > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-emerald-400">Discount</span>
-                        <span className="text-emerald-400">-₹{calculateTotal().discountAmount.toFixed(0)}</span>
-                      </div>
+                    {checkoutMode === 'pay_at_venue' ? (
+                      <>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-[#F5F5DC]/60">Convenience Fee Total</span>
+                          <span className="text-[#F5F5DC]">₹{calculatePayAtVenueTotal().convenienceFeeAmount.toFixed(0)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-[#F5F5DC]/60">Pay at Venue</span>
+                          <span className="text-amber-400">₹{calculatePayAtVenueTotal().remainingAmount.toFixed(0)} at venue</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-[#F5F5DC]/60">Subtotal</span>
+                          <span className="text-[#F5F5DC]">₹{calculateTotal().subtotal.toFixed(0)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-[#F5F5DC]/60">Convenience Fee</span>
+                          <span className="text-[#F5F5DC]">₹{calculateTotal().convenienceFees.toFixed(0)}</span>
+                        </div>
+                        {calculateTotal().discountAmount > 0 && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-emerald-400">Discount</span>
+                            <span className="text-emerald-400">-₹{calculateTotal().discountAmount.toFixed(0)}</span>
+                          </div>
+                        )}
+                      </>
                     )}
                     <div className="h-px bg-[#2A2A2A]" />
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-xs text-[#F5F5DC]/50">{calculateTotal().totalTickets} ticket{calculateTotal().totalTickets !== 1 ? 's' : ''}</span>
-                        <p className="text-lg font-bold text-[#F5F5DC]">₹{calculateTotal().total.toFixed(0)}</p>
+                        <span className="text-xs text-[#F5F5DC]/50">{checkoutMode === 'pay_at_venue' ? calculatePayAtVenueTotal().totalTickets : calculateTotal().totalTickets} ticket{(checkoutMode === 'pay_at_venue' ? calculatePayAtVenueTotal().totalTickets : calculateTotal().totalTickets) !== 1 ? 's' : ''}</span>
+                        <p className="text-lg font-bold text-[#F5F5DC]">₹{(checkoutMode === 'pay_at_venue' ? calculatePayAtVenueTotal().convenienceFeeAmount : calculateTotal().total).toFixed(0)}</p>
                       </div>
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleProceedToPayment}
-                        disabled={isProcessingPayment || calculateTotal().totalTickets === 0}
-                        className="px-8 py-3 bg-[#EB4D4B] text-white font-bold text-sm rounded-xl hover:bg-[#d43d3b] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-                      >
-                        {isProcessingPayment ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Processing</span>
-                          </>
-                        ) : (
-                          'Proceed'
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        {event.payAtVenueEnabled && (
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => {
+                              setCheckoutMode('pay_at_venue');
+                              void handlePayAtVenue();
+                            }}
+                            disabled={isProcessingPayment || calculateTotal().totalTickets === 0}
+                            className="px-6 py-3 bg-amber-500 text-[#0D0D0D] font-bold text-sm rounded-xl hover:bg-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                          >
+                            {isProcessingPayment && checkoutMode === 'pay_at_venue' ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Processing</span>
+                              </>
+                            ) : (
+                              'Pay at Venue'
+                            )}
+                          </motion.button>
                         )}
-                      </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            setCheckoutMode('online');
+                            void handleProceedToPayment();
+                          }}
+                          disabled={isProcessingPayment || calculateTotal().totalTickets === 0}
+                          className="px-8 py-3 bg-[#EB4D4B] text-white font-bold text-sm rounded-xl hover:bg-[#d43d3b] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {isProcessingPayment && checkoutMode === 'online' ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Processing</span>
+                            </>
+                          ) : (
+                            'Pay Online'
+                          )}
+                        </motion.button>
+                      </div>
                     </div>
                     {paymentError && (
                       <p className="text-xs text-[#EB4D4B]">{paymentError}</p>
@@ -1300,6 +1549,19 @@ export default function EventDetailsPage() {
                     <h3 className="text-xl font-bold text-[#F5F5DC]">{bookingDetails.eventTitle}</h3>
                     {event?.category && (
                       <p className="text-sm text-[#F5F5DC]/50 mt-1">{event.category}</p>
+                    )}
+                    {bookingDetails.paymentMode === 'pay_at_venue' && (
+                      <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left text-sm text-amber-100">
+                        {bookingDetails.amountPaid && bookingDetails.amountPaid > 0 ? (
+                          <>
+                            You have chosen Pay at Venue. Please pay ₹{bookingDetails.remainingAmount?.toFixed(0) || 0} at the venue. Show this ticket at the entry.
+                          </>
+                        ) : (
+                          <>
+                            Your ticket is confirmed. No online payment required. Please pay ₹{bookingDetails.remainingAmount?.toFixed(0) || 0} at the venue.
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
 

@@ -123,6 +123,7 @@ ALTER TABLE event_requests
   ADD COLUMN IF NOT EXISTS outlet_email TEXT,
   ADD COLUMN IF NOT EXISTS event_data JSONB,
   ADD COLUMN IF NOT EXISTS ticket_categories JSONB,
+  ADD COLUMN IF NOT EXISTS pay_at_venue_enabled BOOLEAN DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS commission_percent NUMERIC(5,2) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS estimated_total_revenue NUMERIC(12,2),
   ADD COLUMN IF NOT EXISTS estimated_total_commission NUMERIC(12,2);
@@ -157,6 +158,7 @@ CREATE TABLE IF NOT EXISTS published_events (
   tags TEXT[],
   is_featured BOOLEAN DEFAULT FALSE,
   is_public BOOLEAN DEFAULT TRUE,
+  pay_at_venue_enabled BOOLEAN DEFAULT FALSE,
   status VARCHAR(50) DEFAULT 'upcoming',
   social_links JSONB,
   request_id UUID REFERENCES event_requests(id) ON DELETE SET NULL,
@@ -328,6 +330,8 @@ CREATE TABLE IF NOT EXISTS ticket_bookings (
   ticket_categories JSONB NOT NULL DEFAULT '[]'::jsonb,
   total_tickets INTEGER NOT NULL DEFAULT 0,
   amount_paid NUMERIC(10, 2) NOT NULL,
+  remaining_amount NUMERIC(10, 2) DEFAULT 0,
+  payment_mode VARCHAR(50) DEFAULT 'online',
   coupon_code TEXT,
   coupon_source_type TEXT,
   coupon_source_id TEXT,
@@ -346,6 +350,8 @@ CREATE INDEX IF NOT EXISTS idx_ticket_bookings_event_id ON ticket_bookings(event
 CREATE INDEX IF NOT EXISTS idx_ticket_bookings_coupon_code ON ticket_bookings(coupon_code);
 
 ALTER TABLE ticket_bookings
+  ADD COLUMN IF NOT EXISTS remaining_amount NUMERIC(10,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(50) DEFAULT 'online',
   ADD COLUMN IF NOT EXISTS coupon_code TEXT,
   ADD COLUMN IF NOT EXISTS coupon_source_type TEXT,
   ADD COLUMN IF NOT EXISTS coupon_source_id TEXT,

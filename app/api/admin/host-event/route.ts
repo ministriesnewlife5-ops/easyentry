@@ -45,6 +45,7 @@ type HostEventTicketCategory = {
   platformFee?: number | string;
   paymentGatewayFee?: number | string;
   convenienceFee?: number | string;
+  payAtVenueEnabled?: boolean;
   artistShare?: number | string;
   influencerShare?: number | string;
 };
@@ -219,6 +220,7 @@ export async function POST(request: NextRequest) {
     const endTime = normalizeText(eventData.endTime);
     const time = normalizeText(eventData.time) || (startTime && endTime ? `${startTime} - ${endTime}` : startTime);
     const convenienceFee = Number(eventData.convenienceFee || 0);
+    const payAtVenueEnabled = Boolean(eventData.payAtVenueEnabled ?? false);
     const hostCompanyType = normalizeText(eventData.hostCompanyType) as 'outlet' | 'promoter';
     const hostCompanyId = normalizeText(eventData.hostCompanyId);
     const hostCompanyOwnerId = normalizeText(eventData.hostCompanyOwnerId);
@@ -291,6 +293,7 @@ export async function POST(request: NextRequest) {
         subcategory,
         price: normalizePrice(eventData.price ?? minPrice),
         convenienceFee: Number.isFinite(convenienceFee) ? convenienceFee : 0,
+        payAtVenueEnabled,
         image: normalizeText(eventData.image),
         mediaFiles: Array.isArray(eventData.mediaFiles)
           ? eventData.mediaFiles.filter((item: unknown): item is string => typeof item === 'string')
