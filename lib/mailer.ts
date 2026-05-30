@@ -50,6 +50,7 @@ type EventRequestEmailInput = {
     time: string;
     endTime?: string;
     venue: string;
+      convenienceFee?: number;
     couponRules?: Array<{
       code: string;
       discountPercent: number;

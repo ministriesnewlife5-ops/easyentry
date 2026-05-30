@@ -44,6 +44,7 @@ type HostEventTicketCategory = {
   discount?: number | string;
   platformFee?: number | string;
   paymentGatewayFee?: number | string;
+  convenienceFee?: number | string;
   artistShare?: number | string;
   influencerShare?: number | string;
 };
