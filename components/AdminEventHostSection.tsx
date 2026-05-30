@@ -1565,7 +1565,7 @@ export default function AdminEventHostSection() {
                             </div>
 
                             <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
-                              <label className="text-[11px] text-[#F5F5DC]/60">Discount for Artist / Influencer %</label>
+                              <label className="text-[11px] text-[#F5F5DC]/60">Artist Share %</label>
                               <input
                                 type="number"
                                 min={0}
@@ -1576,6 +1576,20 @@ export default function AdminEventHostSection() {
                                 className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                               />
                               <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Artist Amount: {fmt(artistAmt)}</p>
+                            </div>
+
+                            <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
+                              <label className="text-[11px] text-[#F5F5DC]/60">Promoter Share %</label>
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={0.5}
+                                value={cat.influencerShare || ''}
+                                onChange={(e) => updateTicketCategory(cat.id, 'influencerShare', Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                                className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
+                              />
+                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(influencerAmt)}</p>
                             </div>
 
                             <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">

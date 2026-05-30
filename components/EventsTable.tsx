@@ -22,6 +22,7 @@ export default function EventsTable({ events }: EventsTableProps) {
   const [data, setData] = useState(events);
   const [loading, setLoading] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: 'archive' | 'delete' } | null>(null);
+  const [feeModal, setFeeModal] = useState<{ id: string; name: string; open: boolean; fee: number } | null>(null);
 
   const handleAction = async (id: string, action: 'archive' | 'delete') => {
     setLoading(id);
@@ -93,6 +94,23 @@ export default function EventsTable({ events }: EventsTableProps) {
                       Edit
                     </button>
                     <button
+                      onClick={async () => {
+                        // open modal and load current convenience fee
+                        try {
+                          const resp = await fetch(`/api/events/${encodeURIComponent(event.id)}`, { cache: 'no-store' });
+                          const payload = await resp.json();
+                          const fee = Number(payload?.event?.convenienceFee || 0);
+                          setFeeModal({ id: event.id, name: event.name, open: true, fee });
+                        } catch (err) {
+                          console.error('Failed to load event fee:', err);
+                          setFeeModal({ id: event.id, name: event.name, open: true, fee: 0 });
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-[#2A2A2A] rounded-lg hover:bg-green-600 hover:text-white transition-colors"
+                    >
+                      Set Fee
+                    </button>
+                    <button
                       onClick={() => setConfirmAction({ id: event.id, action: 'archive' })}
                       disabled={loading === event.id}
                       className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-[#2A2A2A] rounded-lg hover:bg-amber-600 hover:text-white transition-colors disabled:opacity-50"
@@ -157,6 +175,57 @@ export default function EventsTable({ events }: EventsTableProps) {
                 }`}
               >
                 {confirmAction.action === 'delete' ? 'Delete' : 'Archive'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Convenience Fee Modal */}
+      {feeModal && feeModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="rounded-2xl border border-[#2A2A2A] bg-[#1A1A1A] p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-2">Set Convenience Fee</h3>
+            <p className="text-sm text-[#F5F5DC]/70 mb-4">Event: <span className="font-medium">{feeModal.name}</span></p>
+            <div className="mb-4">
+              <label className="text-xs text-[#F5F5DC]/70 block mb-1">Convenience Fee (₹)</label>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={feeModal.fee}
+                onChange={(e) => setFeeModal((prev) => (prev ? { ...prev, fee: Math.max(0, Number(e.target.value) || 0) } : prev))}
+                className="w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1 text-xs text-[#F5F5DC]"
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setFeeModal(null)} className="px-4 py-2 rounded-lg text-sm bg-[#2A2A2A]">Cancel</button>
+              <button
+                onClick={async () => {
+                  if (!feeModal) return;
+                  try {
+                    const resp = await fetch(`/api/admin/events/${encodeURIComponent(feeModal.id)}/convenience-fee`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ convenienceFee: feeModal.fee }),
+                    });
+                    if (resp.ok) {
+                      // update local row if needed
+                      setData((prev) => prev.map((r) => (r.id === feeModal.id ? { ...r } : r)));
+                      setFeeModal(null);
+                    } else {
+                      const payload = await resp.json();
+                      console.error('Failed to update convenience fee', payload);
+                      alert('Failed to save convenience fee');
+                    }
+                  } catch (err) {
+                    console.error('Failed to save convenience fee:', err);
+                    alert('Failed to save convenience fee');
+                  }
+                }}
+                className="px-4 py-2 rounded-lg text-sm bg-emerald-600 text-white"
+              >
+                Save
               </button>
             </div>
           </div>

@@ -1,0 +1,35 @@
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth-options';
+import { isAdminRole } from '@/lib/roles';
+import { getSupabaseServerClient } from '@/lib/supabase';
+
+export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!isAdminRole(session.user.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const id = params.id;
+    const body = await request.json();
+    const convenienceFee = Number(body?.convenienceFee ?? 0);
+
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from('published_events')
+      .update({ convenience_fee: Number.isFinite(convenienceFee) ? convenienceFee : 0 })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Failed to update convenience fee:', error.message);
+      return NextResponse.json({ error: 'Failed to update convenience fee' }, { status: 500 });
+    }
+
+    return NextResponse.json({ event: data });
+  } catch (err) {
+    console.error('Error in convenience-fee PATCH:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

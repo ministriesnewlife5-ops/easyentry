@@ -2136,7 +2136,7 @@ function SellerFormPage() {
                                   </div>
 
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
-                                    <label className="text-[11px] text-[#F5F5DC]/60">Discount for Artist or Influencer  %</label>
+                                    <label className="text-[11px] text-[#F5F5DC]/60">Artist Share %</label>
                                     <input
                                       type="number"
                                       min={0}
@@ -2155,7 +2155,7 @@ function SellerFormPage() {
                                   </div>
 
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
-                                    <label className="text-[11px] text-[#F5F5DC]/60">Influencer Share %</label>
+                                    <label className="text-[11px] text-[#F5F5DC]/60">Promoter Share %</label>
                                     <input
                                       type="number"
                                       min={0}
