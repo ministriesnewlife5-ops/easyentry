@@ -303,7 +303,6 @@ export async function POST(request: NextRequest) {
           description: eventData.description,
           numberOfTickets: eventData.numberOfTickets,
           ticketCategories: eventData.ticketCategories,
-          convenienceFee: eventData.convenienceFee,
         },
       });
       adminNotificationSent = true;
