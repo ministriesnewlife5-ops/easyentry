@@ -15,6 +15,7 @@ type PublicEventTicketCategory = {
   platformFee?: number;
   paymentGatewayFee?: number;
   gstPercent?: number;
+  convenienceFee?: number;
   artistShare?: number;
   influencerShare?: number;
 };
@@ -84,6 +85,7 @@ export type PublicEvent = {
   locationDistrict?: string;
   locationArea?: string;
   googleMapsLink?: string;
+  convenienceFee?: number;
   distance: string;
   gatesOpen: string;
   price: string;
@@ -196,6 +198,7 @@ function mapEventToDb(event: Partial<PublicEvent> & { sourceRequestId?: string }
     is_public: true,
     status: 'upcoming',
     social_links: Object.keys(socialLinks).length > 0 ? socialLinks : null,
+    convenience_fee: Number.isFinite(Number(event.convenienceFee)) ? Number(event.convenienceFee) : 0,
     request_id: event.sourceRequestId || null,
   };
 }
@@ -295,6 +298,7 @@ function mapDbToEvent(
     locationDistrict,
     locationArea,
     googleMapsLink,
+    convenienceFee: Number(record.convenience_fee || 0),
     distance,
     gatesOpen,
     price: (record.ticket_price as number)?.toString() || '0',
@@ -623,6 +627,7 @@ function createApprovedEvent(request: EventRequest): Partial<PublicEvent> {
     locationDistrict: request.eventData.locationDistrict,
     locationArea: request.eventData.locationArea,
     googleMapsLink: request.eventData.googleMapsLink,
+    convenienceFee: request.eventData.convenienceFee,
     distance: 'Newly approved event',
     gatesOpen: request.eventData.gatesOpen,
     price: request.eventData.price,

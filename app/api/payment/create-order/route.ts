@@ -262,7 +262,7 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseServerClient();
     const eventQuery = supabase
       .from('published_events')
-      .select('id, title, social_links, ticket_price, date, time, request_id')
+      .select('id, title, social_links, ticket_price, date, time, request_id, convenience_fee')
       .eq('id', normalizedEventId)
       .single();
 
@@ -296,7 +296,7 @@ export async function POST(request: NextRequest) {
       const fallbackPublishedLookup = normalizedEventId
         ? await supabase
             .from('published_events')
-        .select('id, title, social_links, ticket_price, date, time, request_id')
+        .select('id, title, social_links, ticket_price, date, time, request_id, convenience_fee')
             .eq('request_id', normalizedEventId)
             .maybeSingle()
         : { data: null, error: null };
@@ -524,15 +524,8 @@ export async function POST(request: NextRequest) {
     const basePrice = normalizedCategories.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0);
     const totalTickets = normalizedCategories.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
-    // Read authoritative convenience fee from app_settings (fallback to 175)
-    const { data: feeSetting, error: feeError } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'convenience_fee')
-      .maybeSingle();
-
-    const configuredFlatFee = feeSetting && feeSetting.value != null ? Number(feeSetting.value) : 175;
-    const legacyFlatConvenienceFee = totalTickets > 0 ? totalTickets * (Number.isFinite(configuredFlatFee) ? Math.round(configuredFlatFee) : 175) : 0;
+    const convenienceFeePerTicket = Math.max(0, toFiniteNumber((resolvedEventData as Record<string, unknown>).convenience_fee));
+    const convenienceFeeAmount = convenienceFeePerTicket * totalTickets;
 
     const activeCouponSourceType: string | null = matchedRule?.sourceType || matchedGlobalRule?.sourceType || null;
     const split = computeMoneySplit(normalizedCategories, activeCouponSourceType);
@@ -543,13 +536,7 @@ export async function POST(request: NextRequest) {
     let paymentGatewayFeeAmount = split.paymentGatewayFeeAmount;
     let platformFeeAmount = split.platformFeeAmount;
     let gstAmount = split.gstAmount;
-    let finalAmount = split.customerPaysTotal;
-
-    // Keep legacy fallback only when no percentage-based fees are configured.
-    if (platformFeeAmount === 0 && paymentGatewayFeeAmount === 0 && gstAmount === 0) {
-      finalAmount = Math.max(subtotal + legacyFlatConvenienceFee, 0);
-      platformFeeAmount = legacyFlatConvenienceFee;
-    }
+    let finalAmount = Math.max(split.customerPaysTotal + convenienceFeeAmount, 0);
 
       if (!Number.isFinite(finalAmount) || finalAmount <= 0) {
         logStructured('payment/create-order', 'Invalid final amount', { finalAmount });
@@ -572,8 +559,7 @@ export async function POST(request: NextRequest) {
           coupon_code: matchedRule?.code || matchedGlobalRule?.code || null,
           coupon_source_type: matchedRule?.sourceType || matchedGlobalRule?.sourceType || null,
           coupon_source_id: matchedRule?.sourceId || matchedGlobalRule?.sourceId || null,
-          // Store platform fee in convenience_fee for backward compatibility
-          convenience_fee: platformFeeAmount,
+          convenience_fee: convenienceFeePerTicket,
           final_amount: finalAmount,
           currency,
           expires_at: expiresAt,
@@ -607,6 +593,8 @@ export async function POST(request: NextRequest) {
         platformFee: String(Math.round(platformFeeAmount * 100) / 100),
         paymentGatewayFee: String(Math.round(paymentGatewayFeeAmount * 100) / 100),
         gstAmount: String(Math.round(gstAmount * 100) / 100),
+        convenienceFeePerTicket: String(Math.round(convenienceFeePerTicket * 100) / 100),
+        convenienceFeeAmount: String(Math.round(convenienceFeeAmount * 100) / 100),
         resolvedFrom: resolvedSource || 'id',
       },
     };

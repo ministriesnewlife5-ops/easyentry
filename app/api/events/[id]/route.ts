@@ -295,6 +295,10 @@ export async function PUT(
       category: typeof body.category === 'string' ? body.category : undefined,
       subcategory: typeof body.subcategory === 'string' ? body.subcategory : undefined,
       price: typeof body.price === 'string' ? body.price : undefined,
+      convenienceFee:
+        body.convenienceFee == null || body.convenienceFee === ''
+          ? undefined
+          : Number(body.convenienceFee),
       description: resolvedDescription,
       fullDescription: resolvedDescription,
       image: resolvedImage,

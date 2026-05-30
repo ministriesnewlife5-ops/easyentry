@@ -2155,7 +2155,7 @@ function SellerFormPage() {
                                   </div>
 
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
-                                    <label className="text-[11px] text-[#F5F5DC]/60">Platform Fees %</label>
+                                    <label className="text-[11px] text-[#F5F5DC]/60">Influencer Share %</label>
                                     <input
                                       type="number"
                                       min={0}
@@ -2174,7 +2174,7 @@ function SellerFormPage() {
                                   </div>
 
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
-                                    <label className="text-[11px] text-[#F5F5DC]/60">Payment Gateway Fees %</label>
+                                    <label className="text-[11px] text-[#F5F5DC]/60">Platform Fees %</label>
                                     <input
                                       type="number"
                                       min={0}

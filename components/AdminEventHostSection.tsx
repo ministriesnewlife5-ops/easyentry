@@ -169,6 +169,7 @@ export default function AdminEventHostSection() {
     entryAge: '18+',
     layout: 'Standing',
     seating: 'General Admission',
+    convenienceFee: '',
   });
   const [categories, setCategories] = useState<BrowseCategory[]>([]);
   const [locationFilters, setLocationFilters] = useState<BrowseLocationState[]>([]);
@@ -335,6 +336,7 @@ export default function AdminEventHostSection() {
           entryAge: typeof event.entryAge === 'string' ? event.entryAge : '18+',
           layout: typeof event.layout === 'string' ? event.layout : 'Standing',
           seating: typeof event.seating === 'string' ? event.seating : 'General Admission',
+          convenienceFee: typeof event.convenienceFee === 'number' ? String(event.convenienceFee) : '0',
         }));
 
         setSelectedArtists(
@@ -602,6 +604,7 @@ export default function AdminEventHostSection() {
         category: formData.category || 'General',
         subcategory: formData.subcategory || undefined,
         price: `₹${minPrice}`,
+        convenienceFee: Number(formData.convenienceFee || 0),
         image: coverImageUrl || (mediaFileUrls.length > 0 && mediaFileUrls[0].type.startsWith('image/') 
           ? mediaFileUrls[0].url 
           : ''),
@@ -680,6 +683,7 @@ export default function AdminEventHostSection() {
           entryAge: '18+',
           layout: 'Standing',
           seating: 'General Admission',
+          convenienceFee: '',
         });
         setTicketCategories([]);
         setRules([{ id: '1', text: '' }]);
@@ -1114,6 +1118,21 @@ export default function AdminEventHostSection() {
                     className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all placeholder:text-[#F5F5DC]/30"
                     placeholder="https://maps.google.com/..."
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#F5F5DC]/80 mb-2">Convenience Fee (₹)</label>
+                  <input
+                    type="number"
+                    name="convenienceFee"
+                    value={formData.convenienceFee}
+                    onChange={handleInputChange}
+                    className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-xl px-4 py-3 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] transition-all"
+                    min={0}
+                    step="0.01"
+                    placeholder="0"
+                  />
+                  <p className="mt-1 text-xs text-[#F5F5DC]/45">Per ticket. Leave blank or set 0 to disable.</p>
                 </div>
 
                 <div ref={artistDropdownRef}>

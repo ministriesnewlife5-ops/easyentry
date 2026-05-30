@@ -293,6 +293,7 @@ export async function POST(request: NextRequest) {
           time: eventData.time,
           endTime: eventData.endTime,
           venue: eventData.venue,
+          convenienceFee: eventData.convenienceFee,
           couponRules: eventData.couponRules,
           locationState: eventData.locationState,
           locationDistrict: eventData.locationDistrict,
@@ -302,6 +303,7 @@ export async function POST(request: NextRequest) {
           description: eventData.description,
           numberOfTickets: eventData.numberOfTickets,
           ticketCategories: eventData.ticketCategories,
+          convenienceFee: eventData.convenienceFee,
         },
       });
       adminNotificationSent = true;

@@ -31,7 +31,8 @@ type IntentTicketCategory = {
 
 function computeMoneySplit(
   ticketCategories: IntentTicketCategory[],
-  couponSourceType?: string | null
+  couponSourceType?: string | null,
+  convenienceFeePerTicket = 0
 ) {
   let basePrice = 0;
   let discountAmount = 0;
@@ -65,7 +66,9 @@ function computeMoneySplit(
     gstAmount += lineGst;
   }
 
-  const finalAmount = subtotal + platformFeeAmount + paymentGatewayFeeAmount + gstAmount;
+  const totalTickets = ticketCategories.reduce((sum, item) => sum + Math.max(0, toFiniteNumber(item.quantity)), 0);
+  const convenienceFeeAmount = Math.max(0, convenienceFeePerTicket) * totalTickets;
+  const finalAmount = subtotal + platformFeeAmount + paymentGatewayFeeAmount + gstAmount + convenienceFeeAmount;
   const discountPercent = basePrice > 0 ? (discountAmount / basePrice) * 100 : 0;
 
   return {
@@ -76,6 +79,7 @@ function computeMoneySplit(
     paymentGatewayFeeAmount,
     platformFeeAmount,
     gstAmount,
+    convenienceFeeAmount,
     finalAmount,
   };
 }
@@ -147,7 +151,8 @@ export async function POST(request: NextRequest) {
       ? ((intent as any).ticket_categories as IntentTicketCategory[])
       : [];
 
-    const split = computeMoneySplit(intentTickets, (intent as any).coupon_source_type || null);
+    const convenienceFeePerTicket = Math.max(0, toFiniteNumber((intent as any).convenience_fee));
+    const split = computeMoneySplit(intentTickets, (intent as any).coupon_source_type || null, convenienceFeePerTicket);
     const currentFinal = toFiniteNumber((intent as any).final_amount);
     const tolerance = 0.01;
 
@@ -158,7 +163,7 @@ export async function POST(request: NextRequest) {
           discount_amount: split.discountAmount,
           discount_percent: split.discountPercent || null,
           subtotal: split.basePrice,
-          convenience_fee: split.platformFeeAmount, // backward compatibility field
+          convenience_fee: convenienceFeePerTicket,
           final_amount: split.finalAmount,
           updated_at: new Date().toISOString(),
         })
@@ -175,6 +180,8 @@ export async function POST(request: NextRequest) {
         newFinal: split.finalAmount,
         discountAmount: split.discountAmount,
         discountPercent: split.discountPercent,
+        convenienceFeePerTicket,
+        convenienceFeeAmount: split.convenienceFeeAmount,
       });
     }
 

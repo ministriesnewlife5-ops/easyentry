@@ -17,6 +17,7 @@ export type TicketCategory = {
   platformFee?: number;
   paymentGatewayFee?: number;
   gstPercent?: number;
+  convenienceFee?: number;
   artistShare?: number;
   influencerShare?: number;
 };
@@ -52,6 +53,7 @@ export type EventRequest = {
     price: string;
     image: string;
     googleMapsLink?: string;
+    convenienceFee?: number;
     couponRules?: EventCouponRule[];
     mediaFiles?: string[];
     numberOfTickets?: string;
@@ -148,6 +150,7 @@ function mapRequestToDb(request: Partial<EventRequest> & {
       estimatedTotalRevenue,
       estimatedTotalCommission,
     } : null,
+    convenience_fee: request.eventData?.convenienceFee ?? 0,
     commission_percent: commissionPercent,
     ticket_categories: ticketCategories.length > 0 ? ticketCategories : null,
     estimated_total_revenue: estimatedTotalRevenue || null,
@@ -174,33 +177,42 @@ function mapDbToRequest(record: Record<string, unknown>): EventRequest {
   // Prefer the full event_data JSONB if present
   const storedEventData = normalizeStoredEventData(record.event_data);
   const ticketCategories = (record.ticket_categories as TicketCategory[]) || storedEventData?.ticketCategories || [];
+  const convenienceFee = Number(record.convenience_fee || storedEventData?.convenienceFee || 0);
+  const eventData = storedEventData
+    ? {
+        ...storedEventData,
+        ticketCategories,
+        convenienceFee,
+      }
+    : {
+        title: (record.title as string) || '',
+        subtitle: '',
+        date: (record.date as string) || '',
+        time: '',
+        venue: '',
+        category: (record.event_type as string) || '',
+        price: (record.budget as number)?.toString() || '',
+        image: (record.attachments as string[])?.[0] || '',
+        mediaFiles: (record.attachments as string[]) || [],
+        description: (record.description as string) || '',
+        fullDescription: (record.description as string) || '',
+        gatesOpen: '',
+        entryAge: '',
+        layout: '',
+        seating: '',
+        ticketCategories,
+        convenienceFee,
+        commissionPercent: (record.commission_percent as number) || 0,
+        estimatedTotalRevenue: (record.estimated_total_revenue as number) || 0,
+        estimatedTotalCommission: (record.estimated_total_commission as number) || 0,
+      };
 
   return {
     id: record.id as string,
     outletUserId: (record.user_id as string) || '',
     outletName: (record.outlet_name as string) || '',
     outletEmail: (record.outlet_email as string) || '',
-    eventData: storedEventData ?? {
-      title: (record.title as string) || '',
-      subtitle: '',
-      date: (record.date as string) || '',
-      time: '',
-      venue: '',
-      category: (record.event_type as string) || '',
-      price: (record.budget as number)?.toString() || '',
-      image: (record.attachments as string[])?.[0] || '',
-      mediaFiles: (record.attachments as string[]) || [],
-      description: (record.description as string) || '',
-      fullDescription: (record.description as string) || '',
-      gatesOpen: '',
-      entryAge: '',
-      layout: '',
-      seating: '',
-      ticketCategories,
-      commissionPercent: (record.commission_percent as number) || 0,
-      estimatedTotalRevenue: (record.estimated_total_revenue as number) || 0,
-      estimatedTotalCommission: (record.estimated_total_commission as number) || 0,
-    },
+    eventData,
     status: (record.status as EventRequestStatus) || 'pending',
     submittedAt: new Date(record.created_at as string).getTime(),
     reviewedAt: record.reviewed_at ? new Date(record.reviewed_at as string).getTime() : undefined,
@@ -377,6 +389,7 @@ export async function updateEventRequest(
       estimatedTotalRevenue,
       estimatedTotalCommission,
     };
+    updateData.convenience_fee = input.eventData.convenienceFee ?? 0;
 
     updateData.title = input.eventData.title;
     updateData.date = input.eventData.date;

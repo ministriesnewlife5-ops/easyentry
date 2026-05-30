@@ -72,7 +72,7 @@ export default function EventDetailsPage() {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const ticketRef = useRef<HTMLDivElement>(null);
 
-  const [convenienceFee, setConvenienceFee] = useState(175);
+  const [convenienceFee, setConvenienceFee] = useState(0);
   const maxTickets = 10;
   useEffect(() => {
     const eventId = params.id as string;
@@ -92,6 +92,7 @@ export default function EventDetailsPage() {
 
         const data = await response.json();
         setEvent(data.event || null);
+        setConvenienceFee(Number(data.event?.convenienceFee || 0));
       } catch (error) {
         console.error('Failed to load event:', error);
         setEvent(null);
@@ -100,20 +101,7 @@ export default function EventDetailsPage() {
       }
     };
 
-    const fetchConvenienceFee = async () => {
-      try {
-        const response = await fetch('/api/admin/convenience-fee');
-        if (response.ok) {
-          const data = await response.json();
-          setConvenienceFee(Number(data.fee) || 175);
-        }
-      } catch (error) {
-        console.error('Failed to load convenience fee:', error);
-      }
-    };
-
     fetchEvent();
-    fetchConvenienceFee();
   }, [params.id]);
 
   useEffect(() => {

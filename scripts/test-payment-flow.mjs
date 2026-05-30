@@ -21,8 +21,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
 const EVENT_ID = 'aa219a44-99df-4bc0-9b4a-cb1536c1db4b';
 const QUANTITY = 1;
 const PRICE = 100; // as requested
-const CONVENIENCE_FEE_PER_TICKET = 175;
-
 function fmt(n) {
   return `₹${Number(n || 0).toFixed(2)}`;
 }
@@ -34,6 +32,8 @@ function computeBreakdown({
   gstPercent,
   platformFeePercent,
   paymentGatewayFeePercent,
+  convenienceFeePerTicket,
+  quantity,
   coupon,
 }) {
   let commissionPercent = 0;
@@ -47,7 +47,8 @@ function computeBreakdown({
   const paymentGatewayFee = customerPaysBeforeFees * (Number(paymentGatewayFeePercent || 0) / 100);
   const platformFee = customerPaysBeforeFees * (Number(platformFeePercent || 0) / 100);
   const gstAmount = (basePrice * gstPercent) / 100;
-  const customerPaid = customerPaysBeforeFees + platformFee + paymentGatewayFee + gstAmount;
+  const convenienceFeeAmount = Number(convenienceFeePerTicket || 0) * Number(quantity || 0);
+  const customerPaid = customerPaysBeforeFees + platformFee + paymentGatewayFee + gstAmount + convenienceFeeAmount;
   const artistCommission = coupon && String(coupon.source_type) === 'artist' ? couponDiscount : 0;
   const influencerCommission = coupon && String(coupon.source_type) === 'promoter' ? couponDiscount : 0;
   const organizerAmount = customerPaysBeforeFees - platformFee;
@@ -59,6 +60,8 @@ function computeBreakdown({
     platformFee,
     paymentGatewayFee,
     gstAmount,
+    convenienceFeePerTicket,
+    convenienceFeeAmount,
     customerPaid,
     artistCommission,
     influencerCommission,
@@ -73,6 +76,8 @@ function printBreakdown(label, breakdown, basePrice) {
   console.log('Subtotal (base - discount):', fmt(breakdown.customerPaysBeforeFees));
   console.log('Payment gateway fee (Razorpay):', fmt(breakdown.paymentGatewayFee));
   console.log('Platform fee:', fmt(breakdown.platformFee));
+  console.log('Convenience fee (per ticket):', fmt(breakdown.convenienceFeePerTicket || 0));
+  console.log('Convenience fee amount:', fmt(breakdown.convenienceFeeAmount || 0));
   console.log('GST:', fmt(breakdown.gstAmount));
   console.log('Customer paid (final):', fmt(breakdown.customerPaid));
   console.log('Promoter/Artist commission (discount amount):', fmt(breakdown.couponDiscount));
@@ -123,6 +128,8 @@ function printBreakdown(label, breakdown, basePrice) {
     }
 
     console.log('Using event:', event.id, event.title || 'no-title');
+    const convenienceFeePerTicket = Number(event.convenience_fee || 0);
+    console.log('Event convenience fee per ticket:', fmt(convenienceFeePerTicket));
 
     // Fetch first active global coupon
     const { data: coupons, error: couponErr } = await supabase
@@ -189,6 +196,8 @@ function printBreakdown(label, breakdown, basePrice) {
       gstPercent: 0,
       platformFeePercent,
       paymentGatewayFeePercent,
+      convenienceFeePerTicket,
+      quantity: QUANTITY,
       coupon,
     });
 
@@ -225,6 +234,7 @@ function printBreakdown(label, breakdown, basePrice) {
       ticket_categories: ticketCategoriesPayload,
       total_tickets: QUANTITY,
       amount_paid: breakdown.customerPaid,
+      convenience_fee_amount: breakdown.convenienceFeeAmount,
       coupon_code: coupon ? coupon.code : null,
       coupon_source_type: coupon ? coupon.source_type : null,
       coupon_source_id: coupon ? coupon.source_id : null,
@@ -292,6 +302,8 @@ function printBreakdown(label, breakdown, basePrice) {
       gstPercent: 18,
       platformFeePercent,
       paymentGatewayFeePercent,
+      convenienceFeePerTicket,
+      quantity: QUANTITY,
       coupon,
     });
 

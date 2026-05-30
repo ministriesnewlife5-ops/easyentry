@@ -93,7 +93,7 @@ BEGIN
   INSERT INTO ticket_bookings(
     user_id, user_email, user_name, event_id, event_title, event_date, event_venue, event_image,
     ticket_categories, total_tickets, amount_paid, coupon_code, coupon_source_type, coupon_source_id,
-    coupon_discount_percent, coupon_discount_amount, coupon_source_commission, payment_id, order_id, status, booked_at
+    coupon_discount_percent, coupon_discount_amount, coupon_source_commission, convenience_fee_amount, payment_id, order_id, status, booked_at
   )
   VALUES (
     intent_row.user_id,
@@ -113,6 +113,7 @@ BEGIN
     intent_row.discount_percent,
     intent_row.discount_amount,
     COALESCE(intent_row.discount_amount, 0), -- coupon_source_commission: commission earned equals discount amount
+    COALESCE(intent_row.convenience_fee, 0) * (SELECT COALESCE(SUM((item->>'quantity')::int),0) FROM jsonb_array_elements(intent_row.ticket_categories) item),
     in_razorpay_payment_id,
     in_razorpay_order_id,
     'confirmed',
@@ -148,7 +149,7 @@ BEGIN
       booking_rec.id,
       in_razorpay_payment_id,
       intent_row.final_amount,
-      intent_row.convenience_fee,
+      COALESCE(intent_row.convenience_fee, 0) * (SELECT COALESCE(SUM((item->>'quantity')::int),0) FROM jsonb_array_elements(intent_row.ticket_categories) item),
       NULL, -- organizer_id (would need to be joined from event)
       0,    -- organizer_share (would need to be calculated)
       NULL, -- promoter_id (would need to be joined from event)
