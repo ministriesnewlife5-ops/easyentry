@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Lock, Settings, IndianRupee } from "lucide-react";
+import { useState } from "react";
+import { Lock, Settings } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const PasswordSettings = dynamic(() => import("./PasswordSettings"), { ssr: false });
@@ -12,82 +12,12 @@ interface SettingsContentProps {
 
 export default function SettingsContent({ userEmail }: SettingsContentProps) {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-  const [convenienceFee, setConvenienceFee] = useState(175);
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    // Load current convenience fee
-    const loadConvenienceFee = async () => {
-      try {
-        const response = await fetch('/api/admin/convenience-fee');
-        if (response.ok) {
-          const data = await response.json();
-          setConvenienceFee(data.fee || 175);
-        }
-      } catch (error) {
-        console.error('Failed to load convenience fee:', error);
-      }
-    };
-    loadConvenienceFee();
-  }, []);
-
-  const updateConvenienceFee = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/admin/convenience-fee', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fee: convenienceFee }),
-      });
-      if (response.ok) {
-        alert('Convenience fee updated successfully!');
-      } else {
-        alert('Failed to update convenience fee.');
-      }
-    } catch (error) {
-      console.error('Failed to update convenience fee:', error);
-      alert('Failed to update convenience fee.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <>
       <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Convenience Fee Settings Card */}
-        <article className="rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/15">
-              <IndianRupee className="h-5 w-5 text-green-400" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-[#F5F5DC]">Convenience Fee</h3>
-              <p className="text-sm text-[#F5F5DC]/60">Set platform convenience fee</p>
-            </div>
-          </div>
-          <div className="mt-4 space-y-3">
-            <div className="relative">
-              <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F5F5DC]/50" />
-              <input
-                type="number"
-                value={convenienceFee}
-                onChange={(e) => setConvenienceFee(Number(e.target.value) || 0)}
-                className="w-full rounded-lg border border-[#2A2A2A] bg-[#0D0D0D]/50 px-9 py-2 text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
-                placeholder="175"
-                min="0"
-                step="1"
-              />
-            </div>
-            <button
-              onClick={updateConvenienceFee}
-              disabled={isLoading}
-              className="w-full rounded-xl bg-[#E5A823] px-4 py-2.5 text-sm font-semibold text-[#0D0D0D] transition hover:bg-[#F5C542] disabled:opacity-50"
-            >
-              {isLoading ? 'Updating...' : 'Update Fee'}
-            </button>
-          </div>
-        </article>
+        {/* (Global convenience fee settings removed; fee is per-event now) */}
 
         {/* Password Settings Card */}
         <article className="rounded-2xl border border-[#2A2A2A] bg-[#101018] p-5">
