@@ -134,7 +134,7 @@ function computeMoneySplit(
   discountAmount: number;
   customerBase: number;
   customerGST: number;
-  convenienceFeeBase: number;
+  convenienceFeeAmount: number;
   convenienceFeeGST: number;
   customerPaysTotal: number;
   artistBase: number;
