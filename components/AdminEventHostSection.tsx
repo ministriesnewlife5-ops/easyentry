@@ -1638,7 +1638,7 @@ export default function AdminEventHostSection() {
                             </div>
                           </div>
                           <div className="mt-3 text-xs text-[#F5F5DC]/50">
-                            Influencer Amount: {fmt(influencerAmt)}
+                            Influencer Amount: {fmt(influencerBase)}
                           </div>
                         </div>
                       </motion.div>
