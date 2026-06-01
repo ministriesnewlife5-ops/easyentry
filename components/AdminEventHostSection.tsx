@@ -1404,16 +1404,24 @@ export default function AdminEventHostSection() {
                   <div className="space-y-4">
                     {ticketCategories.map((cat, index) => {
                       const gross = cat.price || 0;
-                      const discountAmt = gross * ((cat.discount || 0) / 100);
-                      const taxableBase = Math.max(gross - discountAmt, 0);
-                      const gstAmt = taxableBase * ((cat.gstPercent || 0) / 100);
-                      const customerPays = Math.max(taxableBase + gstAmt, 0);
-                      const pgFee = customerPays * ((cat.paymentGatewayFee ?? 5) / 100);
-                      const platformFeeAmt = customerPays * ((cat.platformFee ?? 0) / 100);
-                      const artistAmt = gross * ((cat.artistShare || 0) / 100);
-                      const influencerAmt = gross * ((cat.influencerShare || 0) / 100);
-                      const outletNet = Math.max(customerPays - pgFee - platformFeeAmt - artistAmt - influencerAmt, 0);
+                      const gstRate = (cat.gstPercent || 0) / 100;
+                      const discountBase = gross * ((cat.discount || 0) / 100);
+                      const discountGst = discountBase * gstRate;
+                      const customerBase = Math.max(gross - discountBase, 0);
+                      const customerGST = customerBase * gstRate;
+                      const customerPays = customerBase + customerGST;
+                      const pgBase = customerBase * ((cat.paymentGatewayFee ?? 5) / 100);
+                      const pgGst = pgBase * gstRate;
+                      const platformBase = customerBase * ((cat.platformFee ?? 0) / 100);
+                      const platformGst = platformBase * gstRate;
+                      const artistBase = customerBase * ((cat.artistShare || 0) / 100);
+                      const artistGst = artistBase * gstRate;
+                      const influencerBase = customerBase * ((cat.influencerShare || 0) / 100);
+                      const influencerGst = influencerBase * gstRate;
+                      const outletBase = Math.max(customerBase - pgBase - platformBase - artistBase - influencerBase, 0);
+                      const outletGst = outletBase * gstRate;
                       const fmt = (value: number) => `₹${value.toFixed(0)}`;
+                      const fmtWithGst = (base: number, gst: number) => gstRate > 0 ? `₹${base.toFixed(0)} + GST: ₹${gst.toFixed(0)} = ₹${(base + gst).toFixed(0)}` : `₹${base.toFixed(0)}`;
 
                       return (
                       <motion.div 
@@ -1522,20 +1530,20 @@ export default function AdminEventHostSection() {
 
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
                             <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
-                              <p className="text-[10px] text-[#F5F5DC]/50">Base + GST</p>
+                              <p className="text-[10px] text-[#F5F5DC]/50">Customer Pays</p>
                               <p className="text-sm font-bold text-[#F5F5DC]">{fmt(customerPays)}</p>
                             </div>
                             <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
                               <p className="text-[10px] text-[#F5F5DC]/50">PG Fee</p>
-                              <p className="text-sm font-bold text-[#F5F5DC]">{fmt(pgFee)}</p>
+                              <p className="text-sm font-bold text-[#F5F5DC]">{fmtWithGst(pgBase, pgGst)}</p>
                             </div>
                             <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
                               <p className="text-[10px] text-[#F5F5DC]/50">Platform Fee</p>
-                              <p className="text-sm font-bold text-[#F5F5DC]">{fmt(platformFeeAmt)}</p>
+                              <p className="text-sm font-bold text-[#F5F5DC]">{fmtWithGst(platformBase, platformGst)}</p>
                             </div>
                             <div className="rounded-lg border border-[#3E83B6]/50 bg-[#3E83B6]/10 p-2">
                               <p className="text-[10px] text-[#3E83B6]">Outlet Net</p>
-                              <p className="text-sm font-bold text-[#3E83B6]">{fmt(outletNet)}</p>
+                              <p className="text-sm font-bold text-[#3E83B6]">{fmtWithGst(outletBase, outletGst)}</p>
                             </div>
                           </div>
 
@@ -1551,7 +1559,7 @@ export default function AdminEventHostSection() {
                                 onChange={(e) => updateTicketCategory(cat.id, 'discount', Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
                                 className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                               />
-                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(discountAmt)}</p>
+                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtWithGst(discountBase, discountGst)}</p>
                             </div>
 
                             <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
@@ -1576,7 +1584,7 @@ export default function AdminEventHostSection() {
                                     onChange={(e) => updateTicketCategory(cat.id, 'gstPercent', Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
                                     className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   />
-                                  <p className="text-[10px] text-[#F5F5DC]/50 mt-1">GST Amount: {fmt(gstAmt)}</p>
+                                  <p className="text-[10px] text-[#F5F5DC]/50 mt-1">GST Amount: {fmt(customerGST)}</p>
                                 </>
                               ) : (
                                 <p className="text-[10px] text-[#F5F5DC]/50 mt-1">GST disabled</p>
@@ -1598,7 +1606,7 @@ export default function AdminEventHostSection() {
                                 }}
                                 className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                               />
-                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(Math.max(cat.artistShare || 0, cat.influencerShare || 0))}</p>
+                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtWithGst(artistBase + influencerBase, artistGst + influencerGst)}</p>
                             </div>
 
                             <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
@@ -1612,7 +1620,7 @@ export default function AdminEventHostSection() {
                                 onChange={(e) => updateTicketCategory(cat.id, 'paymentGatewayFee', Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
                                 className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                               />
-                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(pgFee)}</p>
+                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtWithGst(pgBase, pgGst)}</p>
                             </div>
 
                             <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
@@ -1626,7 +1634,7 @@ export default function AdminEventHostSection() {
                                 onChange={(e) => updateTicketCategory(cat.id, 'platformFee', Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
                                 className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                               />
-                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(platformFeeAmt)}</p>
+                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtWithGst(platformBase, platformGst)}</p>
                             </div>
                           </div>
                           <div className="mt-3 text-xs text-[#F5F5DC]/50">

@@ -1774,20 +1774,6 @@ function SellerFormPage() {
                     />
                   </div>
 
-                  <div className="md:col-span-3 rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/50 px-4 py-3">
-                    <label className="flex items-center gap-3 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(formData.payAtVenueEnabled)}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, payAtVenueEnabled: e.target.checked }))}
-                        className="h-4 w-4 rounded border-[#2A2A2A] bg-[#1A1A1A] text-[#E5A823] focus:ring-[#E5A823]"
-                      />
-                      <span>
-                        <span className="block text-sm font-medium">Enable Pay at Venue</span>
-                        <span className="block text-xs text-[#F5F5DC]/50">Allow buyers to reserve online and pay the balance at the venue.</span>
-                      </span>
-                    </label>
-                  </div>
                 </div>
 
                 {/* Details & Rules Section */}
@@ -1883,16 +1869,33 @@ function SellerFormPage() {
                       <div className="space-y-4">
                         {ticketCategories.map((cat, idx) => {
                           const gross = cat.price || 0;
-                          const discountAmt = gross * (cat.discount / 100);
-                          const taxableBase = Math.max(gross - discountAmt, 0);
-                          const gstAmt = taxableBase * ((cat.gstPercent || 0) / 100);
-                          const customerPays = Math.max(taxableBase + gstAmt, 0);
-                          const pgFee = customerPays * ((cat.paymentGatewayFee ?? 5) / 100);
-                          const platformFeeAmt = customerPays * (cat.platformFee / 100);
-                          const artistAmt = gross * (cat.artistShare / 100);
-                          const influencerAmt = gross * (cat.influencerShare / 100);
-                          const outletNet = Math.max(customerPays - pgFee - platformFeeAmt - artistAmt - influencerAmt, 0);
+                          const gstRate = (cat.gstPercent || 0) / 100;
+                          const discountBase = gross * ((cat.discount || 0) / 100);
+                          const discountGst = discountBase * gstRate;
+                          const discountTotal = discountBase + discountGst;
+
+                          const customerBase = Math.max(gross - discountBase, 0);
+                          const customerGST = customerBase * gstRate;
+                          const customerPays = customerBase + customerGST;
+
+                          const pgBase = customerBase * ((cat.paymentGatewayFee ?? 5) / 100);
+                          const pgGst = pgBase * gstRate;
+                          const pgFee = pgBase + pgGst;
+
+                          const platformBase = customerBase * (cat.platformFee / 100);
+                          const platformGst = platformBase * gstRate;
+                          const platformFeeAmt = platformBase + platformGst;
+
+                          const artistBase = customerBase * (cat.artistShare / 100);
+                          const artistGst = artistBase * gstRate;
+                          const influencerBase = customerBase * (cat.influencerShare / 100);
+                          const influencerGst = influencerBase * gstRate;
+
+                          const outletBase = Math.max(customerBase - pgBase - platformBase - artistBase - influencerBase, 0);
+                          const outletGst = outletBase * gstRate;
+                          const outletNet = outletBase + outletGst;
                           const fmt = (n: number) => `₹${n.toFixed(0)}`;
+                          const fmtAmountWithGst = (base: number, gst: number) => gstRate > 0 ? `₹${base.toFixed(0)} + GST: ₹${gst.toFixed(0)} = ₹${(base + gst).toFixed(0)}` : `₹${base.toFixed(0)}`;
 
                           return (
                           <div key={cat.id} className="bg-[#0F0F0F] rounded-xl p-4 border border-[#2A2A2A]">
@@ -2101,20 +2104,20 @@ function SellerFormPage() {
 
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
-                                    <p className="text-[10px] text-[#F5F5DC]/50">Base + GST</p>
+                                    <p className="text-[10px] text-[#F5F5DC]/50">Customer Pays</p>
                                     <p className="text-sm font-bold text-[#F5F5DC]">{fmt(customerPays)}</p>
                                   </div>
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
                                     <p className="text-[10px] text-[#F5F5DC]/50">PG Fee (5%)</p>
-                                    <p className="text-sm font-bold text-[#F5F5DC]">{fmt(pgFee)}</p>
+                                    <p className="text-sm font-bold text-[#F5F5DC]">{fmtAmountWithGst(pgBase, pgGst)}</p>
                                   </div>
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
                                     <p className="text-[10px] text-[#F5F5DC]/50">Platform Fee</p>
-                                    <p className="text-sm font-bold text-[#F5F5DC]">{fmt(platformFeeAmt)}</p>
+                                    <p className="text-sm font-bold text-[#F5F5DC]">{fmtAmountWithGst(platformBase, platformGst)}</p>
                                   </div>
                                   <div className="rounded-lg border border-[#3E83B6]/50 bg-[#3E83B6]/10 p-2">
                                     <p className="text-[10px] text-[#3E83B6]">Outlet Net</p>
-                                    <p className="text-sm font-bold text-[#3E83B6]">{fmt(outletNet)}</p>
+                                    <p className="text-sm font-bold text-[#3E83B6]">{fmtAmountWithGst(outletBase, outletGst)}</p>
                                   </div>
                                 </div>
 
@@ -2135,7 +2138,7 @@ function SellerFormPage() {
                                       }}
                                       className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                                     />
-                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(discountAmt)}</p>
+                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtAmountWithGst(discountBase, discountGst)}</p>
                                   </div>
 
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
@@ -2170,7 +2173,7 @@ function SellerFormPage() {
                                           }}
                                           className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         />
-                                        <p className="text-[10px] text-[#F5F5DC]/50 mt-1">GST Amount: {fmt(gstAmt)}</p>
+                                        <p className="text-[10px] text-[#F5F5DC]/50 mt-1">GST Amount: {fmt(customerGST)}</p>
                                       </>
                                     ) : (
                                       <p className="text-[10px] text-[#F5F5DC]/50 mt-1">GST disabled</p>
@@ -2193,7 +2196,7 @@ function SellerFormPage() {
                                       }}
                                       className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                                     />
-                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(Math.max(cat.artistShare || 0, cat.influencerShare || 0))}</p>
+                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtAmountWithGst(artistBase + influencerBase, artistGst + influencerGst)}</p>
                                   </div>
 
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
@@ -2212,7 +2215,7 @@ function SellerFormPage() {
                                       }}
                                       className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                                     />
-                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(platformFeeAmt)}</p>
+                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtAmountWithGst(platformBase, platformGst)}</p>
                                   </div>
 
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
@@ -2231,13 +2234,27 @@ function SellerFormPage() {
                                       }}
                                       className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                                     />
-                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmt(pgFee)}</p>
+                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtAmountWithGst(pgBase, pgGst)}</p>
                                   </div>
                                 </div>
                               </div>
                             </div>
                           </div>
                         )})}
+                        <div className="mt-4 rounded-xl border border-[#2A2A2A] bg-[#0D0D0D]/50 px-4 py-3">
+                          <label className="flex items-center gap-3 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(formData.payAtVenueEnabled)}
+                              onChange={(e) => setFormData((prev) => ({ ...prev, payAtVenueEnabled: e.target.checked }))}
+                              className="h-4 w-4 rounded border-[#2A2A2A] bg-[#1A1A1A] text-[#E5A823] focus:ring-[#E5A823]"
+                            />
+                            <span>
+                              <span className="block text-sm font-medium">Enable Pay at Venue</span>
+                              <span className="block text-xs text-[#F5F5DC]/50">Allow buyers to reserve online and pay the balance at the venue.</span>
+                            </span>
+                          </label>
+                        </div>
                         <button
                           type="button"
                           onClick={() => {
