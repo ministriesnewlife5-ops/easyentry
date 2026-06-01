@@ -1618,7 +1618,7 @@ export default function AdminEventHostSection() {
                                 }}
                                 className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                               />
-                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtWithGst(artistBase + influencerBase, artistGst + influencerGst)}</p>
+                              <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtWithGst(artistBase + influencerBase, artistGST + influencerGST)}</p>
                             </div>
 
                             <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
