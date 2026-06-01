@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
           platform_revenue: split.platformFeeBase + split.platformFeeGST + split.artistGST,
           outlet_payout: split.outletBase + split.outletGST,
           gateway_fee: split.gatewayFeeBase + split.gatewayFeeGST,
-          convenience_fee_amount: (split.convenienceFeeAmount || split.convenienceFeeBase || 0) + (split.convenienceFeeGST || 0),
+          convenience_fee_amount: (split.convenienceFeeAmount || 0) + (split.convenienceFeeGST || 0),
         });
 
         if (bookingError || !booking) {
