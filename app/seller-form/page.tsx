@@ -1868,32 +1868,35 @@ function SellerFormPage() {
                       <label className="block text-sm font-medium mb-3">Ticket Categories *</label>
                       <div className="space-y-4">
                         {ticketCategories.map((cat, idx) => {
-                          const gross = cat.price || 0;
+                          // Base calculations
+                          const ticketPrice = cat.price || 0;
                           const gstRate = (cat.gstPercent || 0) / 100;
-                          const discountBase = gross * ((cat.discount || 0) / 100);
+                          
+                          // Discount calculation
+                          const discountBase = ticketPrice * ((cat.discount || 0) / 100);
                           const discountGst = discountBase * gstRate;
-                          const discountTotal = discountBase + discountGst;
-
-                          const customerBase = Math.max(gross - discountBase, 0);
+                          
+                          // Customer base (after discount)
+                          const customerBase = Math.max(ticketPrice - discountBase, 0);
                           const customerGST = customerBase * gstRate;
                           const customerPays = customerBase + customerGST;
-
-                          const pgBase = customerBase * ((cat.paymentGatewayFee ?? 5) / 100);
-                          const pgGst = pgBase * gstRate;
-                          const pgFee = pgBase + pgGst;
-
-                          const platformBase = customerBase * (cat.platformFee / 100);
-                          const platformGst = platformBase * gstRate;
-                          const platformFeeAmt = platformBase + platformGst;
-
-                          const artistBase = customerBase * (cat.artistShare / 100);
-                          const artistGst = artistBase * gstRate;
-                          const influencerBase = customerBase * (cat.influencerShare / 100);
-                          const influencerGst = influencerBase * gstRate;
-
-                          const outletBase = Math.max(customerBase - pgBase - platformBase - artistBase - influencerBase, 0);
-                          const outletGst = outletBase * gstRate;
-                          const outletNet = outletBase + outletGst;
+                          
+                          // All fees calculated from customerBase
+                          const gatewayFeeBase = customerBase * ((cat.paymentGatewayFee ?? 5) / 100);
+                          const gatewayFeeGST = gatewayFeeBase * gstRate;
+                          
+                          const platformFeeBase = customerBase * ((cat.platformFee || 0) / 100);
+                          const platformFeeGST = platformFeeBase * gstRate;
+                          
+                          const artistBase = customerBase * ((cat.artistShare || 0) / 100);
+                          const artistGST = artistBase * gstRate;
+                          
+                          const influencerBase = customerBase * ((cat.influencerShare || 0) / 100);
+                          const influencerGST = influencerBase * gstRate;
+                          
+                          // Outlet net (residual after fees and payouts)
+                          const outletBase = Math.max(customerBase - gatewayFeeBase - platformFeeBase - artistBase - influencerBase, 0);
+                          const outletGST = outletBase * gstRate;
                           const fmt = (n: number) => `₹${n.toFixed(0)}`;
                           const fmtAmountWithGst = (base: number, gst: number) => gstRate > 0 ? `₹${base.toFixed(0)} + GST: ₹${gst.toFixed(0)} = ₹${(base + gst).toFixed(0)}` : `₹${base.toFixed(0)}`;
 
@@ -2109,15 +2112,15 @@ function SellerFormPage() {
                                   </div>
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
                                     <p className="text-[10px] text-[#F5F5DC]/50">PG Fee (5%)</p>
-                                    <p className="text-sm font-bold text-[#F5F5DC]">{fmtAmountWithGst(pgBase, pgGst)}</p>
+                                    <p className="text-sm font-bold text-[#F5F5DC]">{fmtAmountWithGst(gatewayFeeBase, gatewayFeeGST)}</p>
                                   </div>
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
                                     <p className="text-[10px] text-[#F5F5DC]/50">Platform Fee</p>
-                                    <p className="text-sm font-bold text-[#F5F5DC]">{fmtAmountWithGst(platformBase, platformGst)}</p>
+                                    <p className="text-sm font-bold text-[#F5F5DC]">{fmtAmountWithGst(platformFeeBase, platformFeeGST)}</p>
                                   </div>
                                   <div className="rounded-lg border border-[#3E83B6]/50 bg-[#3E83B6]/10 p-2">
                                     <p className="text-[10px] text-[#3E83B6]">Outlet Net</p>
-                                    <p className="text-sm font-bold text-[#3E83B6]">{fmtAmountWithGst(outletBase, outletGst)}</p>
+                                    <p className="text-sm font-bold text-[#3E83B6]">{fmtAmountWithGst(outletBase, outletGST)}</p>
                                   </div>
                                 </div>
 
@@ -2215,7 +2218,7 @@ function SellerFormPage() {
                                       }}
                                       className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                                     />
-                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtAmountWithGst(platformBase, platformGst)}</p>
+                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtAmountWithGst(platformFeeBase, platformFeeGST)}</p>
                                   </div>
 
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
@@ -2234,7 +2237,7 @@ function SellerFormPage() {
                                       }}
                                       className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                                     />
-                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtAmountWithGst(pgBase, pgGst)}</p>
+                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtAmountWithGst(gatewayFeeBase, gatewayFeeGST)}</p>
                                   </div>
                                 </div>
                               </div>
