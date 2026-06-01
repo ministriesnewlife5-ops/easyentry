@@ -43,50 +43,62 @@ function computeBreakdown({
   }
 
   const couponDiscount = coupon ? (basePrice * commissionPercent) / 100 : 0;
-  const customerPaysBeforeFees = Math.max(0, basePrice - couponDiscount);
-  const paymentGatewayFee = customerPaysBeforeFees * (Number(paymentGatewayFeePercent || 0) / 100);
-  const platformFee = customerPaysBeforeFees * (Number(platformFeePercent || 0) / 100);
-  const gstAmount = (basePrice * gstPercent) / 100;
-  const convenienceFeeAmount = Number(convenienceFeePerTicket || 0) * Number(quantity || 0);
-  const customerPaid = customerPaysBeforeFees + platformFee + paymentGatewayFee + gstAmount + convenienceFeeAmount;
-  const artistCommission = coupon && String(coupon.source_type) === 'artist' ? couponDiscount : 0;
-  const influencerCommission = coupon && String(coupon.source_type) === 'promoter' ? couponDiscount : 0;
-  const organizerAmount = customerPaysBeforeFees - platformFee;
+  const customerBase = Math.max(0, basePrice - couponDiscount);
+
+  const paymentGatewayBase = customerBase * (Number(paymentGatewayFeePercent || 0) / 100);
+  const platformFeeBase = customerBase * (Number(platformFeePercent || 0) / 100);
+  const artistBase = customerBase * (Number(artistSharePercent || 0) / 100);
+  const convenienceFeeBase = Number(convenienceFeePerTicket || 0) * Number(quantity || 0);
+  const outletBase = Math.max(0, customerBase - platformFeeBase - paymentGatewayBase - artistBase);
+
+  const gstRate = Number(gstPercent || 0) / 100;
+  const customerGST = customerBase * gstRate;
+  const platformGST = platformFeeBase * gstRate;
+  const gatewayGST = paymentGatewayBase * gstRate;
+  const artistGST = artistBase * gstRate;
+  const convenienceGST = convenienceFeeBase * gstRate;
+  const outletGST = outletBase * gstRate;
+
+  const customerPaid = customerBase + customerGST + convenienceFeeBase + convenienceGST;
+
+  const artistCommission = artistBase;
+  const outletGets = outletBase + outletGST;
+  const platformRevenue = platformFeeBase + platformGST + artistGST;
+  const gatewayFee = paymentGatewayBase + gatewayGST;
+  const convenienceFeeAmount = convenienceFeeBase + convenienceGST;
 
   return {
     commissionPercent,
     couponDiscount,
-    customerPaysBeforeFees,
-    platformFee,
-    paymentGatewayFee,
-    gstAmount,
+    customerBase,
+    customerGST,
+    platformFeeBase,
+    paymentGatewayBase,
     convenienceFeePerTicket,
     convenienceFeeAmount,
     customerPaid,
     artistCommission,
-    influencerCommission,
-    organizerAmount,
+    outletGets,
+    platformRevenue,
+    gatewayFee,
   };
 }
 
 function printBreakdown(label, breakdown, basePrice) {
   console.log(`\n--- ${label} ---`);
-  console.log('Base price:', fmt(basePrice));
-  console.log('Coupon discount:', fmt(breakdown.couponDiscount));
-  console.log('Subtotal (base - discount):', fmt(breakdown.customerPaysBeforeFees));
-  console.log('Payment gateway fee (Razorpay):', fmt(breakdown.paymentGatewayFee));
-  console.log('Platform fee:', fmt(breakdown.platformFee));
-  console.log('Convenience fee (per ticket):', fmt(breakdown.convenienceFeePerTicket || 0));
-  console.log('Convenience fee amount:', fmt(breakdown.convenienceFeeAmount || 0));
-  console.log('GST:', fmt(breakdown.gstAmount));
-  console.log('Customer paid (final):', fmt(breakdown.customerPaid));
-  console.log('Promoter/Artist commission (discount amount):', fmt(breakdown.couponDiscount));
-  console.log('Artist commission:', fmt(breakdown.artistCommission));
-  console.log('Promoter commission:', fmt(breakdown.influencerCommission));
-  console.log('Organizer amount:', fmt(breakdown.organizerAmount));
-  console.log('Platform keeps:', fmt(breakdown.platformFee));
-  console.log('Razorpay gets:', fmt(breakdown.paymentGatewayFee));
-  console.log('GST liability held:', fmt(breakdown.gstAmount));
+  console.log('Base Price:', fmt(basePrice));
+  console.log('Discount:', fmt(breakdown.couponDiscount));
+  console.log('Customer Base:', fmt(breakdown.customerBase));
+  console.log('GST (on customer base):', fmt(breakdown.customerGST));
+  console.log('Convenience Fee:', fmt(breakdown.convenienceFeeAmount - (breakdown.convenienceFeeGST || 0)));
+  console.log('Convenience Fee GST:', fmt(breakdown.convenienceFeeAmount - (breakdown.convenienceFeeAmount / (1 + (breakdown.customerGST ? 0 : 0)))));
+  console.log('Customer Pays Total:', fmt(breakdown.customerPaid));
+  console.log('\n--- Split ---');
+  console.log('Artist/Influencer Gets:', fmt(breakdown.artistCommission));
+  console.log('Outlet Gets:', fmt(breakdown.outletGets));
+  console.log('Platform Fee to EasyEntry:', fmt(breakdown.platformRevenue));
+  console.log('Payment Gateway to Razorpay:', fmt(breakdown.gatewayFee));
+  console.log('EasyEntry Total:', fmt(breakdown.platformRevenue));
 }
 
 (async function main() {
@@ -235,6 +247,11 @@ function printBreakdown(label, breakdown, basePrice) {
       total_tickets: QUANTITY,
       amount_paid: breakdown.customerPaid,
       convenience_fee_amount: breakdown.convenienceFeeAmount,
+      gst_amount: breakdown.customerGST,
+      artist_commission: breakdown.artistCommission,
+      platform_revenue: breakdown.platformRevenue,
+      outlet_payout: breakdown.outletGets,
+      gateway_fee: breakdown.gatewayFee,
       coupon_code: coupon ? coupon.code : null,
       coupon_source_type: coupon ? coupon.source_type : null,
       coupon_source_id: coupon ? coupon.source_id : null,

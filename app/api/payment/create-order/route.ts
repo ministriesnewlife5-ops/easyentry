@@ -127,25 +127,41 @@ function computeEventBasedDiscount(
 
 function computeMoneySplit(
   ticketCategories: CheckoutTicketCategory[],
-  couponSourceType?: string | null
+  couponSourceType?: string | null,
+  convenienceFeePerTicket = 0
 ): {
   basePrice: number;
   discountAmount: number;
-  discountPercent: number;
-  subtotal: number;
-  paymentGatewayFeeAmount: number;
-  platformFeeAmount: number;
-  gstAmount: number;
+  customerBase: number;
+  customerGST: number;
+  convenienceFeeBase: number;
+  convenienceFeeGST: number;
   customerPaysTotal: number;
-  commissionAmount: number;
-  organizerAmount: number;
+  artistBase: number;
+  artistGST: number;
+  platformFeeBase: number;
+  platformFeeGST: number;
+  gatewayFeeBase: number;
+  gatewayFeeGST: number;
+  outletBase: number;
+  outletGST: number;
+  easyEntryGets: number;
+  razorpayGets: number;
 } {
   let basePrice = 0;
   let discountAmount = 0;
-  let subtotal = 0;
-  let paymentGatewayFeeAmount = 0;
-  let platformFeeAmount = 0;
-  let gstAmount = 0;
+  let customerBase = 0;
+  let customerGST = 0;
+  let convenienceFeeBaseTotal = 0;
+  let convenienceFeeGSTTotal = 0;
+  let artistBaseTotal = 0;
+  let artistGSTTotal = 0;
+  let platformFeeBaseTotal = 0;
+  let platformFeeGSTTotal = 0;
+  let gatewayFeeBaseTotal = 0;
+  let gatewayFeeGSTTotal = 0;
+  let outletBaseTotal = 0;
+  let outletGSTTotal = 0;
 
   for (const item of ticketCategories) {
     const qty = Math.max(0, toFiniteNumber(item.quantity));
@@ -159,36 +175,61 @@ function computeMoneySplit(
           : 0);
 
     const lineDiscount = lineBase * (couponSharePercent / 100);
-    const lineSubtotal = Math.max(0, lineBase - lineDiscount);
+    const lineCustomerBase = Math.max(0, lineBase - lineDiscount);
 
-    const linePgFee = lineSubtotal * (clampPercent(toFiniteNumber(item.paymentGatewayFee)) / 100);
-    const linePlatformFee = lineSubtotal * (clampPercent(toFiniteNumber(item.platformFee)) / 100);
-    const lineGst = lineBase * (clampPercent(toFiniteNumber(item.gstPercent)) / 100);
+    const linePlatformFeeBase = lineCustomerBase * (clampPercent(toFiniteNumber(item.platformFee)) / 100);
+    const lineGatewayFeeBase = lineCustomerBase * (clampPercent(toFiniteNumber(item.paymentGatewayFee)) / 100);
+    const lineArtistBase = lineCustomerBase * (clampPercent(toFiniteNumber(item.artistShare)) / 100);
+    const lineConvenienceBase = convenienceFeePerTicket * qty;
+
+    const outletBase = Math.max(0, lineCustomerBase - linePlatformFeeBase - lineGatewayFeeBase - lineArtistBase);
+
+    const gstRate = clampPercent(toFiniteNumber(item.gstPercent)) / 100;
+    const lineCustomerGST = lineCustomerBase * gstRate;
+    const linePlatformGST = linePlatformFeeBase * gstRate;
+    const lineGatewayGST = lineGatewayFeeBase * gstRate;
+    const lineArtistGST = lineArtistBase * gstRate;
+    const lineConvenienceGST = lineConvenienceBase * gstRate;
+    const lineOutletGST = outletBase * gstRate;
 
     basePrice += lineBase;
     discountAmount += lineDiscount;
-    subtotal += lineSubtotal;
-    paymentGatewayFeeAmount += linePgFee;
-    platformFeeAmount += linePlatformFee;
-    gstAmount += lineGst;
+    customerBase += lineCustomerBase;
+    customerGST += lineCustomerGST;
+    convenienceFeeBaseTotal += lineConvenienceBase;
+    convenienceFeeGSTTotal += lineConvenienceGST;
+    artistBaseTotal += lineArtistBase;
+    artistGSTTotal += lineArtistGST;
+    platformFeeBaseTotal += linePlatformFeeBase;
+    platformFeeGSTTotal += linePlatformGST;
+    gatewayFeeBaseTotal += lineGatewayFeeBase;
+    gatewayFeeGSTTotal += lineGatewayGST;
+    outletBaseTotal += outletBase;
+    outletGSTTotal += lineOutletGST;
   }
 
-  const customerPaysTotal = Math.max(0, subtotal + platformFeeAmount + paymentGatewayFeeAmount + gstAmount);
-  const commissionAmount = discountAmount;
-  const organizerAmount = subtotal - commissionAmount;
-  const discountPercent = basePrice > 0 ? (discountAmount / basePrice) * 100 : 0;
+  const customerPaysTotal = Math.max(0, customerBase + customerGST + convenienceFeeBaseTotal + convenienceFeeGSTTotal);
+  const easyEntryGets = platformFeeBaseTotal + platformFeeGSTTotal + artistGSTTotal + convenienceFeeBaseTotal + convenienceFeeGSTTotal;
+  const razorpayGets = gatewayFeeBaseTotal + gatewayFeeGSTTotal;
 
   return {
     basePrice,
     discountAmount,
-    discountPercent,
-    subtotal,
-    paymentGatewayFeeAmount,
-    platformFeeAmount,
-    gstAmount,
+    customerBase,
+    customerGST,
+    convenienceFeeAmount: convenienceFeeBaseTotal,
+    convenienceFeeGST: convenienceFeeGSTTotal,
     customerPaysTotal,
-    commissionAmount,
-    organizerAmount,
+    artistBase: artistBaseTotal,
+    artistGST: artistGSTTotal,
+    platformFeeBase: platformFeeBaseTotal,
+    platformFeeGST: platformFeeGSTTotal,
+    gatewayFeeBase: gatewayFeeBaseTotal,
+    gatewayFeeGST: gatewayFeeGSTTotal,
+    outletBase: outletBaseTotal,
+    outletGST: outletGSTTotal,
+    easyEntryGets,
+    razorpayGets,
   };
 }
 
@@ -528,15 +569,15 @@ export async function POST(request: NextRequest) {
     const convenienceFeeAmount = convenienceFeePerTicket * totalTickets;
 
     const activeCouponSourceType: string | null = matchedRule?.sourceType || matchedGlobalRule?.sourceType || null;
-    const split = computeMoneySplit(normalizedCategories, activeCouponSourceType);
+    const split = computeMoneySplit(normalizedCategories, activeCouponSourceType, convenienceFeePerTicket);
 
     let discountAmount = split.discountAmount;
-    let discountPercent = split.discountPercent;
-    let subtotal = split.subtotal;
-    let paymentGatewayFeeAmount = split.paymentGatewayFeeAmount;
-    let platformFeeAmount = split.platformFeeAmount;
-    let gstAmount = split.gstAmount;
-    let finalAmount = Math.max(split.customerPaysTotal + convenienceFeeAmount, 0);
+    let discountPercent = basePrice > 0 ? (discountAmount / basePrice) * 100 : 0;
+    let subtotal = split.customerBase;
+    let paymentGatewayFeeAmount = split.gatewayFeeBase;
+    let platformFeeAmount = split.platformFeeBase;
+    let gstAmount = split.customerGST; // per booking spec: GST on customer base
+    let finalAmount = Math.max(split.customerPaysTotal, 0);
 
       if (!Number.isFinite(finalAmount) || finalAmount <= 0) {
         logStructured('payment/create-order', 'Invalid final amount', { finalAmount });

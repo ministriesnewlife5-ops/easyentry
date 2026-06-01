@@ -43,10 +43,18 @@ function computeMoneySplit(
 ) {
   let basePrice = 0;
   let discountAmount = 0;
-  let subtotal = 0;
-  let paymentGatewayFeeAmount = 0;
-  let platformFeeAmount = 0;
-  let gstAmount = 0;
+  let customerBase = 0;
+  let customerGST = 0;
+  let convenienceFeeBaseTotal = 0;
+  let convenienceFeeGSTTotal = 0;
+  let artistBaseTotal = 0;
+  let artistGSTTotal = 0;
+  let platformFeeBaseTotal = 0;
+  let platformFeeGSTTotal = 0;
+  let gatewayFeeBaseTotal = 0;
+  let gatewayFeeGSTTotal = 0;
+  let outletBaseTotal = 0;
+  let outletGSTTotal = 0;
 
   for (const item of ticketCategories) {
     const qty = Math.max(0, toFiniteNumber(item.quantity));
@@ -60,34 +68,61 @@ function computeMoneySplit(
           : 0);
 
     const lineDiscount = lineBase * (couponSharePercent / 100);
-    const lineSubtotal = Math.max(0, lineBase - lineDiscount);
-    const linePaymentGatewayFee = lineSubtotal * (clampPercent(toFiniteNumber(item.paymentGatewayFee)) / 100);
-    const linePlatformFee = lineSubtotal * (clampPercent(toFiniteNumber(item.platformFee)) / 100);
-    const lineGst = lineBase * (clampPercent(toFiniteNumber(item.gstPercent)) / 100);
+    const lineCustomerBase = Math.max(0, lineBase - lineDiscount);
+
+    const linePlatformFeeBase = lineCustomerBase * (clampPercent(toFiniteNumber(item.platformFee)) / 100);
+    const lineGatewayFeeBase = lineCustomerBase * (clampPercent(toFiniteNumber(item.paymentGatewayFee)) / 100);
+    const lineArtistBase = lineCustomerBase * (clampPercent(toFiniteNumber(item.artistShare)) / 100);
+    const lineConvenienceBase = convenienceFeePerTicket * qty;
+
+    const outletBase = Math.max(0, lineCustomerBase - linePlatformFeeBase - lineGatewayFeeBase - lineArtistBase);
+
+    const gstRate = clampPercent(toFiniteNumber(item.gstPercent)) / 100;
+    const lineCustomerGST = lineCustomerBase * gstRate;
+    const linePlatformGST = linePlatformFeeBase * gstRate;
+    const lineGatewayGST = lineGatewayFeeBase * gstRate;
+    const lineArtistGST = lineArtistBase * gstRate;
+    const lineConvenienceGST = lineConvenienceBase * gstRate;
+    const lineOutletGST = outletBase * gstRate;
 
     basePrice += lineBase;
     discountAmount += lineDiscount;
-    subtotal += lineSubtotal;
-    paymentGatewayFeeAmount += linePaymentGatewayFee;
-    platformFeeAmount += linePlatformFee;
-    gstAmount += lineGst;
+    customerBase += lineCustomerBase;
+    customerGST += lineCustomerGST;
+    convenienceFeeBaseTotal += lineConvenienceBase;
+    convenienceFeeGSTTotal += lineConvenienceGST;
+    artistBaseTotal += lineArtistBase;
+    artistGSTTotal += lineArtistGST;
+    platformFeeBaseTotal += linePlatformFeeBase;
+    platformFeeGSTTotal += linePlatformGST;
+    gatewayFeeBaseTotal += lineGatewayFeeBase;
+    gatewayFeeGSTTotal += lineGatewayGST;
+    outletBaseTotal += outletBase;
+    outletGSTTotal += lineOutletGST;
   }
 
-  const totalTickets = ticketCategories.reduce((sum, item) => sum + Math.max(0, toFiniteNumber(item.quantity)), 0);
-  const convenienceFeeAmount = Math.max(0, convenienceFeePerTicket) * totalTickets;
-  const finalAmount = subtotal + platformFeeAmount + paymentGatewayFeeAmount + gstAmount + convenienceFeeAmount;
-  const discountPercent = basePrice > 0 ? (discountAmount / basePrice) * 100 : 0;
+  const customerPaysTotal = Math.max(0, customerBase + customerGST + convenienceFeeBaseTotal + convenienceFeeGSTTotal);
+  const easyEntryGets = platformFeeBaseTotal + platformFeeGSTTotal + artistGSTTotal + convenienceFeeBaseTotal + convenienceFeeGSTTotal;
+  const razorpayGets = gatewayFeeBaseTotal + gatewayFeeGSTTotal;
 
   return {
     basePrice,
     discountAmount,
-    discountPercent,
-    subtotal,
-    paymentGatewayFeeAmount,
-    platformFeeAmount,
-    gstAmount,
-    convenienceFeeAmount,
-    finalAmount,
+    customerBase,
+    customerGST,
+    convenienceFeeAmount: convenienceFeeBaseTotal,
+    convenienceFeeGST: convenienceFeeGSTTotal,
+    customerPaysTotal,
+    artistBase: artistBaseTotal,
+    artistGST: artistGSTTotal,
+    platformFeeBase: platformFeeBaseTotal,
+    platformFeeGST: platformFeeGSTTotal,
+    gatewayFeeBase: gatewayFeeBaseTotal,
+    gatewayFeeGST: gatewayFeeGSTTotal,
+    outletBase: outletBaseTotal,
+    outletGST: outletGSTTotal,
+    easyEntryGets,
+    razorpayGets,
   };
 }
 
@@ -107,6 +142,12 @@ async function insertPayAtVenueBooking(
     orderId?: string;
     amountPaid: number;
     remainingAmount: number;
+    gst_amount?: number;
+    artist_commission?: number;
+    platform_revenue?: number;
+    outlet_payout?: number;
+    gateway_fee?: number;
+    convenience_fee_amount?: number;
   }
 ) {
   const totalTickets = input.ticketCategories.reduce((sum, item) => sum + Math.max(0, toFiniteNumber(item.quantity)), 0);
@@ -114,7 +155,7 @@ async function insertPayAtVenueBooking(
   const paymentId = input.paymentId || `PAYATVENUE-${crypto.randomUUID()}`;
   const orderId = input.orderId || `PAYATVENUE-${crypto.randomUUID()}`;
 
-  const { data: booking, error: bookingError } = await supabase
+    const { data: booking, error: bookingError } = await supabase
     .from('ticket_bookings')
     .insert([
       {
@@ -130,6 +171,12 @@ async function insertPayAtVenueBooking(
         total_tickets: totalTickets,
         amount_paid: Math.max(0, input.amountPaid),
         remaining_amount: Math.max(0, input.remainingAmount),
+        gst_amount: Math.max(0, input.gst_amount || 0),
+        artist_commission: Math.max(0, input.artist_commission || 0),
+        platform_revenue: Math.max(0, input.platform_revenue || 0),
+        outlet_payout: Math.max(0, input.outlet_payout || 0),
+        gateway_fee: Math.max(0, input.gateway_fee || 0),
+        convenience_fee_amount: Math.max(0, input.convenience_fee_amount || 0),
         payment_mode: 'pay_at_venue',
         status: 'confirmed',
         payment_id: paymentId,
@@ -191,6 +238,8 @@ export async function POST(request: NextRequest) {
       );
 
       if (!body?.razorpay_order_id && !body?.razorpay_payment_id && !body?.razorpay_signature) {
+        const split = computeMoneySplit(ticketCategories as IntentTicketCategory[], body?.coupon_source_type || null, convenienceFeePerTicket);
+
         const { booking, bookingError, paymentId } = await insertPayAtVenueBooking(supabase, {
           userId: session.user.id,
           userEmail: session.user.email || null,
@@ -203,6 +252,12 @@ export async function POST(request: NextRequest) {
           ticketCategories,
           amountPaid,
           remainingAmount,
+          gst_amount: split.customerGST,
+          artist_commission: split.artistBase,
+          platform_revenue: split.platformFeeBase + split.platformFeeGST + split.artistGST,
+          outlet_payout: split.outletBase + split.outletGST,
+          gateway_fee: split.gatewayFeeBase + split.gatewayFeeGST,
+          convenience_fee_amount: (split.convenienceFeeAmount || split.convenienceFeeBase || 0) + (split.convenienceFeeGST || 0),
         });
 
         if (bookingError || !booking) {
@@ -267,6 +322,8 @@ export async function POST(request: NextRequest) {
       const amountPaid = Math.max(0, toFiniteNumber(body?.amountPaid, convenienceFeePerTicket * totalTickets));
       const remainingAmount = Math.max(0, toFiniteNumber(body?.remainingAmount, fullAmount));
 
+      const split = computeMoneySplit(ticketCategories as IntentTicketCategory[], body?.coupon_source_type || null, convenienceFeePerTicket);
+
       const { booking, bookingError } = await insertPayAtVenueBooking(supabase, {
         userId: session.user.id,
         userEmail: session.user.email || null,
@@ -281,6 +338,12 @@ export async function POST(request: NextRequest) {
         orderId: razorpay_order_id,
         amountPaid,
         remainingAmount,
+        gst_amount: split.customerGST,
+        artist_commission: split.artistBase,
+        platform_revenue: split.platformFeeBase + split.platformFeeGST + split.artistGST,
+        outlet_payout: split.outletBase + split.outletGST,
+        gateway_fee: split.gatewayFeeBase + split.gatewayFeeGST,
+        convenience_fee_amount: (split.convenienceFeeAmount || 0) + (split.convenienceFeeGST || 0),
       });
 
       if (bookingError || !booking) {
@@ -328,15 +391,18 @@ export async function POST(request: NextRequest) {
     const currentFinal = toFiniteNumber((intent as any).final_amount);
     const tolerance = 0.01;
 
-    if (Math.abs(currentFinal - split.finalAmount) > tolerance) {
+    // In new model, authoritative final amount is the customer's payable total
+    const newFinal = split.customerPaysTotal;
+
+    if (Math.abs(currentFinal - newFinal) > tolerance) {
       const { error: patchIntentError } = await supabase
         .from('checkout_intents')
         .update({
           discount_amount: split.discountAmount,
-          discount_percent: split.discountPercent || null,
+          discount_percent: split.basePrice > 0 ? (split.discountAmount / split.basePrice) * 100 : null,
           subtotal: split.basePrice,
           convenience_fee: convenienceFeePerTicket,
-          final_amount: split.finalAmount,
+          final_amount: newFinal,
           updated_at: new Date().toISOString(),
         })
         .eq('id', (intent as any).id);
@@ -349,9 +415,9 @@ export async function POST(request: NextRequest) {
       logStructured('payment/verify', 'Checkout intent money split synchronized', {
         intentId: (intent as any).id,
         oldFinal: currentFinal,
-        newFinal: split.finalAmount,
+        newFinal,
         discountAmount: split.discountAmount,
-        discountPercent: split.discountPercent,
+        discountPercent: split.basePrice > 0 ? (split.discountAmount / split.basePrice) * 100 : 0,
         convenienceFeePerTicket,
         convenienceFeeAmount: split.convenienceFeeAmount,
       });

@@ -123,7 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
     // Fetch event core row (published event id)
     const { data: eventById, error: eventByIdError } = await supabase
       .from('published_events')
-      .select('id, title')
+      .select('id, title, convenience_fee')
       .eq('id', normalizedEventId)
       .maybeSingle();
 
@@ -245,11 +245,21 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
 
     let basePrice = 0;
     let totalDiscount = 0;
-    let subtotal = 0;
-    let platformFeeAmount = 0;
-    let paymentGatewayFeeAmount = 0;
-    let gstAmount = 0;
+    let customerBaseTotal = 0;
+    let customerGSTTotal = 0;
+    let convenienceFeeBaseTotal = 0;
+    let convenienceFeeGSTTotal = 0;
+    let platformFeeBaseTotal = 0;
+    let platformFeeGSTTotal = 0;
+    let gatewayFeeBaseTotal = 0;
+    let gatewayFeeGSTTotal = 0;
+    let artistBaseTotal = 0;
+    let artistGSTTotal = 0;
+    let outletBaseTotal = 0;
+    let outletGSTTotal = 0;
     const breakdown: NonNullable<CouponPreviewResponse['discount']>['breakdown'] = [];
+
+    const convenienceFeePerTicket = Number((event as any)?.convenience_fee || 0);
 
     for (const ticket of tickets) {
       const category = ticketCategories.find((tc) => {
@@ -281,19 +291,36 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
 
       const lineTotal = ticket.quantity * ticket.price;
       const lineDiscount = lineTotal * (sharePercent / 100);
+      const lineCustomerBase = Math.max(0, lineTotal - lineDiscount);
 
-      const lineSubtotal = Math.max(0, lineTotal - lineDiscount);
-      const linePlatformFee = lineSubtotal * (Number(category.platform_fee || 0) / 100);
-      const linePaymentGatewayFee = lineSubtotal * (Number(category.payment_gateway_fee || 0) / 100);
-      const lineGst = lineTotal * (Number(category.gst_percent || 0) / 100);
+      const linePlatformBase = lineCustomerBase * (Number(category.platform_fee || 0) / 100);
+      const lineGatewayBase = lineCustomerBase * (Number(category.payment_gateway_fee || 0) / 100);
+      const lineArtistBase = lineCustomerBase * (Number(category.artist_share || 0) / 100);
+      const lineConvenienceBase = convenienceFeePerTicket * ticket.quantity;
+      const lineOutletBase = Math.max(0, lineCustomerBase - linePlatformBase - lineGatewayBase - lineArtistBase);
+
+      const gstRate = Number(category.gst_percent || 0) / 100;
+      const lineCustomerGST = lineCustomerBase * gstRate;
+      const linePlatformGST = linePlatformBase * gstRate;
+      const lineGatewayGST = lineGatewayBase * gstRate;
+      const lineArtistGST = lineArtistBase * gstRate;
+      const lineConvenienceGST = lineConvenienceBase * gstRate;
+      const lineOutletGST = lineOutletBase * gstRate;
 
       basePrice += lineTotal;
       totalDiscount += lineDiscount;
-      subtotal += lineSubtotal;
-      platformFeeAmount += linePlatformFee;
-      paymentGatewayFeeAmount += linePaymentGatewayFee;
-      gstAmount += lineGst;
-
+      customerBaseTotal += lineCustomerBase;
+      customerGSTTotal += lineCustomerGST;
+      convenienceFeeBaseTotal += lineConvenienceBase;
+      convenienceFeeGSTTotal += lineConvenienceGST;
+      platformFeeBaseTotal += linePlatformBase;
+      platformFeeGSTTotal += linePlatformGST;
+      gatewayFeeBaseTotal += lineGatewayBase;
+      gatewayFeeGSTTotal += lineGatewayGST;
+      artistBaseTotal += lineArtistBase;
+      artistGSTTotal += lineArtistGST;
+      outletBaseTotal += lineOutletBase;
+      outletGSTTotal += lineOutletGST;
       breakdown.push({
         ticketCategoryId: ticket.ticketCategoryId,
         quantity: ticket.quantity,
@@ -306,9 +333,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
     // Calculate overall discount percentage
     const cartTotal = tickets.reduce((sum, t) => sum + (t.quantity * t.price), 0);
     const discountPercent = cartTotal > 0 ? (totalDiscount / cartTotal) * 100 : 0;
-    const customerPaysTotal = Math.max(0, subtotal + platformFeeAmount + paymentGatewayFeeAmount + gstAmount);
+    const customerPaysTotal = Math.max(0, customerBaseTotal + customerGSTTotal + convenienceFeeBaseTotal + convenienceFeeGSTTotal);
     const couponSourceCommission = totalDiscount;
-    const organizerAmount = subtotal - couponSourceCommission;
+    const organizerAmount = outletBaseTotal + outletGSTTotal;
 
     if (totalDiscount <= 0) {
       return NextResponse.json(
@@ -333,10 +360,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
       moneySplit: {
         basePrice: Math.round(basePrice * 100) / 100,
         discountAmount: Math.round(totalDiscount * 100) / 100,
-        subtotal: Math.round(subtotal * 100) / 100,
-        platformFeeAmount: Math.round(platformFeeAmount * 100) / 100,
-        paymentGatewayFeeAmount: Math.round(paymentGatewayFeeAmount * 100) / 100,
-        gstAmount: Math.round(gstAmount * 100) / 100,
+        subtotal: Math.round(customerBaseTotal * 100) / 100,
+        platformFeeAmount: Math.round(platformFeeBaseTotal * 100) / 100,
+        paymentGatewayFeeAmount: Math.round(gatewayFeeBaseTotal * 100) / 100,
+        gstAmount: Math.round(customerGSTTotal * 100) / 100,
         customerPaysTotal: Math.round(customerPaysTotal * 100) / 100,
         couponSourceCommission: Math.round(couponSourceCommission * 100) / 100,
         organizerAmount: Math.round(organizerAmount * 100) / 100,
