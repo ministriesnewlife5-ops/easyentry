@@ -595,7 +595,7 @@ export default function AdminEventHostSection() {
         title: formData.title,
         subtitle: formData.subtitle || formData.description,
         date: formData.date,
-        time: formData.endTime ? `${formData.startTime} - ${formData.endTime}` : formData.startTime,
+        time: formData.startTime,
         startTime: formData.startTime,
         endTime: formData.endTime,
         venue: formData.location,
