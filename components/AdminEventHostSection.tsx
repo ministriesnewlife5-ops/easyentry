@@ -656,6 +656,7 @@ export default function AdminEventHostSection() {
         hostCompanyName: selectedCompany.name,
       };
       
+      console.debug('AdminEventHostSection: submitting eventData', eventData);
       const response = await fetch('/api/admin/event-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

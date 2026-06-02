@@ -282,6 +282,9 @@ export default async function AdminPage({
                    `${upcomingEvents.length} upcoming events · ${allUsers.length} total users`}
                 </p>
               </div>
+            <div className="flex items-center gap-3">
+              <Link href="/" className="px-3 py-2 rounded-md border border-[#2A2A2A] text-sm text-[#F5F5DC] hover:bg-[#2A2A2A]">Home</Link>
+            </div>
               {currentSection === 'ads' && (
                 <span className="rounded-full bg-[#E5A823]/10 px-4 py-2 text-xs font-semibold text-[#E5A823]">Promo Banner Data</span>
               )}

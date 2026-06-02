@@ -1191,6 +1191,9 @@ function SellerFormPage() {
               {isEditMode ? 'Edit your hosted event' : 'Create and manage your events'}
             </span>
           </div>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="px-3 py-2 rounded-md border border-[#2A2A2A] text-sm text-[#F5F5DC] hover:bg-[#2A2A2A]">Home</Link>
+          </div>
         </div>
       </div>
 

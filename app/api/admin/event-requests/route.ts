@@ -236,7 +236,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { eventData } = body;
 
+    // Log incoming payload for debugging when requests fail validation
     if (!eventData || !eventData.title || !eventData.date || !eventData.venue) {
+      console.error('Invalid admin event request payload', { eventData });
       return NextResponse.json({ error: 'Missing required event data' }, { status: 400 });
     }
 

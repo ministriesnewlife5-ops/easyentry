@@ -354,6 +354,7 @@ function OutletDashboardContent() {
             <span className="text-[#F5F5DC]/70">Welcome back, {session?.user?.name || 'Provider'}</span>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/" className="px-3 py-2 rounded-md border border-[#2A2A2A] text-sm text-[#F5F5DC] hover:bg-[#2A2A2A]">Home</Link>
             <Link
               href="/outlet/profile"
               className="px-4 py-2 border border-[#2A2A2A] text-[#F5F5DC] font-medium rounded-lg hover:bg-[#2A2A2A] transition-colors"
