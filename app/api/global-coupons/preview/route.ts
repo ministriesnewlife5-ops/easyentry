@@ -293,11 +293,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
       const lineDiscount = lineTotal * (sharePercent / 100);
       const lineCustomerBase = Math.max(0, lineTotal - lineDiscount);
 
-      const linePlatformBase = lineCustomerBase * (Number(category.platform_fee || 0) / 100);
-      const lineGatewayBase = lineCustomerBase * (Number(category.payment_gateway_fee || 0) / 100);
-      const lineArtistBase = lineCustomerBase * (Number(category.artist_share || 0) / 100);
+      const linePlatformBase = lineTotal * (Number(category.platform_fee || 0) / 100);
+      const lineGatewayBase = lineTotal * (Number(category.payment_gateway_fee || 0) / 100);
+      const lineArtistBase = lineTotal * (sharePercent / 100);
       const lineConvenienceBase = convenienceFeePerTicket * ticket.quantity;
-      const lineOutletBase = Math.max(0, lineCustomerBase - linePlatformBase - lineGatewayBase - lineArtistBase);
+      const lineOutletBase = Math.max(0, lineTotal - lineDiscount - linePlatformBase - lineGatewayBase - lineArtistBase);
 
       const gstRate = Number(category.gst_percent || 0) / 100;
       const lineCustomerGST = lineCustomerBase * gstRate;

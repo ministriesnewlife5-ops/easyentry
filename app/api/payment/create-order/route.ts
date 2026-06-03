@@ -177,12 +177,13 @@ function computeMoneySplit(
     const lineDiscount = lineBase * (couponSharePercent / 100);
     const lineCustomerBase = Math.max(0, lineBase - lineDiscount);
 
-    const linePlatformFeeBase = lineCustomerBase * (clampPercent(toFiniteNumber(item.platformFee)) / 100);
-    const lineGatewayFeeBase = lineCustomerBase * (clampPercent(toFiniteNumber(item.paymentGatewayFee)) / 100);
-    const lineArtistBase = lineCustomerBase * (clampPercent(toFiniteNumber(item.artistShare)) / 100);
+    const linePlatformFeeBase = lineBase * (clampPercent(toFiniteNumber(item.platformFee)) / 100);
+    const lineGatewayFeeBase = lineBase * (clampPercent(toFiniteNumber(item.paymentGatewayFee)) / 100);
+    const lineSharePercent = clampPercent(Math.max(0, toFiniteNumber(item.artistShare))) || clampPercent(toFiniteNumber(item.influencerShare));
+    const lineArtistBase = lineBase * (lineSharePercent / 100);
     const lineConvenienceBase = convenienceFeePerTicket * qty;
 
-    const outletBase = Math.max(0, lineCustomerBase - linePlatformFeeBase - lineGatewayFeeBase - lineArtistBase);
+    const outletBase = Math.max(0, lineBase - lineDiscount - linePlatformFeeBase - lineGatewayFeeBase - lineArtistBase);
 
     const gstRate = clampPercent(toFiniteNumber(item.gstPercent)) / 100;
     const lineCustomerGST = lineCustomerBase * gstRate;

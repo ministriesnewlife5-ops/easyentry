@@ -1885,21 +1885,17 @@ function SellerFormPage() {
                           const customerGST = customerBase * gstRate;
                           const customerPays = customerBase + customerGST;
                           
-                          // All fees calculated from customerBase
-                          const gatewayFeeBase = customerBase * ((cat.paymentGatewayFee ?? 5) / 100);
-                          const gatewayFeeGST = gatewayFeeBase * gstRate;
-                          
-                          const platformFeeBase = customerBase * ((cat.platformFee || 0) / 100);
+                          const platformFeeBase = ticketPrice * ((cat.platformFee || 0) / 100);
                           const platformFeeGST = platformFeeBase * gstRate;
-                          
-                          const artistBase = customerBase * ((cat.artistShare || 0) / 100);
-                          const artistGST = artistBase * gstRate;
-                          
-                          const influencerBase = customerBase * ((cat.influencerShare || 0) / 100);
-                          const influencerGST = influencerBase * gstRate;
-                          
-                          // Outlet net (residual after fees and payouts)
-                          const outletBase = Math.max(customerBase - gatewayFeeBase - platformFeeBase - artistBase - influencerBase, 0);
+
+                          const gatewayFeeBase = ticketPrice * ((cat.paymentGatewayFee ?? 5) / 100);
+                          const gatewayFeeGST = gatewayFeeBase * gstRate;
+
+                          const sharePercent = (cat.artistShare || cat.influencerShare || 0);
+                          const shareBase = ticketPrice * (sharePercent / 100);
+                          const shareGST = shareBase * gstRate;
+
+                          const outletBase = Math.max(ticketPrice - discountBase - platformFeeBase - gatewayFeeBase - shareBase, 0);
                           const outletGST = outletBase * gstRate;
                           const fmt = (n: number) => `₹${n.toFixed(0)}`;
                           const fmtAmountWithGst = (base: number, gst: number) => gstRate > 0 ? `₹${base.toFixed(0)} + GST: ₹${gst.toFixed(0)} = ₹${(base + gst).toFixed(0)}` : `₹${base.toFixed(0)}`;
@@ -2203,7 +2199,7 @@ function SellerFormPage() {
                                       }}
                                       className="mt-1 w-full bg-[#2A2A2A] border border-[#2A2A2A] rounded px-2 py-1.5 text-xs text-[#F5F5DC] focus:outline-none focus:border-[#E5A823]"
                                     />
-                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtAmountWithGst(artistBase + influencerBase, artistGST + influencerGST)}</p>
+                                    <p className="text-[10px] text-[#F5F5DC]/50 mt-1">Amount: {fmtAmountWithGst(shareBase, shareGST)}</p>
                                   </div>
 
                                   <div className="rounded-lg border border-[#2A2A2A] bg-[#0D0D0D] p-2">
