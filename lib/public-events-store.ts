@@ -86,6 +86,7 @@ export type PublicEvent = {
   locationArea?: string;
   googleMapsLink?: string;
   convenienceFee?: number;
+  convenienceFeeGstPercent?: number;
   payAtVenueEnabled?: boolean;
   distance: string;
   gatesOpen: string;
@@ -158,6 +159,9 @@ function mapEventToDb(event: Partial<PublicEvent> & { sourceRequestId?: string }
   if (event.locationState) socialLinks.locationState = event.locationState;
   if (event.locationDistrict) socialLinks.locationDistrict = event.locationDistrict;
   if (event.locationArea) socialLinks.locationArea = event.locationArea;
+  if (Number.isFinite(Number(event.convenienceFeeGstPercent))) {
+    socialLinks.convenienceFeeGstPercent = Number(event.convenienceFeeGstPercent);
+  }
 
   return {
     title: event.title || 'Untitled Event',
@@ -302,6 +306,10 @@ function mapDbToEvent(
     locationArea,
     googleMapsLink,
     convenienceFee: Number(record.convenience_fee || 0),
+    convenienceFeeGstPercent:
+      socialLinks && Number.isFinite(Number(socialLinks.convenienceFeeGstPercent))
+        ? Number(socialLinks.convenienceFeeGstPercent)
+        : 0,
     payAtVenueEnabled,
     distance,
     gatesOpen,

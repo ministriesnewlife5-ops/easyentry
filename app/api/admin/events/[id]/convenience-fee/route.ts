@@ -14,11 +14,32 @@ export async function PATCH(request: NextRequest, context: any) {
     const id = resolvedParams?.id;
     const body = await request.json();
     const convenienceFee = Number(body?.convenienceFee ?? 0);
+    const conveyanceFeeGstPercent = Number(body?.conveyanceFeeGstPercent ?? 0);
 
     const supabase = getSupabaseServerClient();
+    const { data: existingEvent, error: selectError } = await supabase
+      .from('published_events')
+      .select('social_links')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (selectError) {
+      console.error('Failed to load existing event social links:', selectError.message);
+      return NextResponse.json({ error: 'Failed to update conveyance fee' }, { status: 500 });
+    }
+
+    const existingLinks = existingEvent?.social_links as Record<string, unknown> | null;
+    const newSocialLinks = {
+      ...(typeof existingLinks === 'object' && existingLinks ? existingLinks : {}),
+      convenienceFeeGstPercent: Number.isFinite(conveyanceFeeGstPercent) ? conveyanceFeeGstPercent : 0,
+    };
+
     const { data, error } = await supabase
       .from('published_events')
-      .update({ convenience_fee: Number.isFinite(convenienceFee) ? convenienceFee : 0 })
+      .update({
+        convenience_fee: Number.isFinite(convenienceFee) ? convenienceFee : 0,
+        social_links: newSocialLinks,
+      })
       .eq('id', id)
       .select()
       .single();
