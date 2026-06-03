@@ -104,7 +104,7 @@ export default function EventsTable({ events }: EventsTableProps) {
                           setFeeModal({ id: event.id, name: event.name, open: true, fee, feeGstPercent });
                         } catch (err) {
                           console.error('Failed to load event fee:', err);
-                          setFeeModal({ id: event.id, name: event.name, open: true, fee: 0 });
+                          setFeeModal({ id: event.id, name: event.name, open: true, fee: 0, feeGstPercent: 0 });
                         }
                       }}
                       className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-[#2A2A2A] rounded-lg hover:bg-green-600 hover:text-white transition-colors"
