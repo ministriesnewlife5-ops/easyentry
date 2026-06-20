@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, ChevronDown, Heart, Instagram, MapPin, MapPinned, Star, Ticket, Video, Play, Loader2, CheckCircle, Download, X, MessageCircle } from 'lucide-react';
 import { BsWhatsapp } from 'react-icons/bs';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import type { PublicEvent } from '@/lib/public-events-store';
 import { useSession } from 'next-auth/react';
@@ -107,6 +107,55 @@ export default function EventDetailsPage() {
 
     fetchEvent();
   }, [params.id]);
+
+  const searchParams = useSearchParams();
+
+  // If `bookingId` query param is present, load that booking and show the ticket
+  useEffect(() => {
+    const bookingId = searchParams?.get('bookingId');
+    if (!bookingId) return;
+
+    const fetchBooking = async () => {
+      try {
+        const resp = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}`, { cache: 'no-store' });
+        if (!resp.ok) {
+          console.error('Failed to fetch booking by id');
+          return;
+        }
+        const payload = await resp.json().catch(() => ({}));
+        const booking = payload?.booking;
+        if (!booking) return;
+
+        const mappedTickets = Array.isArray(booking.ticket_categories)
+          ? booking.ticket_categories.map((t: any) => ({ id: t.id, name: t.name, quantity: t.quantity, price: t.price }))
+          : [];
+
+        const newBooking: BookingDetails = {
+          bookingId: booking.id,
+          paymentId: booking.payment_id || '',
+          eventTitle: booking.event_title || booking.event_title || '',
+          eventDate: booking.event_date || '',
+          eventTime: event?.time || '',
+          venue: booking.event_venue || booking.event_venue || '',
+          tickets: mappedTickets,
+          totalAmount: Number((booking.amount_paid || 0) + (booking.remaining_amount || 0)),
+          remainingAmount: Number(booking.remaining_amount || 0),
+          amountPaid: Number(booking.amount_paid || 0),
+          paymentMode: booking.payment_mode || undefined,
+          userName: booking.user_name || '',
+          userEmail: booking.user_email || '',
+          bookedAt: booking.booked_at || new Date().toISOString(),
+        };
+
+        setBookingDetails(newBooking);
+        setShowSuccessModal(true);
+      } catch (err) {
+        console.error('Failed to load booking by id:', err);
+      }
+    };
+
+    fetchBooking();
+  }, [searchParams, event]);
 
   useEffect(() => {
     if (!event) return;
