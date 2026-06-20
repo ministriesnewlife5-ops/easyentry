@@ -3,14 +3,14 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { getSupabaseServerClient } from '@/lib/supabase';
 
-export async function GET(request: NextRequest, context: { params?: { id?: string } }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const id = context?.params?.id || '';
+    const { id } = await context.params;
     if (!id) return NextResponse.json({ error: 'Missing booking id' }, { status: 400 });
 
     const supabase = getSupabaseServerClient();
