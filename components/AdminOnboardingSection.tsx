@@ -17,13 +17,14 @@ import {
   EyeOff
 } from 'lucide-react';
 
-type Role = 'SUB_ADMIN' | 'ARTIST' | 'PROMOTER' | 'ORGANIZER';
+type Role = 'SUB_ADMIN' | 'ARTIST' | 'PROMOTER' | 'ORGANIZER' | 'STAFF';
 
 const roles = [
   { id: 'SUB_ADMIN' as Role, label: 'Sub Admin', icon: Shield, desc: 'Manage approved admin operations', color: '#6366F1' },
   { id: 'ARTIST' as Role, label: 'Artist', icon: Mic2, desc: 'Performer account for hosting and promotions', color: '#E5A823' },
   { id: 'PROMOTER' as Role, label: 'Promoter', icon: Megaphone, desc: 'Promoter account for campaigns and events', color: '#EB4D4B' },
   { id: 'ORGANIZER' as Role, label: 'Organizer', icon: Building2, desc: 'Venue/organizer account for hosting events', color: '#10B981' },
+  { id: 'STAFF' as Role, label: 'Staff', icon: User, desc: 'Event staff for on-site scanning and check-ins', color: '#64748B' },
 ];
 
 const sectionVariants = {

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const allowedRoles: AppRole[] = ['SUB_ADMIN', 'ARTIST', 'PROMOTER', 'ORGANIZER'];
+    const allowedRoles: AppRole[] = ['SUB_ADMIN', 'ARTIST', 'PROMOTER', 'ORGANIZER', 'STAFF'];
     const role: AppRole = allowedRoles.includes(requestedRole) ? requestedRole : 'SUB_ADMIN';
 
     const supabase = getSupabaseServerClient();

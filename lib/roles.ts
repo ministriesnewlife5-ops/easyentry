@@ -1,6 +1,7 @@
 export const APP_ROLES = [
   'ADMIN',
   'SUB_ADMIN',
+  'STAFF',
   'ORGANIZER',
   'ARTIST',
   'PROMOTER',
@@ -65,6 +66,8 @@ export function getRoleDisplayName(role: RoleValue | null | undefined): string {
       return 'Admin';
     case 'SUB_ADMIN':
       return 'Sub Admin';
+      case 'STAFF':
+        return 'Staff';
     case 'ORGANIZER':
       return 'Organizer';
     case 'ARTIST':
@@ -82,6 +85,7 @@ export function getRoleHomePath(role: RoleValue | null | undefined): string {
   switch (normalizeRole(role)) {
     case 'ADMIN':
     case 'SUB_ADMIN':
+    case 'STAFF':
       return '/admin';
     case 'ORGANIZER':
       return '/outlet/profile';
@@ -99,6 +103,7 @@ export function getRoleDashboardPath(role: RoleValue | null | undefined): string
   switch (normalizeRole(role)) {
     case 'ADMIN':
     case 'SUB_ADMIN':
+    case 'STAFF':
       return '/admin';
     case 'ORGANIZER':
       return '/outlet/dashboard';
@@ -130,6 +135,7 @@ export function getRoleIconKey(role: RoleValue | null | undefined): 'admin' | 'o
   switch (normalizeRole(role)) {
     case 'ADMIN':
     case 'SUB_ADMIN':
+    case 'STAFF':
       return 'admin';
     case 'ORGANIZER':
       return 'organizer';
