@@ -970,9 +970,12 @@ function SellerFormPage() {
       const responseBody = await response.json().catch(() => ({}));
 
       if (response.ok) {
+        const eventCode = responseBody?.event?.eventCode || responseBody?.event?.event_code || responseBody?.eventCode;
         const successMessage = isEditMode
           ? 'Hosted event updated successfully.'
-          : 'Your request has been sent to admin for approval.';
+          : eventCode
+            ? `Event created and published. Your event code: ${eventCode}`
+            : 'Your request has been sent to admin for approval.';
         setNotificationMessage(successMessage);
         setShowNotification(true);
 

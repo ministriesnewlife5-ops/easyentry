@@ -11,6 +11,7 @@ interface Event {
   provider: string;
   location: string;
   date: string;
+  code?: string;
 }
 
 interface EventsTableProps {
@@ -67,6 +68,7 @@ export default function EventsTable({ events }: EventsTableProps) {
               <th className="px-4 py-3 font-semibold">Outlet Provider</th>
               <th className="px-4 py-3 font-semibold">Location</th>
               <th className="px-4 py-3 font-semibold">Date</th>
+              <th className="px-4 py-3 font-semibold">Code</th>
               <th className="px-4 py-3 font-semibold">Actions</th>
             </tr>
           </thead>
@@ -77,6 +79,7 @@ export default function EventsTable({ events }: EventsTableProps) {
                 <td className="px-4 py-4">{event.provider}</td>
                 <td className="px-4 py-4 text-[#F5F5DC]/80">{event.location}</td>
                 <td className="px-4 py-4">{event.date}</td>
+                <td className="px-4 py-4 text-sm text-[#F5F5DC]/70">{event.code || ''}</td>
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-2">
                     <Link

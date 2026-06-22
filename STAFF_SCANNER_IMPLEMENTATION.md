@@ -18,7 +18,7 @@ Update this table as work is completed. Status values: `TODO`, `IN PROGRESS`, `D
 | 0 | DNS record for `staff.easyentry.in` (manual, human does this) | TODO | |
 | 1 | SQL migration — schema changes | DONE | |
 | 2 | STAFF role | DONE | |
-| 3 | Event Code field | TODO | |
+| 3 | Event Code field | DONE | event_code generated on publish; surfaced in admin host UI and events list; seller UI surfaces code when returned |
 | 4 | Subdomain routing (middleware) | TODO | |
 | 5 | Staff login page | TODO | |
 | 6 | Event selection page + search API | TODO | |
@@ -33,6 +33,9 @@ Update this table as work is completed. Status values: `TODO`, `IN PROGRESS`, `D
 *(Append one line per session, most recent on top. Example: "2026-06-22 — Completed Step 2, STAFF role added to lib/roles.ts, onboarding updated, build passed.")*
 
 -
+
+2026-06-22 — Completed Step 3: added `event_code` generation in `lib/public-events-store.ts`, mapped `event_code` from DB, surfaced code in `AdminEventHostSection` and events list; seller UI will display code if returned by publish API. Ensure DB migration applied in Supabase.
+
 
 2026-06-22 — Completed Step 2, STAFF role added to lib/roles.ts, onboarding UI and admin onboard API updated.
 

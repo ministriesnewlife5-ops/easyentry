@@ -657,14 +657,17 @@ export default function AdminEventHostSection() {
       };
       
       console.debug('AdminEventHostSection: submitting eventData', eventData);
-      const response = await fetch('/api/admin/event-requests', {
+      const response = await fetch('/api/admin/host-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ eventData }),
       });
-      
+      const responseBody = await response.json().catch(() => ({}));
+
       if (response.ok) {
-        setMessage({ type: 'success', text: 'Event created successfully!' });
+        const createdEvent = responseBody?.event as Record<string, unknown> | undefined;
+        const code = createdEvent?.eventCode || createdEvent?.event_code || undefined;
+        setMessage({ type: 'success', text: code ? `Event created successfully! Your event code: ${code}` : 'Event created successfully!' });
         // Reset form
         setSelectedCompany(null);
         setFormData({
@@ -709,8 +712,9 @@ export default function AdminEventHostSection() {
           endsAt: '',
           maxUses: '',
         });
+        // Optionally keep the created event in local state or clipboard in future iterations
       } else {
-        const error = await response.json();
+        const error = responseBody || await response.json().catch(() => ({}));
         setMessage({ type: 'error', text: error.error || 'Failed to create event' });
       }
     } catch (error) {
