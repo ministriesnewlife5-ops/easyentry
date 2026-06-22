@@ -148,10 +148,17 @@ export async function POST(request: NextRequest) {
     const { client: razorpay, keyId } = getRazorpayClient();
     let order: any;
     try {
+      // Razorpay enforces a max length of 40 for `receipt`. Build a short receipt
+      // by using a compact prefix + first 8 chars of eventId + a short timestamp fragment.
+      const receiptPrefix = 'payatv';
+      const eventIdShort = String(eventId || '').slice(0, 8);
+      const timeShort = String(Date.now()).slice(-6);
+      const receipt = `${receiptPrefix}-${eventIdShort}-${timeShort}`.slice(0, 40);
+
       order = await razorpay.orders.create({
         amount: Math.round(convenienceFeeAmount * 100),
         currency,
-        receipt: `pay-at-venue-${eventId}-${Date.now()}`,
+        receipt,
         notes: {
           eventId,
           eventTitle: eventTitle || (event as any).title || '',
