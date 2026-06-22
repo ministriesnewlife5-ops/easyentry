@@ -268,7 +268,8 @@ export async function POST(request: NextRequest) {
         });
 
         if (bookingError || !booking) {
-          return respondError('BOOKING_CREATE_FAILED', 'Failed to create booking', { error: bookingError?.message || 'Unknown error' }, 500);
+          logStructured('payment/verify', 'Pay-at-venue booking insert failed', { bookingError });
+          return respondError('BOOKING_CREATE_FAILED', 'Failed to create booking', { error: (bookingError as any)?.message || JSON.stringify(bookingError) || 'Unknown error' }, 500);
         }
 
         return respondSuccess(
@@ -354,7 +355,8 @@ export async function POST(request: NextRequest) {
       });
 
       if (bookingError || !booking) {
-        return respondError('BOOKING_CREATE_FAILED', 'Failed to create booking', { error: bookingError?.message || 'Unknown error' }, 500);
+        logStructured('payment/verify', 'Pay-at-venue booking insert failed (with payment ids)', { bookingError });
+        return respondError('BOOKING_CREATE_FAILED', 'Failed to create booking', { error: (bookingError as any)?.message || JSON.stringify(bookingError) || 'Unknown error' }, 500);
       }
 
       return respondSuccess(
