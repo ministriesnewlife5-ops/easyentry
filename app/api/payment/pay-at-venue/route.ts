@@ -162,7 +162,13 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (rpErr) {
-      const errMsg = rpErr && (rpErr.error || rpErr.message) ? (rpErr.error || rpErr.message) : JSON.stringify(rpErr);
+      let errMsg: string;
+      if (rpErr && typeof rpErr === 'object') {
+        errMsg = (rpErr as any).error || (rpErr as any).message || JSON.stringify(rpErr);
+      } else {
+        errMsg = String(rpErr);
+      }
+
       logStructured('payment/pay-at-venue', 'Razorpay order creation failed', { error: errMsg, details: rpErr });
       return respondError('RAZORPAY_ORDER_FAILED', 'Failed to create Razorpay order', { error: String(errMsg) }, 500);
     }
