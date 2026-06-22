@@ -1665,7 +1665,7 @@ export default function EventDetailsPage() {
 
                     {/* Booking Code & ID */}
                     <div className="mt-4 pt-4 border-t border-[#2A2A2A] text-center space-y-1">
-                      <p className="text-xs text-[#F5F5DC]/40">Booking code: {bookingDetails.bookingId.slice(0, 8).toUpperCase()}</p>
+                      <p className="text-xs text-[#F5F5DC]/40">Booking code: {typeof bookingDetails.bookingId === 'string' ? bookingDetails.bookingId.slice(0, 8).toUpperCase() : ''}</p>
                       <p className="text-xs text-[#F5F5DC]/40">Booking ID: {bookingDetails.paymentId}</p>
                     </div>
                   </div>
