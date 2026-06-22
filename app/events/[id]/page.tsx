@@ -721,7 +721,7 @@ export default function EventDetailsPage() {
               setQuantities({});
               setShowTicketSection(false);
             } else {
-              throw new Error(verifyData.error || 'Payment verification failed');
+              throw new Error(verifyData?.message || verifyData?.code || verifyData?.error || 'Payment verification failed');
             }
           } catch (error) {
             console.error('Payment verification error:', error);
@@ -811,7 +811,7 @@ export default function EventDetailsPage() {
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.error || 'Failed to start Pay at Venue flow');
+        throw new Error(payload?.message || payload?.code || payload?.error || 'Failed to start Pay at Venue flow');
       }
 
       if (payload?.details?.direct) {
@@ -909,7 +909,7 @@ export default function EventDetailsPage() {
               setShowTicketSection(false);
               setCheckoutMode('online');
             } else {
-              throw new Error(verifyData.error || 'Pay at Venue verification failed');
+              throw new Error(verifyData?.message || verifyData?.code || verifyData?.error || 'Pay at Venue verification failed');
             }
           } catch (error) {
             console.error('Pay at Venue verification error:', error);
