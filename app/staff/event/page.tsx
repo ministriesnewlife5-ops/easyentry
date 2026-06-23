@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export default function StaffEventPage() {
   return (
     <div className="py-12">
