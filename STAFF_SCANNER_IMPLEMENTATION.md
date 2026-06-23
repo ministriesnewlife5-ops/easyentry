@@ -19,9 +19,9 @@ Update this table as work is completed. Status values: `TODO`, `IN PROGRESS`, `D
 | 1 | SQL migration — schema changes | DONE | |
 | 2 | STAFF role | DONE | |
 | 3 | Event Code field | DONE | event_code generated on publish; surfaced in admin host UI and events list; seller UI surfaces code when returned |
-| 4 | Subdomain routing (middleware) | TODO | |
-| 5 | Staff login page | TODO | |
-| 6 | Event selection page + search API | TODO | |
+| 4 | Subdomain routing (middleware) | IN PROGRESS | middleware rewrite added for staff subdomain; staff routes and placeholders created |
+| 5 | Staff login page | IN PROGRESS | basic staff login page created at app/staff/page.tsx (NextAuth credentials) |
+| 6 | Event selection page + search API | IN PROGRESS | placeholder event selection page created at app/staff/event/page.tsx; search API pending |
 | 7 | QR payload fix (booking ID only) | TODO | |
 | 8 | Verification API | TODO | |
 | 9 | Mark Paid + Check-In APIs | TODO | |

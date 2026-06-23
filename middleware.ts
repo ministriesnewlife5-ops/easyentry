@@ -6,6 +6,26 @@ import { canAccessRoute, getRouteAccess } from "@/lib/route-access";
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  const hostname = String(request.headers.get('host') || '');
+
+  // Subdomain routing: if request is to staff.* host, rewrite to /staff/*
+  if (hostname.startsWith('staff.')) {
+    // If the incoming URL is already under /staff, continue normally
+    if (!pathname.startsWith('/staff')) {
+      const url = request.nextUrl.clone();
+      // Rewrite root to /staff, otherwise prefix with /staff
+      url.pathname = `/staff${url.pathname === '/' ? '' : url.pathname}`;
+      return NextResponse.rewrite(url);
+    }
+    // allow middleware to continue for /staff paths
+  } else {
+    // If host is NOT staff.* but path is /staff/* — block access by showing 404
+    if (pathname.startsWith('/staff')) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/404';
+      return NextResponse.rewrite(url);
+    }
+  }
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
   const normalizedRole = normalizeRole(token?.role);
   const routeAccess = getRouteAccess(pathname);
