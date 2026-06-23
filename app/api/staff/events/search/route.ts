@@ -11,9 +11,10 @@ export async function GET(request: Request) {
     if (!code) return NextResponse.json({ error: 'code is required' }, { status: 400 });
 
     const session = await getServerSession(authOptions as any);
-    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const sessionUser = (session as any)?.user;
+    if (!sessionUser?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const role = normalizeRole((session as any)?.user?.role);
+    const role = normalizeRole(sessionUser?.role);
     if (!role || !(role === 'STAFF' || isAdminRole(role) || isOrganizerRole(role))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
 
     // If organizer role, ensure ownership
     if (role === 'ORGANIZER') {
-      const userId = String(session.user.id);
+      const userId = String(sessionUser.id);
       if (String(event.organizer_id) !== userId) {
         return NextResponse.json({ error: 'forbidden' }, { status: 403 });
       }
