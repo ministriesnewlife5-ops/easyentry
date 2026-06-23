@@ -21,7 +21,7 @@ Update this table as work is completed. Status values: `TODO`, `IN PROGRESS`, `D
 | 3 | Event Code field | DONE | event_code generated on publish; surfaced in admin host UI and events list; seller UI surfaces code when returned |
 | 4 | Subdomain routing (middleware) | IN PROGRESS | middleware rewrite added for staff subdomain; staff routes and placeholders created |
 | 5 | Staff login page | IN PROGRESS | basic staff login page created at app/staff/page.tsx (NextAuth credentials) |
-| 6 | Event selection page + search API | IN PROGRESS | placeholder event selection page created at app/staff/event/page.tsx; search API pending |
+| 6 | Event selection page + search API | DONE | placeholder event selection page created at app/staff/event/page.tsx and search API implemented at app/api/staff/events/search/route.ts |
 | 7 | QR payload fix (booking ID only) | TODO | |
 | 8 | Verification API | TODO | |
 | 9 | Mark Paid + Check-In APIs | TODO | |
@@ -33,6 +33,8 @@ Update this table as work is completed. Status values: `TODO`, `IN PROGRESS`, `D
 *(Append one line per session, most recent on top. Example: "2026-06-22 — Completed Step 2, STAFF role added to lib/roles.ts, onboarding updated, build passed.")*
 
 -
+
+2026-06-23 — Implemented Step 4–6: middleware subdomain rewrite for `staff.` hosts, created `app/staff` pages (login, event search, scan placeholder), added `GET /api/staff/events/search?code=` API to lookup events by `event_code` with ticket aggregates.
 
 2026-06-22 — Completed Step 3: added `event_code` generation in `lib/public-events-store.ts`, mapped `event_code` from DB, surfaced code in `AdminEventHostSection` and events list; seller UI will display code if returned by publish API. Ensure DB migration applied in Supabase.
 

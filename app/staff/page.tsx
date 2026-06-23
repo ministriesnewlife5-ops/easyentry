@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { signIn, getSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 export default function StaffLoginPage() {
@@ -16,11 +16,23 @@ export default function StaffLoginPage() {
     setLoading(true);
     setError(null);
     const res = await signIn('credentials', { redirect: false, email, password });
-    setLoading(false);
     if (res?.error) {
+      setLoading(false);
       setError('Invalid credentials');
       return;
     }
+
+    // Validate role after sign-in
+    const session = await getSession();
+    setLoading(false);
+    const role = (session as any)?.user?.role as string | undefined;
+    const allowed = role && ['STAFF', 'ADMIN', 'ORGANIZER'].includes(String(role).toUpperCase());
+    if (!allowed) {
+      await signOut({ redirect: false });
+      setError('This portal is for staff only');
+      return;
+    }
+
     // On success, redirect to staff event selection
     router.push('/staff/event');
   };
