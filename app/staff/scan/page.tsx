@@ -34,10 +34,7 @@ export default function StaffScanPage() {
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
   const [manualId, setManualId] = useState('');
   const [checkInCount, setCheckInCount] = useState(1);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const detectorRef = useRef<any>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const scanIntervalRef = useRef<number | null>(null);
+  const scannerRef = useRef<any>(null);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -63,59 +60,60 @@ export default function StaffScanPage() {
   useEffect(() => {
     if (!selected) return;
 
-    const startCamera = async () => {
+    const startScanner = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-        if (videoRef.current) videoRef.current.srcObject = stream;
-
-        // Use native BarcodeDetector if available
-        const BarcodeDetectorCtor = (window as any).BarcodeDetector;
-        if (BarcodeDetectorCtor) {
-          try {
-            detectorRef.current = new BarcodeDetectorCtor({ formats: ['qr_code'] });
-          } catch (e) {
-            detectorRef.current = null;
-          }
+        setScanning(true);
+        const { Html5Qrcode } = await import('html5-qrcode');
+        const qrRegionId = 'html5qr-scanner';
+        // create the element if missing
+        let el = document.getElementById(qrRegionId);
+        if (!el) {
+          el = document.createElement('div');
+          el.id = qrRegionId;
+          // insert after the video container
+          const container = document.querySelector('.w-full.h-56');
+          if (container && container.parentNode) container.parentNode.insertBefore(el, container.nextSibling);
+          else document.body.appendChild(el);
         }
 
-        // Start scanning loop
-        setScanning(true);
+        scannerRef.current = new Html5Qrcode(qrRegionId);
 
-        scanIntervalRef.current = window.setInterval(async () => {
-          try {
-            if (!videoRef.current) return;
-            if (detectorRef.current) {
-              // draw to canvas and detect
-              if (!canvasRef.current) canvasRef.current = document.createElement('canvas');
-              const video = videoRef.current;
-              canvasRef.current.width = video.videoWidth;
-              canvasRef.current.height = video.videoHeight;
-              const ctx = canvasRef.current.getContext('2d');
-              if (!ctx) return;
-              ctx.drawImage(video, 0, 0, canvasRef.current.width, canvasRef.current.height);
-              const bitmap = await createImageBitmap(canvasRef.current);
-              const barcodes = await detectorRef.current.detect(bitmap);
-              if (barcodes && barcodes.length > 0) {
-                handleScanned(String(barcodes[0].rawValue || ''));
-              }
-            }
-          } catch (e) {
-            console.error('Scan loop error:', e);
+        const cameras = await Html5Qrcode.getCameras().catch(() => []);
+        let cameraId: string | undefined = undefined;
+        if (cameras && cameras.length) {
+          // prefer back camera if available
+          const back = cameras.find((c: any) => /back|rear|environment/i.test(c.label || c.id));
+          cameraId = (back && back.id) || cameras[0].id;
+        }
+
+        await scannerRef.current.start(
+          cameraId || { facingMode: 'environment' },
+          { fps: 10, qrbox: 250 },
+          (decodedText: string) => {
+            handleScanned(String(decodedText || ''));
+          },
+          (errorMessage: any) => {
+            // ignore per-frame decode errors
           }
-        }, 700);
+        );
       } catch (err) {
-        console.error('Camera start failed:', err);
+        console.error('html5-qrcode start failed:', err);
         setMessage({ type: 'error', text: 'Camera unavailable — use manual booking ID input' });
       }
     };
 
-    startCamera();
+    startScanner();
 
     return () => {
       setScanning(false);
-      if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
-      const tracks = (videoRef.current?.srcObject as MediaStream | null)?.getTracks() || [];
-      tracks.forEach((t) => t.stop());
+      try {
+        if (scannerRef.current) {
+          scannerRef.current.stop().catch((e: any) => console.error('Failed to stop scanner:', e));
+          scannerRef.current.clear().catch((e: any) => {});
+        }
+      } catch (e) {
+        console.error('Scanner cleanup error:', e);
+      }
     };
   }, [selected]);
 
@@ -209,7 +207,7 @@ export default function StaffScanPage() {
       <main className="mt-4">
         <div className="rounded overflow-hidden bg-[#111] p-3">
           <div className="w-full h-56 bg-black flex items-center justify-center">
-            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
+            <div id="html5qr-scanner" className="w-full h-full" />
           </div>
           <div className="mt-3">
             <p className="text-sm text-[#F5F5DC]/70">Point the camera at the ticket QR. If camera is unavailable, enter booking ID manually.</p>
