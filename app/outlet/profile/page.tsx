@@ -39,6 +39,7 @@ type OutletEventItem = {
   rejectionReason?: string;
   isPublished: boolean;
   publicEventUrl?: string;
+  eventCode?: string;
 };
 
 type OutletEventsResponse = {
