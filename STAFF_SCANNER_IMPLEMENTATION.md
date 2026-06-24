@@ -24,7 +24,7 @@ Update this table as work is completed. Status values: `TODO`, `IN PROGRESS`, `D
 | 6 | Event selection page + search API | DONE | placeholder event selection page created at app/staff/event/page.tsx and search API implemented at app/api/staff/events/search/route.ts |
 | 7 | QR payload fix (booking ID only) | DONE | qr payload changed to bookingId only in app/events/[id]/page.tsx |
 | 8 | Verification API | DONE | Verified against real booking data on production (pay_at_venue/unpaid scenario tested) |
-| 9 | Mark Paid + Check-In APIs | TODO | |
+| 9 | Mark Paid + Check-In APIs | DONE | mark-paid and check-in APIs implemented; optimistic-lock pattern used to avoid missing RPC dependency |
 | 10 | Scanner page (PWA UI) | TODO | |
 | 11 | PWA manifest | TODO | |
 | 12 | End-to-end testing checklist | TODO | |
@@ -35,6 +35,15 @@ Update this table as work is completed. Status values: `TODO`, `IN PROGRESS`, `D
 -
 
 2026-06-24 — QR payload fix completed: QR generation previously encoded full JSON (bookingId, event, tickets, timestamp) which exposed unnecessary data to client-side QR payloads and made server-side verification rely on client-provided data. Fixed by changing the QR generator to emit only the `bookingId` (in `app/events/[id]/page.tsx`, `QRCodeCanvas` now sets `const qrData = bookingId`). This ensures staff scanners send only the booking identifier and the server-side verification API performs authoritative lookups.
+
+2026-06-24 — Check-in root cause & fix: The check-in flow originally relied on a Postgres RPC (`exec`) to run multi-statement SQL; that RPC did not exist in the database which caused the RPC call to fail and the endpoint to return the generic {"error":"Failed"} without useful logs. Replaced RPC usage with an optimistic-lock update (`.update().eq('checked_in_count', ...)`) plus an insert into `ticket_scans`. Verified full partial check-in flows end-to-end on production test data; mark-paid and payment-required gate verified.
+
+2026-06-24 — Test booking cleanup SQL: test booking `07686ce5-cd05-43e0-9cb3-5945068316bf` created for manual partial check-in verification. To remove it manually in Supabase run:
+
+```sql
+DELETE FROM ticket_scans WHERE booking_id = '07686ce5-cd05-43e0-9cb3-5945068316bf';
+DELETE FROM ticket_bookings WHERE id = '07686ce5-cd05-43e0-9cb3-5945068316bf';
+```
 
 2026-06-24 — Verification API tested on production: `POST /api/staff/tickets/verify` validated against real booking IDs. Verified responses for valid booking, wrong event, non-existent booking, and unauthorized requests. Pay-at-venue unpaid scenario returned correct `paymentMode: "pay_at_venue"` and `venuePaymentStatus: "unpaid"`.
 
