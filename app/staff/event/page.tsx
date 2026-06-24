@@ -51,6 +51,33 @@ function EventSearch() {
           <h3 className="font-semibold text-[#F5F5DC]">{event.title}</h3>
           <p className="text-sm text-[#F5F5DC]/70">{event.date} • {event.venue}</p>
           <p className="mt-2 text-xs text-[#F5F5DC]/60">Code: {event.event_code || event.eventCode}</p>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={() => {
+                const payload = {
+                  eventId: event.id,
+                  eventCode: event.event_code || event.eventCode || '',
+                  eventTitle: event.title || '',
+                };
+                document.cookie = `staff_selected_event=${encodeURIComponent(JSON.stringify(payload))}; path=/; max-age=${60 * 60 * 24}`;
+                window.location.href = '/staff/scan';
+              }}
+              className="px-4 py-2 rounded bg-[#E5A823] text-[#0D0D0D] font-semibold"
+            >
+              Select This Event
+            </button>
+            <button
+              onClick={() => {
+                const codeToCopy = event.event_code || event.eventCode || '';
+                try { navigator.clipboard.writeText(codeToCopy); } catch (e) {
+                  const t = document.createElement('textarea'); t.value = codeToCopy; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t);
+                }
+              }}
+              className="px-3 py-2 rounded bg-[#2A2A2A] text-sm"
+            >
+              Copy Code
+            </button>
+          </div>
         </div>
       )}
     </div>

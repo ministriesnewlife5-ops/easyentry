@@ -80,6 +80,7 @@ export default async function AdminPage({
     category: event.category,
     subcategory: event.subcategory,
     price: event.price,
+    code: (event as any).eventCode || (event as any).event_code || undefined,
   }));
 
   // Map artists to the format used in the admin dashboard

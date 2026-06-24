@@ -79,7 +79,32 @@ export default function EventsTable({ events }: EventsTableProps) {
                 <td className="px-4 py-4">{event.provider}</td>
                 <td className="px-4 py-4 text-[#F5F5DC]/80">{event.location}</td>
                 <td className="px-4 py-4">{event.date}</td>
-                <td className="px-4 py-4 text-sm text-[#F5F5DC]/70">{event.code || ''}</td>
+                <td className="px-4 py-4 text-sm text-[#F5F5DC]/70">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate">{event.code || ''}</span>
+                    {event.code && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(event.code || '');
+                          } catch (e) {
+                            // fallback
+                            const el = document.createElement('textarea');
+                            el.value = event.code || '';
+                            document.body.appendChild(el);
+                            el.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(el);
+                          }
+                        }}
+                        title="Copy code"
+                        className="px-2 py-1 rounded bg-[#2A2A2A] text-xs hover:bg-[#3A3A3A]"
+                      >
+                        Copy
+                      </button>
+                    )}
+                  </div>
+                </td>
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-2">
                     <Link
@@ -136,7 +161,7 @@ export default function EventsTable({ events }: EventsTableProps) {
             ))}
             {data.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-[#F5F5DC]/50">
+                <td colSpan={6} className="px-4 py-12 text-center text-[#F5F5DC]/50">
                   No events found
                 </td>
               </tr>
