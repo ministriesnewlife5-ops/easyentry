@@ -26,6 +26,7 @@ type OutletEventSummary = {
   rejectionReason?: string;
   isPublished: boolean;
   publicEventUrl?: string;
+  eventCode?: string;
 };
 
 function getEventCutoffTimestamp(dateValue: string) {
