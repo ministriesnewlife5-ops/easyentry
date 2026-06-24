@@ -19,8 +19,8 @@ Update this table as work is completed. Status values: `TODO`, `IN PROGRESS`, `D
 | 1 | SQL migration — schema changes | DONE | |
 | 2 | STAFF role | DONE | |
 | 3 | Event Code field | DONE | event_code generated on publish; surfaced in admin host UI and events list; seller UI surfaces code when returned |
-| 4 | Subdomain routing (middleware) | IN PROGRESS | middleware rewrite added for staff subdomain; staff routes and placeholders created |
-| 5 | Staff login page | IN PROGRESS | basic staff login page created at app/staff/page.tsx (NextAuth credentials) |
+| 4 | Subdomain routing (middleware) | DONE | middleware rewrite added for staff subdomain; staff routes and placeholders created |
+| 5 | Staff login page | DONE | basic staff login page created at app/staff/page.tsx (NextAuth credentials) |
 | 6 | Event selection page + search API | DONE | placeholder event selection page created at app/staff/event/page.tsx and search API implemented at app/api/staff/events/search/route.ts |
 | 7 | QR payload fix (booking ID only) | TODO | |
 | 8 | Verification API | TODO | |
@@ -33,6 +33,8 @@ Update this table as work is completed. Status values: `TODO`, `IN PROGRESS`, `D
 *(Append one line per session, most recent on top. Example: "2026-06-22 — Completed Step 2, STAFF role added to lib/roles.ts, onboarding updated, build passed.")*
 
 -
+
+2026-06-24 — Verified & fixed Step 3 and Step 6 items: a) Admin events list shows `event_code` with copy button; b) Organizer `/outlet/profile` events list shows `event_code` with copy button; c) `seller-form` and `AdminEventHostSection` surface `event_code` after publish; d) `/staff/event` "Select This Event" now sets `staff_selected_event` cookie and redirects to `/staff/scan`; e) `/staff/scan` reads the cookie and displays selected event name/code; f) `/staff/scan` redirects to `/staff/event` when cookie missing. Also applied TypeScript typing fixes for outlet/summary and staff API and added `use client` where needed. 
 
 2026-06-23 — Implemented Step 4–6: middleware subdomain rewrite for `staff.` hosts, created `app/staff` pages (login, event search, scan placeholder), added `GET /api/staff/events/search?code=` API to lookup events by `event_code` with ticket aggregates.
 

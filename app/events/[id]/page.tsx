@@ -1705,13 +1705,8 @@ function QRCodeCanvas({
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    // Generate QR code data
-    const qrData = JSON.stringify({
-      bookingId,
-      event: eventTitle,
-      tickets: tickets.map(t => ({ name: t.name, qty: t.quantity })),
-      timestamp: Date.now(),
-    });
+    // Generate QR code data (booking ID only)
+    const qrData = bookingId;
 
     // Generate QR code on canvas
     QRCode.toCanvas(canvasRef.current, qrData, {
