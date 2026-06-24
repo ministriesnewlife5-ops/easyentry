@@ -22,7 +22,7 @@ Update this table as work is completed. Status values: `TODO`, `IN PROGRESS`, `D
 | 4 | Subdomain routing (middleware) | DONE | middleware rewrite added for staff subdomain; staff routes and placeholders created |
 | 5 | Staff login page | DONE | basic staff login page created at app/staff/page.tsx (NextAuth credentials) |
 | 6 | Event selection page + search API | DONE | placeholder event selection page created at app/staff/event/page.tsx and search API implemented at app/api/staff/events/search/route.ts |
-| 7 | QR payload fix (booking ID only) | TODO | |
+| 7 | QR payload fix (booking ID only) | DONE | qr payload changed to bookingId only in app/events/[id]/page.tsx |
 | 8 | Verification API | TODO | |
 | 9 | Mark Paid + Check-In APIs | TODO | |
 | 10 | Scanner page (PWA UI) | TODO | |
@@ -33,6 +33,8 @@ Update this table as work is completed. Status values: `TODO`, `IN PROGRESS`, `D
 *(Append one line per session, most recent on top. Example: "2026-06-22 — Completed Step 2, STAFF role added to lib/roles.ts, onboarding updated, build passed.")*
 
 -
+
+2026-06-24 — QR payload fix completed: QR generation previously encoded full JSON (bookingId, event, tickets, timestamp) which exposed unnecessary data to client-side QR payloads and made server-side verification rely on client-provided data. Fixed by changing the QR generator to emit only the `bookingId` (in `app/events/[id]/page.tsx`, `QRCodeCanvas` now sets `const qrData = bookingId`). This ensures staff scanners send only the booking identifier and the server-side verification API performs authoritative lookups.
 
 2026-06-24 — Verified & fixed Step 3 and Step 6 items: a) Admin events list shows `event_code` with copy button; b) Organizer `/outlet/profile` events list shows `event_code` with copy button; c) `seller-form` and `AdminEventHostSection` surface `event_code` after publish; d) `/staff/event` "Select This Event" now sets `staff_selected_event` cookie and redirects to `/staff/scan`; e) `/staff/scan` reads the cookie and displays selected event name/code; f) `/staff/scan` redirects to `/staff/event` when cookie missing. Also applied TypeScript typing fixes for outlet/summary and staff API and added `use client` where needed. 
 
