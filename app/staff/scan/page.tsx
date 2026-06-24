@@ -86,9 +86,10 @@ export default function StaffScanPage() {
           cameraId = (back && back.id) || cameras[0].id;
         }
 
+        // Start without html5-qrcode's built-in qrbox so our custom overlay is the only viewfinder
         await scannerRef.current.start(
           cameraId || { facingMode: 'environment' },
-          { fps: 10, qrbox: 250 },
+          { fps: 10 },
           (decodedText: string) => {
             handleScanned(String(decodedText || ''));
           },
