@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (bookingErr) {
-      console.error('Error fetching booking in check-in:', bookingErr.message);
+      console.error('Error fetching booking in check-in:', bookingErr);
       return NextResponse.json({ error: 'Failed' }, { status: 500 });
     }
 
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
 
       if (eventErr) {
-        console.error('Error fetching event for organizer check (check-in):', eventErr.message);
+        console.error('Error fetching event for organizer check (check-in):', eventErr);
         return NextResponse.json({ error: 'Failed' }, { status: 500 });
       }
 
@@ -83,57 +83,64 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'invalid_count', message: 'Check-in count exceeds remaining tickets' }, { status: 400 });
     }
 
-    // Attempt an atomic update using optimistic locking (match previous checked_in_count)
-    const safeBookingId = sanitize(bookingId);
-    const safeEventId = sanitize(eventId);
-    const safeScannedBy = sanitize(String(sessionUser.id));
+    // Perform optimistic-lock update: set new checked_in_count only if current matches
+    const newCheckedIn = checkedInCount + checkInCount;
+    const newEntryStatus = newCheckedIn >= totalTickets ? 'used' : 'partial';
 
-    const sql = `BEGIN;
-      UPDATE ticket_bookings
-      SET checked_in_count = checked_in_count + ${checkInCount},
-          entry_status = CASE WHEN checked_in_count + ${checkInCount} >= total_tickets THEN 'used' ELSE 'partial' END,
-          first_checked_in_at = COALESCE(first_checked_in_at, now()),
-          last_checked_in_at = now()
-      WHERE id = '${safeBookingId}' AND checked_in_count = ${checkedInCount}
-      RETURNING id, checked_in_count, total_tickets, first_checked_in_at, last_checked_in_at, entry_status;
+    const { data: updatedRows, error: updateErr } = await supabase
+      .from('ticket_bookings')
+      .update({
+        checked_in_count: newCheckedIn,
+        entry_status: newEntryStatus,
+        first_checked_in_at: (booking as any).first_checked_in_at || new Date().toISOString(),
+        last_checked_in_at: new Date().toISOString(),
+      })
+      .eq('id', bookingId)
+      .eq('checked_in_count', checkedInCount)
+      .select('id, checked_in_count, total_tickets, first_checked_in_at, last_checked_in_at, entry_status')
+      .maybeSingle();
 
-      INSERT INTO ticket_scans (booking_id, event_id, scanned_by, scanned_count, running_total, scan_result)
-      SELECT id, '${safeEventId}', '${safeScannedBy}', ${checkInCount}, checked_in_count, 'checked_in'
-      FROM ticket_bookings
-      WHERE id = '${safeBookingId}';
-    COMMIT;`;
-
-    const { data: execResult, error: execError } = await supabase.rpc('exec', { sql });
-
-    if (execError) {
-      console.error('Error executing check-in transaction:', execError.message);
+    if (updateErr) {
+      console.error('Error updating booking checked_in_count (check-in):', updateErr);
       return NextResponse.json({ error: 'Failed' }, { status: 500 });
     }
 
-    // execResult may be an array of results; try to find the update RETURNING row
-    let updatedBooking: any = null;
-    if (Array.isArray(execResult) && execResult.length > 0) {
-      for (const item of execResult) {
-        if (item && item.checked_in_count !== undefined) {
-          updatedBooking = item;
-          break;
-        }
-      }
+    if (!updatedRows) {
+      // No row updated — likely concurrent update; ask client to retry
+      return NextResponse.json({ error: 'conflict', message: 'Concurrent update detected, please retry' }, { status: 409 });
     }
 
-    if (!updatedBooking) {
-      // Could be a race (checked_in_count changed), tell caller to retry
-      return NextResponse.json({ error: 'conflict', message: 'Concurrent update detected, please retry' }, { status: 409 });
+    // Insert scan record referencing the updated booking
+    try {
+      const { error: insertErr } = await supabase.from('ticket_scans').insert([
+        {
+          booking_id: updatedRows.id,
+          event_id: eventId,
+          scanned_by: String(sessionUser.id),
+          scanned_count: checkInCount,
+          running_total: updatedRows.checked_in_count,
+          scan_result: 'checked_in',
+        },
+      ]);
+
+      if (insertErr) {
+        console.error('Error inserting ticket_scans row (check-in):', insertErr);
+        // Note: we do not roll back the booking update here; surface an error
+        return NextResponse.json({ error: 'Failed' }, { status: 500 });
+      }
+    } catch (e) {
+      console.error('Unexpected error inserting ticket_scans (check-in):', e);
+      return NextResponse.json({ error: 'Failed' }, { status: 500 });
     }
 
     return NextResponse.json({
       result: 'ok',
-      bookingId: updatedBooking.id,
-      checked_in_count: updatedBooking.checked_in_count,
-      total_tickets: updatedBooking.total_tickets,
-      first_checked_in_at: updatedBooking.first_checked_in_at,
-      last_checked_in_at: updatedBooking.last_checked_in_at,
-      entry_status: updatedBooking.entry_status,
+      bookingId: updatedRows.id,
+      checked_in_count: updatedRows.checked_in_count,
+      total_tickets: updatedRows.total_tickets,
+      first_checked_in_at: updatedRows.first_checked_in_at,
+      last_checked_in_at: updatedRows.last_checked_in_at,
+      entry_status: updatedRows.entry_status,
     });
   } catch (err) {
     console.error('Error in staff tickets check-in POST:', err);
