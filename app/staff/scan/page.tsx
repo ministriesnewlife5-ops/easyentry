@@ -199,15 +199,15 @@ export default function StaffScanPage() {
   if (!selected) return null;
 
   return (
-    <div className="min-h-screen p-4 bg-[#0D0D0D] text-[#F5F5DC]">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-[#E5A823]">Scanner</h1>
-          <p className="text-sm mt-1">{selected.eventTitle} — <span className="font-mono">{selected.eventCode}</span></p>
+    <div className="min-h-screen p-4 bg-[#0D0D0D] text-[#F5F5DC] overflow-x-hidden">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-semibold text-[#E5A823] truncate">Scanner</h1>
+          <p className="text-sm mt-1 truncate">{selected.eventTitle} — <span className="font-mono">{selected.eventCode}</span></p>
         </div>
-        <div className="flex items-center gap-3">
-          <button className="px-3 py-2 bg-[#111] rounded" onClick={() => router.push('/staff/event')}>Change Event</button>
-          <button className="px-3 py-2 bg-[#111] rounded" onClick={() => signOut({ callbackUrl: '/staff' })}>Logout</button>
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+          <button className="w-full sm:w-auto px-3 py-2 bg-[#111] rounded text-left sm:text-center" onClick={() => router.push('/staff/event')}>Change Event</button>
+          <button className="w-full sm:w-auto px-3 py-2 bg-[#111] rounded" onClick={() => signOut({ callbackUrl: '/staff' })}>Logout</button>
         </div>
       </header>
 
@@ -220,19 +220,19 @@ export default function StaffScanPage() {
             <div className="absolute inset-0 pointer-events-none">
               <div className="absolute inset-0 bg-black/60" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="relative w-[60%] max-w-[380px] aspect-square z-10">
+                <div className="relative w-[60%] max-w-[90%] md:max-w-[380px] aspect-square z-10">
                   {/* Corner brackets */}
-                  <div className="absolute -top-2 -left-2 w-10 h-10">
-                    <div className="w-10 h-10 border-t-4 border-l-4 border-[#E5A823]" />
+                  <div className="absolute -top-2 -left-2 w-8 h-8 md:w-10 md:h-10">
+                    <div className="w-full h-full border-t-4 border-l-4 border-[#E5A823]" />
                   </div>
-                  <div className="absolute -top-2 -right-2 w-10 h-10">
-                    <div className="w-10 h-10 border-t-4 border-r-4 border-[#E5A823]" />
+                  <div className="absolute -top-2 -right-2 w-8 h-8 md:w-10 md:h-10">
+                    <div className="w-full h-full border-t-4 border-r-4 border-[#E5A823]" />
                   </div>
-                  <div className="absolute -bottom-2 -left-2 w-10 h-10">
-                    <div className="w-10 h-10 border-b-4 border-l-4 border-[#E5A823]" />
+                  <div className="absolute -bottom-2 -left-2 w-8 h-8 md:w-10 md:h-10">
+                    <div className="w-full h-full border-b-4 border-l-4 border-[#E5A823]" />
                   </div>
-                  <div className="absolute -bottom-2 -right-2 w-10 h-10">
-                    <div className="w-10 h-10 border-b-4 border-r-4 border-[#E5A823]" />
+                  <div className="absolute -bottom-2 -right-2 w-8 h-8 md:w-10 md:h-10">
+                    <div className="w-full h-full border-b-4 border-r-4 border-[#E5A823]" />
                   </div>
                 </div>
               </div>
@@ -250,9 +250,9 @@ export default function StaffScanPage() {
         )}
 
         <section className="mt-4 bg-[#111] p-4 rounded">
-          <div className="flex gap-2">
-            <input value={manualId} onChange={(e) => setManualId(e.target.value)} placeholder="Manual booking ID" className="flex-1 p-3 rounded bg-[#0b0b0b]" />
-            <button onClick={onManualVerify} className="px-4 py-2 bg-[#E5A823] text-black rounded">Verify</button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input value={manualId} onChange={(e) => setManualId(e.target.value)} placeholder="Manual booking ID" className="flex-1 p-3 rounded bg-[#0b0b0b] w-full" />
+            <button onClick={onManualVerify} className="w-full sm:w-auto px-4 py-2 bg-[#E5A823] text-black rounded">Verify</button>
           </div>
 
           {verifyResult && (
@@ -277,29 +277,33 @@ export default function StaffScanPage() {
                         <button onClick={() => onMarkPaid((verifyResult as any).bookingId)} className="px-4 py-2 bg-[#E5A823] text-black rounded">Mark as Paid (₹{verifyResult.remainingAmount})</button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-3">
-                        <label className="text-sm">Check-in:</label>
-                        <div className="inline-flex items-center bg-[#0b0b0b] rounded">
-                          <button
-                            onClick={() => setCheckInCount((c) => Math.max(1, c - 1))}
-                            disabled={checkInCount <= 1}
-                            className={`w-12 h-12 flex items-center justify-center ${checkInCount <= 1 ? 'bg-[#222] text-[#777]' : 'bg-[#111] text-[#F5F5DC]'} rounded-l`}
-                            aria-label="decrement"
-                          >
-                            −
-                          </button>
-                          <div className="w-20 text-center text-lg font-medium">{checkInCount}</div>
-                          <button
-                            onClick={() => setCheckInCount((c) => Math.min(verifyResult.remaining, c + 1))}
-                            disabled={checkInCount >= verifyResult.remaining}
-                            className={`w-12 h-12 flex items-center justify-center ${checkInCount >= verifyResult.remaining ? 'bg-[#222] text-[#777]' : 'bg-[#111] text-[#F5F5DC]'} rounded-r`}
-                            aria-label="increment"
-                          >
-                            +
-                          </button>
+                      <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                          <label className="text-sm">Check-in:</label>
+                          <div className="inline-flex items-center bg-[#0b0b0b] rounded">
+                            <button
+                              onClick={() => setCheckInCount((c) => Math.max(1, c - 1))}
+                              disabled={checkInCount <= 1}
+                              className={`min-w-[44px] min-h-[44px] flex items-center justify-center ${checkInCount <= 1 ? 'bg-[#222] text-[#777]' : 'bg-[#111] text-[#F5F5DC]'} rounded-l`}
+                              aria-label="decrement"
+                            >
+                              −
+                            </button>
+                            <div className="min-w-[56px] text-center text-lg font-medium px-2">{checkInCount}</div>
+                            <button
+                              onClick={() => setCheckInCount((c) => Math.min(verifyResult.remaining, c + 1))}
+                              disabled={checkInCount >= verifyResult.remaining}
+                              className={`min-w-[44px] min-h-[44px] flex items-center justify-center ${checkInCount >= verifyResult.remaining ? 'bg-[#222] text-[#777]' : 'bg-[#111] text-[#F5F5DC]'} rounded-r`}
+                              aria-label="increment"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <div className="text-sm">of {verifyResult.remaining} remaining</div>
                         </div>
-                        <div className="text-sm">of {verifyResult.remaining} remaining</div>
-                        <button onClick={() => onConfirmCheckIn((verifyResult as any).bookingId, checkInCount)} className="px-4 py-2 bg-[#E5A823] text-black rounded">Confirm Check-In</button>
+                        <div className="w-full sm:w-auto">
+                          <button onClick={() => onConfirmCheckIn((verifyResult as any).bookingId, checkInCount)} className="w-full sm:w-auto px-4 py-2 bg-[#E5A823] text-black rounded">Confirm Check-In</button>
+                        </div>
                       </div>
                     )}
                   </div>
