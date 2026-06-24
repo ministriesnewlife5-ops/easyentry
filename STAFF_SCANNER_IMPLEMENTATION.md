@@ -25,14 +25,18 @@ Update this table as work is completed. Status values: `TODO`, `IN PROGRESS`, `D
 | 7 | QR payload fix (booking ID only) | DONE | qr payload changed to bookingId only in app/events/[id]/page.tsx |
 | 8 | Verification API | DONE | Verified against real booking data on production (pay_at_venue/unpaid scenario tested) |
 | 9 | Mark Paid + Check-In APIs | DONE | mark-paid and check-in APIs implemented; optimistic-lock pattern used to avoid missing RPC dependency |
-| 10 | Scanner page (PWA UI) | TODO | |
-| 11 | PWA manifest | TODO | |
+| 10 | Scanner page (PWA UI) | DONE | Manual verification completed on real Android device — see Implementation Log for details |
+| 11 | PWA manifest | DONE | Created public/staff-manifest.json, generated icon-192.png and icon-512.png from existing logo, added manifest link + PWA meta tags to app/staff/layout.tsx |
 | 12 | End-to-end testing checklist | TODO | |
 
 ### Implementation Log
 *(Append one line per session, most recent on top. Example: "2026-06-22 — Completed Step 2, STAFF role added to lib/roles.ts, onboarding updated, build passed.")*
 
 -
+
+2026-06-24 — Step 11 (PWA manifest) implemented: created public/staff-manifest.json, generated public/icon-192.png and public/icon-512.png from existing Easy Entry Logo.png via sharp, added manifest link and PWA meta tags (theme-color, apple-mobile-web-app-capable, mobile-web-app-capable) to app/staff/layout.tsx. TypeScript compiled successfully.
+
+2026-06-24 — Step 10 (scanner page) mobile layout fixes manually verified on a real Android phone: (a) check-in stepper correctly defaults to full remaining ticket count, (b) "Confirm Check-In" button fully visible within its card with no horizontal overflow, (c) QR scanner viewfinder shows exactly one clean overlay (no duplicate brackets), (d) overall page fits mobile viewport with no horizontal scrolling. **IMPORTANT: iPhone/Safari testing has NOT been done yet and should be flagged as outstanding before this feature is considered fully production-ready for all staff devices, since the QR scanning library's iOS compatibility is unconfirmed.**
 
 2026-06-24 — QR payload fix completed: QR generation previously encoded full JSON (bookingId, event, tickets, timestamp) which exposed unnecessary data to client-side QR payloads and made server-side verification rely on client-provided data. Fixed by changing the QR generator to emit only the `bookingId` (in `app/events/[id]/page.tsx`, `QRCodeCanvas` now sets `const qrData = bookingId`). This ensures staff scanners send only the booking identifier and the server-side verification API performs authoritative lookups.
 
