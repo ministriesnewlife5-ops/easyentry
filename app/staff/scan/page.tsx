@@ -131,6 +131,12 @@ export default function StaffScanPage() {
       });
       const body = await res.json();
       setVerifyResult(body as VerifyResult);
+      if ((body as any).result === 'valid') {
+        // default stepper to full remaining on valid ticket
+        try {
+          setCheckInCount(Number((body as any).remaining) || 1);
+        } catch (e) {}
+      }
       if ((body as any).result !== 'valid') setMessage({ type: 'warn', text: `Result: ${(body as any).result}` });
       else setMessage({ type: 'success', text: 'Ticket valid' });
     } catch (e) {
@@ -206,11 +212,33 @@ export default function StaffScanPage() {
 
       <main className="mt-4">
         <div className="rounded overflow-hidden bg-[#111] p-3">
-          <div className="w-full h-56 bg-black flex items-center justify-center">
+          <div className="w-full h-56 bg-black flex items-center justify-center relative">
             <div id="html5qr-scanner" className="w-full h-full" />
+
+            {/* Overlay: dim outside, centered square with corner brackets */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute inset-0 bg-black/60" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="relative w-[60%] max-w-[380px] aspect-square z-10">
+                  {/* Corner brackets */}
+                  <div className="absolute -top-2 -left-2 w-10 h-10">
+                    <div className="w-10 h-10 border-t-4 border-l-4 border-[#E5A823]" />
+                  </div>
+                  <div className="absolute -top-2 -right-2 w-10 h-10">
+                    <div className="w-10 h-10 border-t-4 border-r-4 border-[#E5A823]" />
+                  </div>
+                  <div className="absolute -bottom-2 -left-2 w-10 h-10">
+                    <div className="w-10 h-10 border-b-4 border-l-4 border-[#E5A823]" />
+                  </div>
+                  <div className="absolute -bottom-2 -right-2 w-10 h-10">
+                    <div className="w-10 h-10 border-b-4 border-r-4 border-[#E5A823]" />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           <div className="mt-3">
-            <p className="text-sm text-[#F5F5DC]/70">Point the camera at the ticket QR. If camera is unavailable, enter booking ID manually.</p>
+            <p className="text-sm text-[#F5F5DC]/70">Point camera at ticket QR code. If camera is unavailable, enter booking ID manually.</p>
           </div>
         </div>
 
@@ -248,9 +276,28 @@ export default function StaffScanPage() {
                         <button onClick={() => onMarkPaid((verifyResult as any).bookingId)} className="px-4 py-2 bg-[#E5A823] text-black rounded">Mark as Paid (₹{verifyResult.remainingAmount})</button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         <label className="text-sm">Check-in:</label>
-                        <input type="number" min={1} max={verifyResult.remaining} value={checkInCount} onChange={(e) => setCheckInCount(Math.max(1, Math.min(Number(e.target.value || 1), verifyResult.remaining)))} className="w-20 p-2 rounded bg-[#0b0b0b]" />
+                        <div className="inline-flex items-center bg-[#0b0b0b] rounded">
+                          <button
+                            onClick={() => setCheckInCount((c) => Math.max(1, c - 1))}
+                            disabled={checkInCount <= 1}
+                            className={`w-12 h-12 flex items-center justify-center ${checkInCount <= 1 ? 'bg-[#222] text-[#777]' : 'bg-[#111] text-[#F5F5DC]'} rounded-l`}
+                            aria-label="decrement"
+                          >
+                            −
+                          </button>
+                          <div className="w-20 text-center text-lg font-medium">{checkInCount}</div>
+                          <button
+                            onClick={() => setCheckInCount((c) => Math.min(verifyResult.remaining, c + 1))}
+                            disabled={checkInCount >= verifyResult.remaining}
+                            className={`w-12 h-12 flex items-center justify-center ${checkInCount >= verifyResult.remaining ? 'bg-[#222] text-[#777]' : 'bg-[#111] text-[#F5F5DC]'} rounded-r`}
+                            aria-label="increment"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <div className="text-sm">of {verifyResult.remaining} remaining</div>
                         <button onClick={() => onConfirmCheckIn((verifyResult as any).bookingId, checkInCount)} className="px-4 py-2 bg-[#E5A823] text-black rounded">Confirm Check-In</button>
                       </div>
                     )}
