@@ -26,6 +26,7 @@ type OutletEventSummary = {
   rejectionReason?: string;
   isPublished: boolean;
   publicEventUrl?: string;
+  eventCode?: string;
 };
 
 function getEventCutoffTimestamp(dateValue: string) {
@@ -86,6 +87,7 @@ export async function GET(request: NextRequest) {
         rejectionReason: requestItem.rejectionReason,
         isPublished: Boolean(publishedEvent),
         publicEventUrl: publishedEvent ? `/events/${publishedEvent.id}` : undefined,
+        eventCode: publishedEvent ? ((publishedEvent as any).eventCode || (publishedEvent as any).event_code) : undefined,
       };
 
       if (requestItem.status === 'pending') {

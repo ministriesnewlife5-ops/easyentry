@@ -146,19 +146,39 @@ export async function POST(request: NextRequest) {
     }
 
     const { client: razorpay, keyId } = getRazorpayClient();
-    const order = await razorpay.orders.create({
-      amount: Math.round(convenienceFeeAmount * 100),
-      currency,
-      receipt: `pay-at-venue-${eventId}-${Date.now()}`,
-      notes: {
-        eventId,
-        eventTitle: eventTitle || (event as any).title || '',
-        paymentMode: 'pay_at_venue',
-        convenienceFeePerTicket: String(convenienceFeePerTicket),
-        convenienceFeeAmount: String(convenienceFeeAmount),
-        remainingAmount: String(fullTicketAmount),
-      },
-    });
+    let order: any;
+    try {
+      // Razorpay enforces a max length of 40 for `receipt`. Build a short receipt
+      // by using a compact prefix + first 8 chars of eventId + a short timestamp fragment.
+      const receiptPrefix = 'payatv';
+      const eventIdShort = String(eventId || '').slice(0, 8);
+      const timeShort = String(Date.now()).slice(-6);
+      const receipt = `${receiptPrefix}-${eventIdShort}-${timeShort}`.slice(0, 40);
+
+      order = await razorpay.orders.create({
+        amount: Math.round(convenienceFeeAmount * 100),
+        currency,
+        receipt,
+        notes: {
+          eventId,
+          eventTitle: eventTitle || (event as any).title || '',
+          paymentMode: 'pay_at_venue',
+          convenienceFeePerTicket: String(convenienceFeePerTicket),
+          convenienceFeeAmount: String(convenienceFeeAmount),
+          remainingAmount: String(fullTicketAmount),
+        },
+      });
+    } catch (rpErr) {
+      let errMsg: string;
+      if (rpErr && typeof rpErr === 'object') {
+        errMsg = (rpErr as any).error || (rpErr as any).message || JSON.stringify(rpErr);
+      } else {
+        errMsg = String(rpErr);
+      }
+
+      logStructured('payment/pay-at-venue', 'Razorpay order creation failed', { error: errMsg, details: rpErr });
+      return respondError('RAZORPAY_ORDER_FAILED', 'Failed to create Razorpay order', { error: String(errMsg) }, 500);
+    }
 
     return respondSuccess(
       {
@@ -176,7 +196,20 @@ export async function POST(request: NextRequest) {
       200
     );
   } catch (error) {
-    logStructured('payment/pay-at-venue', 'Pay at Venue flow failed', { error: String(error) });
-    return respondError('PAY_AT_VENUE_FAILED', 'Failed to process Pay at Venue flow', { error: String(error) }, 500);
+    // Normalize and log error details for easier debugging
+    let errorDetails: Record<string, unknown> | string = String(error);
+    try {
+      if (error instanceof Error) {
+        errorDetails = { message: error.message, stack: error.stack };
+      } else if (typeof error === 'object' && error !== null) {
+        errorDetails = JSON.parse(JSON.stringify(error, Object.getOwnPropertyNames(error)));
+      }
+    } catch (e) {
+      errorDetails = String(error);
+    }
+
+    logStructured('payment/pay-at-venue', 'Pay at Venue flow failed', { error: errorDetails });
+    const errMsg = typeof errorDetails === 'string' ? errorDetails : (errorDetails as any).message || JSON.stringify(errorDetails);
+    return respondError('PAY_AT_VENUE_FAILED', 'Failed to process Pay at Venue flow', { error: String(errMsg) }, 500);
   }
 }

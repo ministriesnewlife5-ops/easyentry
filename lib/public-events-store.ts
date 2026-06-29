@@ -109,6 +109,7 @@ export type PublicEvent = {
   artists: PublicEventArtist[];
   publishedAt: number;
   sourceRequestId?: string;
+  eventCode?: string;
   ticketCategories?: PublicEventTicketCategory[];
   taggedArtists?: PublicEventTaggedArtist[];
 };
@@ -205,6 +206,7 @@ function mapEventToDb(event: Partial<PublicEvent> & { sourceRequestId?: string }
     social_links: Object.keys(socialLinks).length > 0 ? socialLinks : null,
     convenience_fee: Number.isFinite(Number(event.convenienceFee)) ? Number(event.convenienceFee) : 0,
     pay_at_venue_enabled: Boolean(event.payAtVenueEnabled ?? false),
+    event_code: (event as any).eventCode || (event as any).event_code || null,
     request_id: event.sourceRequestId || null,
   };
 }
@@ -332,6 +334,7 @@ function mapDbToEvent(
     artists: [],
     publishedAt: new Date(record.published_at as string).getTime(),
     sourceRequestId: (record.request_id as string) || undefined,
+    eventCode: (record.event_code as string) || undefined,
     ticketCategories,
     taggedArtists,
   };
@@ -765,6 +768,38 @@ export async function getPublishedEventCards(): Promise<PublicEventCard[]> {
  */
 export async function publishEventFromRequest(request: EventRequest): Promise<PublicEvent> {
   const eventData = createApprovedEvent(request);
+  // Ensure a short human-readable event code exists for staff search
+  async function ensureEventCode(data: Partial<PublicEvent>) {
+    const candidateChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const gen = () => Array.from({ length: 8 }).map(() => candidateChars.charAt(Math.floor(Math.random() * candidateChars.length))).join('');
+    const sup = supabase;
+
+    // If already present, keep it
+    if ((data as any).eventCode || (data as any).event_code) return;
+
+    for (let i = 0; i < 6; i++) {
+      const code = gen();
+      const { data: existing, error } = await sup
+        .from('published_events')
+        .select('id')
+        .eq('event_code', code)
+        .maybeSingle();
+      if (error) {
+        // on DB error, continue and try another code
+        console.error('Error checking event_code uniqueness:', error.message);
+        continue;
+      }
+      if (!existing) {
+        (data as any).eventCode = code;
+        return;
+      }
+    }
+
+    // Fallback: use prefix from uuid
+    (data as any).eventCode = (request.id || '').toString().slice(0, 8).toUpperCase() || gen();
+  }
+
+  await ensureEventCode(eventData);
   const dbData = mapEventToDb({ ...eventData, sourceRequestId: request.id });
 
   try {

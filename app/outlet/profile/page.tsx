@@ -39,6 +39,7 @@ type OutletEventItem = {
   rejectionReason?: string;
   isPublished: boolean;
   publicEventUrl?: string;
+  eventCode?: string;
 };
 
 type OutletEventsResponse = {
@@ -1058,9 +1059,32 @@ function EventsSection({
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="text-xl font-semibold text-[#F5F5DC]">{event.title}</h4>
-                        <StatusBadge status={event.status} />
-                      </div>
+                          <h4 className="text-xl font-semibold text-[#F5F5DC]">{event.title}</h4>
+                          <StatusBadge status={event.status} />
+                        </div>
+                        {event.eventCode && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-sm text-[#F5F5DC]/60">Code:</span>
+                            <span className="text-sm font-medium text-[#E5A823]">{event.eventCode}</span>
+                            <button
+                              onClick={() => {
+                                try {
+                                  navigator.clipboard.writeText(event.eventCode || '');
+                                } catch (e) {
+                                  const el = document.createElement('textarea');
+                                  el.value = event.eventCode || '';
+                                  document.body.appendChild(el);
+                                  el.select();
+                                  document.execCommand('copy');
+                                  document.body.removeChild(el);
+                                }
+                              }}
+                              className="ml-2 px-2 py-1 rounded bg-[#2A2A2A] text-xs hover:bg-[#3A3A3A]"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        )}
                       <p className="mt-1 text-sm text-[#F5F5DC]/60">{event.subtitle}</p>
                     </div>
 

@@ -20,6 +20,16 @@ function clampPercent(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 
+function getCouponSharePercent(item: IntentTicketCategory, sourceType?: string | null): number {
+  if (sourceType === 'artist') {
+    return clampPercent(toFiniteNumber(item.artistShare));
+  }
+  if (sourceType === 'promoter') {
+    return clampPercent(toFiniteNumber(item.influencerShare));
+  }
+  return 0;
+}
+
 type IntentTicketCategory = {
   quantity?: number;
   price?: number;
@@ -62,11 +72,7 @@ function computeMoneySplit(
     const price = Math.max(0, toFiniteNumber(item.price));
     const lineBase = qty * price;
 
-    const couponSharePercent = couponSourceType === 'artist'
-      ? clampPercent(toFiniteNumber(item.artistShare))
-      : (couponSourceType === 'promoter'
-          ? clampPercent(toFiniteNumber(item.influencerShare))
-          : 0);
+    const couponSharePercent = getCouponSharePercent(item, couponSourceType);
 
     const lineDiscount = lineBase * (couponSharePercent / 100);
     const lineCustomerBase = Math.max(0, lineBase - lineDiscount);
@@ -263,7 +269,8 @@ export async function POST(request: NextRequest) {
         });
 
         if (bookingError || !booking) {
-          return respondError('BOOKING_CREATE_FAILED', 'Failed to create booking', { error: bookingError?.message || 'Unknown error' }, 500);
+          logStructured('payment/verify', 'Pay-at-venue booking insert failed', { bookingError });
+          return respondError('BOOKING_CREATE_FAILED', 'Failed to create booking', { error: (bookingError as any)?.message || JSON.stringify(bookingError) || 'Unknown error' }, 500);
         }
 
         // Generate QR code for pay at venue booking
@@ -354,7 +361,8 @@ export async function POST(request: NextRequest) {
       });
 
       if (bookingError || !booking) {
-        return respondError('BOOKING_CREATE_FAILED', 'Failed to create booking', { error: bookingError?.message || 'Unknown error' }, 500);
+        logStructured('payment/verify', 'Pay-at-venue booking insert failed (with payment ids)', { bookingError });
+        return respondError('BOOKING_CREATE_FAILED', 'Failed to create booking', { error: (bookingError as any)?.message || JSON.stringify(bookingError) || 'Unknown error' }, 500);
       }
 
       // Generate QR code for pay at venue booking

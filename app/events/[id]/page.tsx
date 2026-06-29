@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, ChevronDown, Heart, Instagram, MapPin, MapPinned, Star, Ticket, Video, Play, Loader2, CheckCircle, Download, X, MessageCircle } from 'lucide-react';
 import { BsWhatsapp } from 'react-icons/bs';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import type { PublicEvent } from '@/lib/public-events-store';
 import { useSession } from 'next-auth/react';
@@ -107,6 +107,55 @@ export default function EventDetailsPage() {
 
     fetchEvent();
   }, [params.id]);
+
+  const searchParams = useSearchParams();
+
+  // If `bookingId` query param is present, load that booking and show the ticket
+  useEffect(() => {
+    const bookingId = searchParams?.get('bookingId');
+    if (!bookingId) return;
+
+    const fetchBooking = async () => {
+      try {
+        const resp = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}`, { cache: 'no-store' });
+        if (!resp.ok) {
+          console.error('Failed to fetch booking by id');
+          return;
+        }
+        const payload = await resp.json().catch(() => ({}));
+        const booking = payload?.booking;
+        if (!booking) return;
+
+        const mappedTickets = Array.isArray(booking.ticket_categories)
+          ? booking.ticket_categories.map((t: any) => ({ id: t.id, name: t.name, quantity: t.quantity, price: t.price }))
+          : [];
+
+        const newBooking: BookingDetails = {
+          bookingId: booking.id,
+          paymentId: booking.payment_id || '',
+          eventTitle: booking.event_title || booking.event_title || '',
+          eventDate: booking.event_date || '',
+          eventTime: event?.time || '',
+          venue: booking.event_venue || booking.event_venue || '',
+          tickets: mappedTickets,
+          totalAmount: Number((booking.amount_paid || 0) + (booking.remaining_amount || 0)),
+          remainingAmount: Number(booking.remaining_amount || 0),
+          amountPaid: Number(booking.amount_paid || 0),
+          paymentMode: booking.payment_mode || undefined,
+          userName: booking.user_name || '',
+          userEmail: booking.user_email || '',
+          bookedAt: booking.booked_at || new Date().toISOString(),
+        };
+
+        setBookingDetails(newBooking);
+        setShowSuccessModal(true);
+      } catch (err) {
+        console.error('Failed to load booking by id:', err);
+      }
+    };
+
+    fetchBooking();
+  }, [searchParams, event]);
 
   useEffect(() => {
     if (!event) return;
@@ -672,7 +721,7 @@ export default function EventDetailsPage() {
               setQuantities({});
               setShowTicketSection(false);
             } else {
-              throw new Error(verifyData.error || 'Payment verification failed');
+              throw new Error(verifyData?.message || verifyData?.code || verifyData?.error || 'Payment verification failed');
             }
           } catch (error) {
             console.error('Payment verification error:', error);
@@ -762,7 +811,7 @@ export default function EventDetailsPage() {
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.error || 'Failed to start Pay at Venue flow');
+        throw new Error(payload?.message || payload?.code || payload?.error || 'Failed to start Pay at Venue flow');
       }
 
       if (payload?.details?.direct) {
@@ -860,7 +909,7 @@ export default function EventDetailsPage() {
               setShowTicketSection(false);
               setCheckoutMode('online');
             } else {
-              throw new Error(verifyData.error || 'Pay at Venue verification failed');
+              throw new Error(verifyData?.message || verifyData?.code || verifyData?.error || 'Pay at Venue verification failed');
             }
           } catch (error) {
             console.error('Pay at Venue verification error:', error);
@@ -1618,7 +1667,7 @@ export default function EventDetailsPage() {
 
                     {/* Booking Code & ID */}
                     <div className="mt-4 pt-4 border-t border-[#2A2A2A] text-center space-y-1">
-                      <p className="text-xs text-[#F5F5DC]/40">Booking code: {bookingDetails.bookingId.slice(0, 8).toUpperCase()}</p>
+                      <p className="text-xs text-[#F5F5DC]/40">Booking code: {typeof bookingDetails.bookingId === 'string' ? bookingDetails.bookingId.slice(0, 8).toUpperCase() : ''}</p>
                       <p className="text-xs text-[#F5F5DC]/40">Booking ID: {bookingDetails.paymentId}</p>
                     </div>
                   </div>
@@ -1658,13 +1707,8 @@ function QRCodeCanvas({
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    // Generate QR code data
-    const qrData = JSON.stringify({
-      bookingId,
-      event: eventTitle,
-      tickets: tickets.map(t => ({ name: t.name, qty: t.quantity })),
-      timestamp: Date.now(),
-    });
+    // Generate QR code data (booking ID only)
+    const qrData = bookingId;
 
     // Generate QR code on canvas
     QRCode.toCanvas(canvasRef.current, qrData, {

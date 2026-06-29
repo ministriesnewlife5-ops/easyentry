@@ -75,6 +75,16 @@ type CouponQuickValidationResponse = {
   message: string;
 };
 
+function getCouponSharePercent(category: TicketCategory, sourceType: 'artist' | 'promoter' | null): number {
+  if (sourceType === 'artist') {
+    return Number(category.artist_share ?? category.artistShare ?? 0);
+  }
+  if (sourceType === 'promoter') {
+    return Number(category.influencer_share ?? category.influencerShare ?? 0);
+  }
+  return 0;
+}
+
 /**
  * POST /api/global-coupons/preview
  * 
@@ -282,12 +292,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<CouponPre
         );
       }
 
-      // Determine share percentage based on event creator type
-      const sharePercent = typedCoupon.source_type === 'artist'
-        ? Number(category.artist_share ?? category.artistShare ?? 0)
-        : (typedCoupon.source_type === 'promoter'
-            ? Number(category.influencer_share ?? category.influencerShare ?? 0)
-            : 0);
+      // Determine discount share percentage from the ticket category and coupon source type.
+      // Artist coupons use artist_share, promoter coupons use influencer_share.
+      const sharePercent = getCouponSharePercent(category, typedCoupon.source_type);
 
       const lineTotal = ticket.quantity * ticket.price;
       const lineDiscount = lineTotal * (sharePercent / 100);

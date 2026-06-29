@@ -18,6 +18,7 @@ type BookingHistoryItem = {
   status: 'Completed' | 'Upcoming';
   tickets: number;
   price: string;
+  eventId: string;
 };
 
 // Component that uses search params - wrapped in Suspense
@@ -64,6 +65,7 @@ function ProfileContent() {
           status: isCompleted ? 'Completed' : 'Upcoming',
           tickets: totalTickets,
           price: `₹${Number(booking.amount_paid || 0).toLocaleString('en-IN')}`,
+          eventId: booking.event_id || booking.eventId || '',
         };
       });
 
@@ -370,9 +372,12 @@ function ProfileContent() {
                               <span className="text-[#F5F5DC]/80">{booking.tickets} tickets</span>
                               <span className="text-[#E5A823] font-bold">{booking.price}</span>
                             </div>
-                            <button className="px-3 py-1 border border-[#E5A823] text-[#E5A823] rounded-lg text-sm font-bold hover:bg-[#E5A823] hover:text-[#0D0D0D] transition-colors">
+                            <Link
+                              href={`/events/${booking.eventId}?bookingId=${booking.id}`}
+                              className="px-3 py-1 border border-[#E5A823] text-[#E5A823] rounded-lg text-sm font-bold hover:bg-[#E5A823] hover:text-[#0D0D0D] transition-colors"
+                            >
                               View Ticket
-                            </button>
+                            </Link>
                           </div>
                         </div>
                       </div>
