@@ -69,7 +69,7 @@ export default function OutletHostEventPage() {
       return;
     }
     if (status === 'authenticated' && !isOrganizerRole(session?.user?.role)) {
-      router.push('/events');
+      router.push('/');
     }
   }, [status, session, router]);
 

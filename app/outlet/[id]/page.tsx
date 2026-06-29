@@ -84,8 +84,8 @@ export default function OutletViewProfile() {
       <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC] flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">{error || 'Outlet Not Found'}</h1>
-          <Link href="/events" className="text-[#E5A823] hover:text-[#F5C542]">
-            Back to Events
+          <Link href="/" className="text-[#E5A823] hover:text-[#F5C542]">
+            Back
           </Link>
         </div>
       </div>
@@ -113,7 +113,7 @@ export default function OutletViewProfile() {
         
         <div className="absolute top-4 left-4 z-10">
           <Link 
-            href="/events"
+            href="/"
             className="inline-flex items-center gap-2 px-4 py-2 bg-[#0D0D0D]/60 backdrop-blur-md rounded-full text-[#F5F5DC] hover:bg-[#E5A823] hover:text-[#0D0D0D] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />

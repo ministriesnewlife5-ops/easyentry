@@ -304,64 +304,68 @@ export default function BrowseFilters({
       <div className="container mx-auto">
 
         {/* ── TOP FILTER BAR ── */}
-        <div className="flex gap-3 mb-6 overflow-x-auto scrollbar-hide pb-2 md:pb-0">
+        <div className="flex gap-3 mb-6 items-center justify-between">
+          {/* Left side filters */}
+          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 md:pb-0 flex-1">
+            {/* LOCATION BUTTON — BookMyShow style */}
+            <motion.button
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowLocationModal(true)}
+              className={`flex items-center gap-2 px-4 py-2 rounded text-xs font-bold transition-all uppercase tracking-wider whitespace-nowrap border ${
+                selectedCity
+                  ? 'bg-[#E5A823] text-[#0D0D0D] border-[#E5A823] shadow-[0_0_15px_rgba(229,168,35,0.4)]'
+                  : 'bg-[#2A2A2A] text-[#F5F5DC] border-[#2A2A2A] hover:border-[#E5A823]'
+              }`}
+            >
+              <MapPin className="w-3 h-3" />
+              {locationLabel}
+              <ChevronDown className="w-3 h-3 opacity-60" />
+            </motion.button>
 
-          {/* LOCATION BUTTON — BookMyShow style */}
-          <motion.button
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowLocationModal(true)}
-            className={`flex items-center gap-2 px-4 py-2 rounded text-xs font-bold transition-all uppercase tracking-wider whitespace-nowrap border ${
-              selectedCity
-                ? 'bg-[#E5A823] text-[#0D0D0D] border-[#E5A823] shadow-[0_0_15px_rgba(229,168,35,0.4)]'
-                : 'bg-[#2A2A2A] text-[#F5F5DC] border-[#2A2A2A] hover:border-[#E5A823]'
-            }`}
-          >
-            <MapPin className="w-3 h-3" />
-            {locationLabel}
-            <ChevronDown className="w-3 h-3 opacity-60" />
-          </motion.button>
+            {/* DATE button */}
+            <motion.button
+              whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }}
+              onClick={() => setShowDatePicker(true)}
+              className={`flex items-center gap-2 px-4 py-2 rounded text-xs font-bold transition-all uppercase tracking-wider whitespace-nowrap border ${
+                dateLabel ? 'bg-[#E5A823] text-[#0D0D0D] border-[#E5A823] shadow-[0_0_15px_rgba(229,168,35,0.4)]' : 'bg-[#2A2A2A] text-[#F5F5DC] border-[#2A2A2A] hover:border-[#E5A823]'
+              }`}
+            >
+              <Calendar className="w-3 h-3" />
+              {dateLabel || 'DATE'}
+            </motion.button>
 
-          {/* DATE button */}
-          <motion.button
-            whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }}
-            onClick={() => setShowDatePicker(true)}
-            className={`flex items-center gap-2 px-4 py-2 rounded text-xs font-bold transition-all uppercase tracking-wider whitespace-nowrap border ${
-              dateLabel ? 'bg-[#E5A823] text-[#0D0D0D] border-[#E5A823] shadow-[0_0_15px_rgba(229,168,35,0.4)]' : 'bg-[#2A2A2A] text-[#F5F5DC] border-[#2A2A2A] hover:border-[#E5A823]'
-            }`}
-          >
-            <Calendar className="w-3 h-3" />
-            {dateLabel || 'DATE'}
-          </motion.button>
+            {/* PRICE button */}
+            <motion.button
+              whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }}
+              onClick={() => setShowPricePicker(true)}
+              className={`flex items-center gap-2 px-4 py-2 rounded text-xs font-bold transition-all uppercase tracking-wider whitespace-nowrap border ${
+                priceLabel ? 'bg-[#E5A823] text-[#0D0D0D] border-[#E5A823] shadow-[0_0_15px_rgba(229,168,35,0.4)]' : 'bg-[#2A2A2A] text-[#F5F5DC] border-[#2A2A2A] hover:border-[#E5A823]'
+              }`}
+            >
+              <Tag className="w-3 h-3" />
+              {priceLabel || 'PRICE'}
+            </motion.button>
+          </div>
 
-          {/* PRICE button */}
-          <motion.button
-            whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }}
-            onClick={() => setShowPricePicker(true)}
-            className={`flex items-center gap-2 px-4 py-2 rounded text-xs font-bold transition-all uppercase tracking-wider whitespace-nowrap border ${
-              priceLabel ? 'bg-[#E5A823] text-[#0D0D0D] border-[#E5A823] shadow-[0_0_15px_rgba(229,168,35,0.4)]' : 'bg-[#2A2A2A] text-[#F5F5DC] border-[#2A2A2A] hover:border-[#E5A823]'
-            }`}
-          >
-            <Tag className="w-3 h-3" />
-            {priceLabel || 'PRICE'}
-          </motion.button>
-
-          {/* Other main filters (ARTIST, VENUES) */}
-          {filters.mainFilters
-            .filter(f => f.href)
-            .map((filter, i) => {
-              const IconComp = getIconComponent(filter.icon);
-              return (
-                <motion.button key={filter.name}
-                  whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }}
-                  onClick={() => router.push(filter.href!)}
-                  className="flex items-center gap-2 px-4 py-2 rounded text-xs font-bold transition-all uppercase tracking-wider whitespace-nowrap border bg-[#2A2A2A] text-[#F5F5DC] border-[#2A2A2A] hover:border-[#E5A823]"
-                >
-                  <IconComp className="w-3 h-3" />
-                  {filter.name}
-                </motion.button>
-              );
-            })}
+          {/* Right side filters (ARTIST, INFLUENCER, VENUES) */}
+          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 md:pb-0">
+            {filters.mainFilters
+              .filter(f => f.href)
+              .map((filter, i) => {
+                const IconComp = getIconComponent(filter.icon);
+                return (
+                  <motion.button key={filter.name}
+                    whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }}
+                    onClick={() => router.push(filter.href!)}
+                    className="flex items-center gap-2 px-4 py-2 rounded text-xs font-bold transition-all uppercase tracking-wider whitespace-nowrap border bg-[#2A2A2A] text-[#F5F5DC] border-[#2A2A2A] hover:border-[#E5A823]"
+                  >
+                    <IconComp className="w-3 h-3" />
+                    {filter.name}
+                  </motion.button>
+                );
+              })}
+          </div>
         </div>
 
         {/* ── LOCATION MODAL — BookMyShow style ── */}

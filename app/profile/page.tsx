@@ -122,7 +122,7 @@ function ProfileContent() {
   };
 
   const handleLogout = () => {
-    signOut({ callbackUrl: '/events' });
+    signOut({ callbackUrl: '/' });
   };
 
   const tabs = [
@@ -258,7 +258,7 @@ function ProfileContent() {
                   <p className="text-[#F5F5DC]/60">No events in your wishlist yet</p>
                   <p className="text-[#F5F5DC]/40 text-sm mt-2">Click the heart icon on any event card to add it here</p>
                   <Link 
-                    href="/events" 
+                    href="/" 
                     className="inline-block mt-4 px-4 py-2 bg-[#E5A823] text-[#0D0D0D] rounded-lg font-bold text-sm hover:bg-[#F5C542] transition-colors"
                   >
                     Browse Events
@@ -324,7 +324,7 @@ function ProfileContent() {
                   <p className="text-[#F5F5DC]/60">No bookings yet</p>
                   <p className="text-[#F5F5DC]/40 text-sm mt-2">Your ticket purchases will appear here</p>
                   <Link 
-                    href="/events" 
+                    href="/" 
                     className="inline-block mt-4 px-4 py-2 bg-[#E5A823] text-[#0D0D0D] rounded-lg font-bold text-sm hover:bg-[#F5C542] transition-colors"
                   >
                     Browse Events

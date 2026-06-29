@@ -908,8 +908,8 @@ export default function EventDetailsPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold">Event not found</h1>
           <p className="mt-2 text-[#F5F5DC]/60">This event is not available or has not been published yet.</p>
-          <Link href="/events" className="mt-6 inline-flex rounded-lg bg-[#E5A823] px-4 py-2 font-semibold text-[#0D0D0D]">
-            Back to events
+          <Link href="/" className="mt-6 inline-flex rounded-lg bg-[#E5A823] px-4 py-2 font-semibold text-[#0D0D0D]">
+            Back
           </Link>
         </div>
       </div>
@@ -1455,12 +1455,14 @@ export default function EventDetailsPage() {
                       </>
                     )}
                     <div className="h-px bg-[#2A2A2A]" />
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs text-[#F5F5DC]/50">{checkoutMode === 'pay_at_venue' ? calculatePayAtVenueTotal().totalTickets : calculateTotal().totalTickets} ticket{(checkoutMode === 'pay_at_venue' ? calculatePayAtVenueTotal().totalTickets : calculateTotal().totalTickets) !== 1 ? 's' : ''}</span>
-                        <p className="text-lg font-bold text-[#F5F5DC]">₹{(checkoutMode === 'pay_at_venue' ? calculatePayAtVenueTotal().convenienceFeeAmount : calculateTotal().total).toFixed(0)}</p>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <span className="text-xs text-[#F5F5DC]/50">{checkoutMode === 'pay_at_venue' ? calculatePayAtVenueTotal().totalTickets : calculateTotal().totalTickets} ticket{(checkoutMode === 'pay_at_venue' ? calculatePayAtVenueTotal().totalTickets : calculateTotal().totalTickets) !== 1 ? 's' : ''}</span>
+                          <p className="text-lg font-bold text-[#F5F5DC]">₹{(checkoutMode === 'pay_at_venue' ? calculatePayAtVenueTotal().convenienceFeeAmount : calculateTotal().total).toFixed(0)}</p>
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-2 sm:flex-row">
+                      <div className="flex flex-col gap-2 sm:flex-row w-full">
                         {event.payAtVenueEnabled && (
                           <motion.button
                             whileHover={{ scale: 1.02 }}
@@ -1470,7 +1472,7 @@ export default function EventDetailsPage() {
                               void handlePayAtVenue();
                             }}
                             disabled={isProcessingPayment || calculateTotal().totalTickets === 0}
-                            className="px-6 py-3 bg-amber-500 text-[#0D0D0D] font-bold text-sm rounded-xl hover:bg-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="flex-1 px-6 py-3 bg-amber-500 text-[#0D0D0D] font-bold text-sm rounded-xl hover:bg-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                           >
                             {isProcessingPayment && checkoutMode === 'pay_at_venue' ? (
                               <>
@@ -1490,7 +1492,7 @@ export default function EventDetailsPage() {
                             void handleProceedToPayment();
                           }}
                           disabled={isProcessingPayment || calculateTotal().totalTickets === 0}
-                          className="px-8 py-3 bg-[#EB4D4B] text-white font-bold text-sm rounded-xl hover:bg-[#d43d3b] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                          className="flex-1 px-8 py-3 bg-[#EB4D4B] text-white font-bold text-sm rounded-xl hover:bg-[#d43d3b] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                           {isProcessingPayment && checkoutMode === 'online' ? (
                             <>

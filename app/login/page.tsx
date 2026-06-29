@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Facebook, Linkedin, Loader2, ArrowRight } from 'lucide-react';
 import { signIn, getSession } from 'next-auth/react';
-import { getRoleHomePath, normalizeRole } from '@/lib/roles';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -114,8 +113,7 @@ export default function LoginPage() {
         setError(res.error);
         setIsLoading(false);
       } else {
-        const session = await getSession();
-        router.push(getRoleHomePath(normalizeRole(session?.user?.role)));
+        router.push('/');
         router.refresh();
       }
     } catch (err) {
@@ -141,8 +139,7 @@ export default function LoginPage() {
         setError(res.error);
         setIsLoading(false);
       } else {
-        const session = await getSession();
-        router.push(getRoleHomePath(normalizeRole(session?.user?.role)));
+        router.push('/');
         router.refresh();
       }
     } catch (err) {

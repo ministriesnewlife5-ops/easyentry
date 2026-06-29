@@ -587,7 +587,7 @@ function OutletProfileContent() {
                     type="image"
                     maxSize={10}
                     onFileSelect={handleGalleryImageUpload}
-                    className="w-40 h-40 rounded-xl"
+                    className="w-full h-40 rounded-xl"
                     label="Drop gallery photo"
                   />
                 </div>

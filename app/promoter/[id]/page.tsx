@@ -112,8 +112,8 @@ export default function PromoterViewProfile() {
       <div className="min-h-screen bg-[#0D0D0D] text-[#F5F5DC] flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Promoter Not Found</h1>
-          <Link href="/events" className="text-[#E5A823] hover:text-[#F5C542]">
-            Back to Promoters
+          <Link href="/" className="text-[#E5A823] hover:text-[#F5C542]">
+            Back
           </Link>
         </div>
       </div>

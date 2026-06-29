@@ -3,12 +3,11 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Menu, X, ChevronDown, Mic2, Building2, Megaphone, LogOut, UserCircle2, LayoutDashboard, CalendarDays, Heart, History } from 'lucide-react';
+import { Search, Menu, X, ChevronDown, Mic2, Building2, Megaphone, LogOut, UserCircle2, LayoutDashboard, CalendarDays, Heart, History, Home } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import { getRoleDisplayName, getRoleHomePath, isAdminRole, isCustomerRole, normalizeRole } from '@/lib/roles';
 
 export default function Navigation() {
-  const [workDropdownOpen, setWorkDropdownOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { data: session } = useSession();
@@ -19,19 +18,13 @@ export default function Navigation() {
   const userName = session?.user?.name || 'User';
   const userEmail = session?.user?.email || '';
 
-  const workItems = [
-    { name: 'Artist', href: '/work/register?role=artist', icon: Mic2, desc: 'Perform & grow' },
-    { name: 'Organizer', href: '/work/register?role=organizer', icon: Building2, desc: 'Host events' },
-    { name: 'Promoter', href: '/work/register?role=promoter', icon: Megaphone, desc: 'Sell tickets' },
-  ];
-
   // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, []);
 
   const handleSignOut = () => {
-    signOut({ callbackUrl: '/events' });
+    signOut({ callbackUrl: '/' });
     setMobileMenuOpen(false);
   };
 
@@ -39,6 +32,12 @@ export default function Navigation() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0D0D0D]/95 backdrop-blur-md border-b border-[#2A2A2A] h-16 flex items-center">
       <div className="container mx-auto px-4 w-full">
         <div className="flex items-center justify-between w-full">
+          {/* Home Button - Permanent */}
+          <Link href="/" className="flex items-center gap-2 mr-4 md:mr-6 p-2 rounded-lg hover:bg-[#2A2A2A] transition-colors group flex-shrink-0">
+            <Home className="w-5 h-5 text-[#E5A823] group-hover:text-[#F5C542] transition-colors" />
+            <span className="hidden sm:inline text-sm font-bold text-[#F5F5DC] group-hover:text-[#E5A823] transition-colors">Home</span>
+          </Link>
+
           {/* Search - Left-Middle (Hidden on mobile) */}
           <div className="hidden md:flex items-center flex-1 max-w-2xl mr-auto">
             <div className="relative w-full group">
@@ -60,57 +59,6 @@ export default function Navigation() {
               <Link href="/blog" className="hover:text-[#E5A823] transition-colors">
                 Blog
               </Link>
-                {/* Work With Us Dropdown */}
-                <div 
-                  className="relative"
-                  onMouseEnter={() => setWorkDropdownOpen(true)}
-                  onMouseLeave={() => setWorkDropdownOpen(false)}
-                >
-                  <button className="flex items-center gap-1 hover:text-[#E5A823] transition-colors">
-                    Work with us
-                    <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${workDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  
-                  <AnimatePresence>
-                    {workDropdownOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                        className="absolute top-full left-1/2 -translate-x-1/2 pt-3"
-                      >
-                        <div 
-                          className="rounded-xl overflow-hidden min-w-[200px] relative bg-[#0D0D0D]/95 border border-[#2A2A2A] shadow-2xl"
-                        >
-                          {/* Subtle top accent */}
-                          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#E5A823] to-transparent" />
-                          
-                          {workItems.map((item, index) => (
-                            <Link
-                              key={item.name}
-                              href={item.href}
-                              className="flex items-center gap-3 px-4 py-3 hover:bg-[#E5A823]/10 transition-colors group relative"
-                            >
-                              <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#2A2A2A] border border-[#2A2A2A] group-hover:bg-[#E5A823]/20 group-hover:border-[#E5A823] transition-all">
-                                <item.icon className="w-4 h-4 text-[#F5F5DC]/70 group-hover:text-[#E5A823] transition-colors" />
-                              </div>
-                              <div>
-                                <span className="block text-[#F5F5DC] font-medium text-sm group-hover:text-[#E5A823] transition-colors">{item.name}</span>
-                                <span className="block text-[#F5F5DC]/40 text-xs">{item.desc}</span>
-                              </div>
-                              
-                              {/* Separator */}
-                              {index < workItems.length - 1 && (
-                                <div className="absolute bottom-0 left-4 right-4 h-px bg-[#2A2A2A]" />
-                              )}
-                            </Link>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
 
               {/* Profile Dropdown - Shows when logged in */}
               {isLoggedIn ? (
@@ -329,7 +277,15 @@ export default function Navigation() {
                 {/* Mobile Navigation Links */}
                 <div className="space-y-1">
                   <Link 
-                    href="/events" 
+                    href="/" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC] font-medium"
+                  >
+                    <Home className="w-4 h-4 text-[#E5A823]" />
+                    <span>Home</span>
+                  </Link>
+                  <Link 
+                    href="/" 
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC] font-medium"
                   >
@@ -349,32 +305,6 @@ export default function Navigation() {
                   >
                     <span>Blog</span>
                   </Link>
-                </div>
-
-                {/* Divider */}
-                <div className="h-px bg-[#2A2A2A]" />
-
-                {/* Work With Us Section */}
-                <div>
-                  <p className="text-xs font-bold text-[#F5F5DC]/50 uppercase tracking-wider px-3 mb-2">Work With Us</p>
-                  <div className="space-y-1">
-                    {workItems.map((item) => (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-[#2A2A2A] text-[#F5F5DC]"
-                      >
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#1A1A1A]">
-                          <item.icon className="w-4 h-4 text-[#E5A823]" />
-                        </div>
-                        <div>
-                          <span className="block text-sm font-medium">{item.name}</span>
-                          <span className="block text-xs text-[#F5F5DC]/50">{item.desc}</span>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
                 </div>
 
                 {/* Divider */}
