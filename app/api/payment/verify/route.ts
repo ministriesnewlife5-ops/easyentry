@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import crypto from 'crypto';
 import { authOptions } from '@/lib/auth-options';
 import { getSupabaseServerClient } from '@/lib/supabase';
-import { logStructured, respondError, respondSuccess } from '@/lib/api-utils';
+import { logStructured, respondError, respondSuccess, assertUUID } from '@/lib/api-utils';
 
 function normalizeEnvValue(value?: string) {
   return value?.trim().replace(/^['\"]|['\"]$/g, '');
@@ -205,6 +205,14 @@ export async function POST(request: NextRequest) {
     if (!session?.user) {
       logStructured('payment/verify', 'Unauthorized request to verify payment');
       return respondError('UNAUTHORIZED', 'Unauthorized', null, 401);
+    }
+
+    // Validate user ID is a proper UUID before proceeding (ticket_bookings.user_id is UUID)
+    try {
+      assertUUID(session.user.id, 'session.user.id');
+    } catch (e) {
+      logStructured('payment/verify', 'Invalid session user ID format', { userId: session.user.id });
+      return respondError('INVALID_USER_ID', (e as Error).message, null, 400);
     }
 
     const body = await request.json().catch(() => null);
