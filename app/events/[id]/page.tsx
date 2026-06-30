@@ -75,6 +75,9 @@ export default function EventDetailsPage() {
   const [checkoutMode, setCheckoutMode] = useState<'online' | 'pay_at_venue'>('online');
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const ticketRef = useRef<HTMLDivElement>(null);
+  const payAtVenueConfirmRef = useRef<HTMLDivElement>(null);
+  const [showPayAtVenueConfirm, setShowPayAtVenueConfirm] = useState(false);
+  const isProcessingPayAtVenueRef = useRef(false);
 
   const [convenienceFee, setConvenienceFee] = useState(0);
   const maxTickets = 10;
@@ -156,6 +159,22 @@ export default function EventDetailsPage() {
 
     fetchBooking();
   }, [searchParams, event]);
+
+  // Escape key closes the pay at venue confirmation modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showPayAtVenueConfirm) {
+        setShowPayAtVenueConfirm(false);
+        isProcessingPayAtVenueRef.current = false;
+      }
+    };
+    if (showPayAtVenueConfirm) {
+      document.addEventListener('keydown', handleKeyDown);
+      // Trap focus inside modal
+      payAtVenueConfirmRef.current?.focus();
+    }
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showPayAtVenueConfirm]);
 
   useEffect(() => {
     if (!event) return;
@@ -1517,8 +1536,10 @@ export default function EventDetailsPage() {
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => {
+                              if (isProcessingPayAtVenueRef.current) return;
+                              isProcessingPayAtVenueRef.current = true;
                               setCheckoutMode('pay_at_venue');
-                              void handlePayAtVenue();
+                              setShowPayAtVenueConfirm(true);
                             }}
                             disabled={isProcessingPayment || calculateTotal().totalTickets === 0}
                             className="flex-1 px-6 py-3 bg-amber-500 text-[#0D0D0D] font-bold text-sm rounded-xl hover:bg-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
@@ -1562,6 +1583,94 @@ export default function EventDetailsPage() {
             </motion.div>
           </div>
         </div>
+
+        {/* Pay at Venue Confirmation Modal */}
+        <AnimatePresence>
+          {showPayAtVenueConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowPayAtVenueConfirm(false);
+                isProcessingPayAtVenueRef.current = false;
+              }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[90]"
+            >
+              <motion.div
+                ref={payAtVenueConfirmRef}
+                initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-[#0D0D0D]/90 backdrop-blur-xl border border-amber-500/20 rounded-2xl p-6 max-w-sm w-11/12 shadow-2xl focus:outline-none"
+                tabIndex={-1}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="pay-at-venue-confirm-title"
+              >
+                {/* Close (×) button */}
+                <div className="flex items-center justify-between mb-4">
+                  <h2
+                    id="pay-at-venue-confirm-title"
+                    className="text-xl font-bold text-[#F5F5DC]"
+                  >
+                    Confirm Your Booking
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setShowPayAtVenueConfirm(false);
+                      isProcessingPayAtVenueRef.current = false;
+                    }}
+                    className="text-[#F5F5DC]/50 hover:text-[#F5F5DC] transition-colors"
+                    aria-label="Close"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Message */}
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                    <p className="text-sm text-[#F5F5DC]/90 leading-relaxed">
+                      The amount you are paying online is only for seat reservation and the online convenience fee.
+                    </p>
+                    <p className="text-sm text-[#F5F5DC]/90 leading-relaxed mt-3">
+                      The actual ticket price must be paid at the venue during the event.
+                    </p>
+                    <p className="text-sm text-amber-300 leading-relaxed mt-4 font-medium">
+                      Please proceed only if you understand and agree to these terms.
+                    </p>
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex flex-col gap-3">
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        setShowPayAtVenueConfirm(false);
+                        void handlePayAtVenue();
+                      }}
+                      className="w-full px-6 py-3 bg-amber-500 text-[#0D0D0D] font-bold text-sm rounded-xl hover:bg-amber-400 transition-all"
+                    >
+                      Pay Now
+                    </motion.button>
+                    <button
+                      onClick={() => {
+                        setShowPayAtVenueConfirm(false);
+                        isProcessingPayAtVenueRef.current = false;
+                      }}
+                      className="w-full px-6 py-3 bg-transparent border border-[#F5F5DC]/20 text-[#F5F5DC]/70 font-semibold text-sm rounded-xl hover:bg-[#F5F5DC]/5 hover:text-[#F5F5DC] transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Ticket Success Modal with QR Code - BookMyShow Style */}
         <AnimatePresence>
