@@ -47,7 +47,8 @@ DECLARE
   booking_rec RECORD;
   coupon_row RECORD;
 BEGIN
-  PERFORM pg_advisory_xact_lock(('x'::text)::bigint); -- cheap global lock to reduce race (optional)
+  -- Advisory lock using a numeric hash of a key string to prevent race conditions
+  PERFORM pg_advisory_xact_lock(hashtext('easyentry_finalize_checkout')::bigint);
 
   SELECT * INTO intent_row FROM checkout_intents WHERE id = in_intent_id FOR UPDATE;
   IF NOT FOUND THEN

@@ -432,6 +432,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Validate all input parameters before calling the DB RPC
+    if (!intent.id || typeof intent.id !== 'string') {
+      logStructured('payment/verify', 'Invalid intent.id type before finalize', { intentId: intent.id });
+      return respondError('INVALID_INTENT_ID', 'Invalid checkout intent identifier', null, 500);
+    }
+
+    if (!razorpay_order_id || typeof razorpay_order_id !== 'string') {
+      logStructured('payment/verify', 'Invalid razorpay_order_id before finalize', { hasOrderId: Boolean(razorpay_order_id) });
+      return respondError('INVALID_ORDER_ID', 'Invalid payment order identifier', null, 500);
+    }
+
+    if (!razorpay_payment_id || typeof razorpay_payment_id !== 'string') {
+      logStructured('payment/verify', 'Invalid razorpay_payment_id before finalize', { hasPaymentId: Boolean(razorpay_payment_id) });
+      return respondError('INVALID_PAYMENT_ID', 'Invalid payment identifier', null, 500);
+    }
+
     const { data: finalizeResult, error: finalizeError } = await supabase.rpc('finalize_checkout_intent', {
       in_intent_id: intent.id,
       in_razorpay_order_id: razorpay_order_id,
