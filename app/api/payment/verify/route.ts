@@ -4,7 +4,6 @@ import crypto from 'crypto';
 import { authOptions } from '@/lib/auth-options';
 import { getSupabaseServerClient } from '@/lib/supabase';
 import { logStructured, respondError, respondSuccess } from '@/lib/api-utils';
-import { generateAndStoreQRCode } from '@/lib/qr-code-generator';
 
 function normalizeEnvValue(value?: string) {
   return value?.trim().replace(/^['\"]|['\"]$/g, '');
@@ -273,9 +272,6 @@ export async function POST(request: NextRequest) {
           return respondError('BOOKING_CREATE_FAILED', 'Failed to create booking', { error: (bookingError as any)?.message || JSON.stringify(bookingError) || 'Unknown error' }, 500);
         }
 
-        // Generate QR code for pay at venue booking
-        const qrResult = await generateAndStoreQRCode(booking.id);
-
         return respondSuccess(
           {
             bookingId: booking.id,
@@ -284,8 +280,6 @@ export async function POST(request: NextRequest) {
             amountPaid,
             remainingAmount,
             direct: true,
-            ticketId: qrResult.ticketId,
-            qrCodeImage: qrResult.qrCodeImage,
           },
           'BOOKING_CREATED',
           'Booking created successfully',
@@ -365,19 +359,8 @@ export async function POST(request: NextRequest) {
         return respondError('BOOKING_CREATE_FAILED', 'Failed to create booking', { error: (bookingError as any)?.message || JSON.stringify(bookingError) || 'Unknown error' }, 500);
       }
 
-      // Generate QR code for pay at venue booking
-      const qrResult = await generateAndStoreQRCode(booking.id);
-
       return respondSuccess(
-        {
-          bookingId: booking.id,
-          paymentId: razorpay_payment_id,
-          paymentMode: 'pay_at_venue',
-          amountPaid,
-          remainingAmount,
-          ticketId: qrResult.ticketId,
-          qrCodeImage: qrResult.qrCodeImage,
-        },
+        { bookingId: booking.id, paymentId: razorpay_payment_id, paymentMode: 'pay_at_venue', amountPaid, remainingAmount },
         'BOOKING_CREATED',
         'Booking confirmed',
         200
@@ -482,20 +465,7 @@ export async function POST(request: NextRequest) {
       paymentId: razorpay_payment_id,
     });
 
-    // Generate QR code after successful payment
-    const qrResult = await generateAndStoreQRCode(bookingId);
-
-    return respondSuccess(
-      {
-        bookingId,
-        paymentId: razorpay_payment_id,
-        ticketId: qrResult.ticketId,
-        qrCodeImage: qrResult.qrCodeImage,
-      },
-      'BOOKING_CREATED',
-      'Payment verified and tickets booked successfully',
-      200
-    );
+    return respondSuccess({ bookingId, paymentId: razorpay_payment_id }, 'BOOKING_CREATED', 'Payment verified and tickets booked successfully', 200);
   } catch (error) {
     logStructured('payment/verify', 'Payment verification failed', { error: String(error) });
     return respondError('VERIFICATION_FAILED', 'Failed to verify payment', { error: String(error) }, 500);
