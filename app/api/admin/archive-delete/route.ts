@@ -83,7 +83,27 @@ export async function PUT(req: NextRequest) {
 
         return NextResponse.json({ success: true, message: 'Event unarchived successfully' });
       } else if (action === 'delete') {
-        // First delete related ticket categories
+        // Delete ticket_scans first (FK constraint: ticket_scans.event_id -> published_events.id)
+        const { error: scansError } = await supabase
+          .from('ticket_scans')
+          .delete()
+          .eq('event_id', id);
+
+        if (scansError) {
+          console.error('Error deleting ticket scans:', scansError);
+        }
+
+        // Delete ticket_bookings for this event (FK: ON DELETE SET NULL, but clean up explicitly)
+        const { error: bookingsError } = await supabase
+          .from('ticket_bookings')
+          .delete()
+          .eq('event_id', id);
+
+        if (bookingsError) {
+          console.error('Error deleting ticket bookings:', bookingsError);
+        }
+
+        // Delete related ticket categories
         const { error: ticketError } = await supabase
           .from('ticket_categories')
           .delete()
