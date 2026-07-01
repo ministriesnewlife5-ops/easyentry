@@ -204,7 +204,7 @@ export default function Navigation() {
                           )}
 
                           <button
-                            onClick={() => signOut({ callbackUrl: '/events' })}
+                            onClick={() => signOut({ callbackUrl: '/' })}
                             className="flex items-center gap-3 px-4 py-3 hover:bg-[#EB4D4B]/10 transition-colors group w-full border-t border-[#2A2A2A]"
                           >
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#2A2A2A] border border-[#2A2A2A] group-hover:bg-[#EB4D4B]/20 group-hover:border-[#EB4D4B] transition-all">
