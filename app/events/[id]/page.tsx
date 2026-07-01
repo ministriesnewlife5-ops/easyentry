@@ -1815,9 +1815,12 @@ function QRCodeCanvas({
 
   useEffect(() => {
     if (!canvasRef.current) return;
+    if (!bookingId || typeof bookingId !== 'string' || bookingId.trim() === '') {
+      return;
+    }
 
     // Generate QR code data (booking ID only)
-    const qrData = bookingId;
+    const qrData = bookingId.trim();
 
     // Generate QR code on canvas
     QRCode.toCanvas(canvasRef.current, qrData, {
