@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, ChevronDown, Heart, Instagram, MapPin, MapPinned, Star, Ticket, Video, Play, Loader2, CheckCircle, Download, X, MessageCircle } from 'lucide-react';
+import { Calendar, ChevronDown, Heart, Instagram, MapPin, MapPinned, Star, Ticket, Video, Play, Loader2, CheckCircle, Download, X, MessageCircle, Info, AlertCircle } from 'lucide-react';
 import { BsWhatsapp } from 'react-icons/bs';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -255,6 +255,58 @@ export default function EventDetailsPage() {
     }
     return '';
   }, [event, directionsUrl]);
+
+  const eventTimeRange = useMemo(() => {
+    if (!event?.time) {
+      return { startTime: '', endTime: '' };
+    }
+
+    const segments = event.time
+      .split(/\s*-\s*/)
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+
+    return {
+      startTime: segments[0] || '',
+      endTime: segments[1] || '',
+    };
+  }, [event?.time]);
+
+  const hasActivePromoAvailability = useMemo(() => {
+    if (!event?.couponRules || event.couponRules.length === 0) {
+      return false;
+    }
+
+    const now = Date.now();
+
+    return event.couponRules.some((rule) => {
+      const startsAt = rule.startsAt ? new Date(rule.startsAt).getTime() : undefined;
+      const endsAt = rule.endsAt ? new Date(rule.endsAt).getTime() : undefined;
+
+      if (Number.isFinite(startsAt as number) && now < (startsAt as number)) {
+        return false;
+      }
+
+      if (Number.isFinite(endsAt as number) && now > (endsAt as number)) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [event?.couponRules]);
+
+  const eventRules = useMemo(() => {
+    if (!event) {
+      return [] as string[];
+    }
+
+    const rawRules = (event as Record<string, unknown>).rules;
+    if (!Array.isArray(rawRules)) {
+      return [] as string[];
+    }
+
+    return rawRules.filter((rule): rule is string => typeof rule === 'string' && rule.trim().length > 0);
+  }, [event]);
 
   const shareToWhatsApp = () => {
     if (!event) {
@@ -995,15 +1047,32 @@ export default function EventDetailsPage() {
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-8">
         {/* Title Row */}
         <div className="flex items-start justify-between mb-6">
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl md:text-3xl font-black text-[#F5F5DC] mb-2">{event.title}</h1>
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 bg-[#E5A823]/20 text-[#E5A823] text-xs font-bold rounded-full border border-[#E5A823]/30">
-                LIVE PERFORMANCE
-              </span>
-              <span className="px-3 py-1 bg-[#EB4D4B]/20 text-[#EB4D4B] text-xs font-bold rounded-full border border-[#EB4D4B]/30">
-                LIMITED AVAILABILITY
-              </span>
+            {event.subtitle && (
+              <p className="text-base md:text-lg text-[#F5F5DC]/80 mb-3 font-medium">{event.subtitle}</p>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {event.category && (
+                <span className="px-3 py-1 bg-[#E5A823]/20 text-[#E5A823] text-xs font-bold rounded-full border border-[#E5A823]/30">
+                  {event.category}
+                </span>
+              )}
+              {event.subcategory && (
+                <span className="px-3 py-1 bg-[#EB4D4B]/20 text-[#EB4D4B] text-xs font-bold rounded-full border border-[#EB4D4B]/30">
+                  {event.subcategory}
+                </span>
+              )}
+              {event.entryAge && (
+                <span className="px-3 py-1 bg-purple-500/20 text-purple-300 text-xs font-bold rounded-full border border-purple-500/30">
+                  {event.entryAge}+
+                </span>
+              )}
+              {event.eventCode && (
+                <span className="px-3 py-1 bg-blue-500/20 text-blue-300 text-xs font-bold rounded-full border border-blue-500/30 font-mono">
+                  #{event.eventCode}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -1252,8 +1321,16 @@ export default function EventDetailsPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-bold text-[#F5F5DC]">Starts At:</p>
-                  <p className="text-sm text-[#F5F5DC]/70">{event.date}, {event.time}</p>
-                  <p className="text-xs text-[#F5F5DC]/50 mt-2">{event.gatesOpen} - {event.time}</p>
+                  <p className="text-sm text-[#F5F5DC]/70">{event.date}</p>
+                  {eventTimeRange.startTime && (
+                    <p className="text-sm text-[#F5F5DC]/70">Start time: {eventTimeRange.startTime}</p>
+                  )}
+                  {eventTimeRange.endTime && (
+                    <p className="text-sm text-[#F5F5DC]/70">End time: {eventTimeRange.endTime}</p>
+                  )}
+                  {event.gatesOpen && (
+                    <p className="text-xs text-[#F5F5DC]/50 mt-2">Gates open: {event.gatesOpen}</p>
+                  )}
                 </div>
               </motion.div>
 
@@ -1270,7 +1347,12 @@ export default function EventDetailsPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-bold text-[#F5F5DC]">{event.venue}</p>
-                  <p className="text-xs text-[#F5F5DC]/50">{event.distance}</p>
+                  {event.locationArea && <p className="text-xs text-[#F5F5DC]/50">Area: {event.locationArea}</p>}
+                  {event.locationDistrict && <p className="text-xs text-[#F5F5DC]/50">District: {event.locationDistrict}</p>}
+                  {event.locationState && <p className="text-xs text-[#F5F5DC]/50">State: {event.locationState}</p>}
+                  {!event.locationArea && !event.locationDistrict && !event.locationState && (
+                    <p className="text-xs text-[#F5F5DC]/50">{event.distance}</p>
+                  )}
                   {directionsUrl && (
                     <a
                       href={directionsUrl}
@@ -1285,12 +1367,88 @@ export default function EventDetailsPage() {
               </motion.div>
             </div>
 
+            {/* About / Description Section */}
+            {(event.fullDescription || event.description) && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 }}
+                className="bg-[#2A2A2A] rounded-xl p-4 border border-[#2A2A2A]"
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <Info className="w-4 h-4 text-[#E5A823]" />
+                  <span className="text-sm font-bold text-[#F5F5DC]">About Event</span>
+                </div>
+                <div className="text-sm text-[#F5F5DC]/80 leading-relaxed whitespace-pre-wrap">
+                  {event.fullDescription || event.description}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Event Details: Layout, Seating, Age */}
+            {(event.layout || event.seating || event.entryAge) && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.26 }}
+                className="bg-[#2A2A2A] rounded-xl p-4 border border-[#2A2A2A]"
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <Ticket className="w-4 h-4 text-[#E5A823]" />
+                  <span className="text-sm font-bold text-[#F5F5DC]">Event Details</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {event.layout && (
+                    <div>
+                      <p className="text-xs text-[#F5F5DC]/50 mb-1">Layout</p>
+                      <p className="text-sm font-semibold text-[#F5F5DC]">{event.layout}</p>
+                    </div>
+                  )}
+                  {event.seating && (
+                    <div>
+                      <p className="text-xs text-[#F5F5DC]/50 mb-1">Seating</p>
+                      <p className="text-sm font-semibold text-[#F5F5DC]">{event.seating}</p>
+                    </div>
+                  )}
+                  {event.entryAge && (
+                    <div>
+                      <p className="text-xs text-[#F5F5DC]/50 mb-1">Entry Age</p>
+                      <p className="text-sm font-semibold text-[#F5F5DC]">{event.entryAge}+</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Event Rules */}
+            {eventRules.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.27 }}
+                className="bg-[#2A2A2A] rounded-xl p-4 border border-[#2A2A2A]"
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <AlertCircle className="w-4 h-4 text-[#E5A823]" />
+                  <span className="text-sm font-bold text-[#F5F5DC]">Event Rules</span>
+                </div>
+                <ul className="space-y-2">
+                  {eventRules.map((rule, idx) => (
+                    <li key={idx} className="text-sm text-[#F5F5DC]/80 flex items-start gap-2">
+                      <span className="text-[#E5A823] mt-0.5">•</span>
+                      <span>{rule}</span>
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            )}
+
             {/* Performing Artists - Separate Section */}
             {event.taggedArtists && event.taggedArtists.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25 }}
+                transition={{ delay: 0.28 }}
                 className="bg-[#2A2A2A] rounded-xl p-4 border border-[#2A2A2A]"
               >
                 <div className="flex items-center gap-2 mb-4">
@@ -1387,6 +1545,13 @@ export default function EventDetailsPage() {
             >
               <>
                 <h2 className="text-lg font-bold text-[#F5F5DC] mb-4">Select Tickets</h2>
+
+                {hasActivePromoAvailability && (
+                  <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#E5A823]/20 bg-[#E5A823]/10 px-3 py-1 text-xs font-medium text-[#E5A823]">
+                    <span className="h-2 w-2 rounded-full bg-[#E5A823]" />
+                    Promo codes available for this event
+                  </p>
+                )}
 
                   {/* Ticket Categories List */}
                   <div className="space-y-3">
